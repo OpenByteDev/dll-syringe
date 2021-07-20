@@ -1,0 +1,19 @@
+[package]
+name = "dll-syringe"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+winapi = { version = "0.3", features = ["processthreadsapi", "libloaderapi", "memoryapi", "wow64apiset"] }
+cstr = "0.2.2"
+wchar = "0.10"
+sysinfo = "0.19"
+widestring = "0.4"
+rust_win32error = "0.8"
+path-absolutize = "3.0"
+dispose = "0.3"
+goblin = "0.4"
+stopwatch = "0.0"
+
+[profile.dev]
+overflow-checks = false
