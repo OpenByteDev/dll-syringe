@@ -12,8 +12,13 @@ widestring = "0.4"
 rust_win32error = "0.8"
 path-absolutize = "3.0"
 dispose = "0.3"
-goblin = "0.4"
 stopwatch = "0.0"
 
-[profile.dev]
-overflow-checks = false
+[target.'cfg(target_arch = "x86")'.dependencies]
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+goblin = { version = "0.4", optional = true }
+
+[features]
+default = ["into_x86_from_x64"]
+into_x86_from_x64 = ["goblin"]

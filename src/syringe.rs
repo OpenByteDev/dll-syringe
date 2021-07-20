@@ -1,5 +1,7 @@
 use cstr::cstr;
 use dispose::defer;
+#[cfg(target_arch = "x86_64")]
+#[cfg(feature = "into_x86_from_x64")]
 use goblin::Object;
 use rust_win32error::Win32Error;
 use std::{
@@ -29,7 +31,7 @@ use winapi::{
     },
 };
 
-use crate::{ForeignProcessWideString, InjectedModule, Module, ModuleHandle, Process, injected_module, retry_with_filter};
+use crate::{ForeignProcessWideString, InjectedModule, Module, ModuleHandle, Process, retry_with_filter};
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
@@ -73,8 +75,13 @@ impl Syringe {
                 self.x64_data
                     .get_or_try_init(Self::load_inject_help_data_for_current_target)
             } else {
-                self.x86_data
-                    .get_or_try_init(|| Self::load_inject_help_data_for_process(process))
+                if cfg!(feature = "into_x86_from_x64") {
+                    self.x86_data
+                        .get_or_try_init(|| Self::load_inject_help_data_for_process(process))
+                } else {
+                    // TODO: proper errors
+                    Err("Not supported".into())
+                }
             }
         }
             
@@ -219,6 +226,9 @@ impl Syringe {
             free_library_offset: free_library_fn_ptr as usize - kernel32_module.handle() as usize,
         })
     }
+    
+    #[cfg(target_arch = "x86_64")]
+    #[cfg(feature = "into_x86_from_x64")]
     fn load_inject_help_data_for_process(
         process: &Process,
     ) -> Result<InjectHelpData, Box<dyn Error>> {
