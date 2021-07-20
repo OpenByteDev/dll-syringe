@@ -1,5 +1,7 @@
+#![cfg(windows)]
 #![feature(maybe_uninit_uninit_array, once_cell)]
 #[warn(unsafe_op_in_unsafe_fn)]
+
 mod syringe;
 pub use syringe::*;
 
