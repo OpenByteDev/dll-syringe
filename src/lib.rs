@@ -10,16 +10,10 @@ pub use process::*;
 mod process_module;
 pub use process_module::*;
 
-mod array_or_vec;
-pub(crate) use array_or_vec::*;
-
 mod injected_module;
 pub use injected_module::*;
 
-mod foreign_process_memory;
-pub(crate) use foreign_process_memory::*;
-
-mod retry;
-pub(crate) use retry::*;
+mod utils;
+pub(crate) use utils::*;
 
 // TODO: proper error handling
