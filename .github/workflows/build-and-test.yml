@@ -23,6 +23,8 @@ jobs:
           toolchain: nightly
           target: ${{ matrix.target }}
           override: true
+    - name: DIR
+      run: dir
 
   build:
     needs: setup
@@ -31,6 +33,8 @@ jobs:
       matrix:
         target: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
     steps:
+    - name: DIR
+      run: dir
     - name: Build
       run: cargo build --verbose --target ${{ matrix.target }}
 
