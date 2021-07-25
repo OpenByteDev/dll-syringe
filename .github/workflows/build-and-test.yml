@@ -13,19 +13,25 @@ jobs:
   setup:
     name: Build & Test
     runs-on: windows-latest
-    strategy:
-      max-parallel: 1
-      matrix:
-        target: ["i686-pc-windows-msvc", "x86_64-pc-windows-msvc"]
     steps:
     - uses: actions/checkout@v2
-    - name: Install latest nightly for ${{ matrix.target }}
+    - name: Install latest nightly (x86_64-pc-windows-msvc)
       uses: actions-rs/toolchain@v1
       with:
           toolchain: nightly
-          target: ${{ matrix.target }}
+          target: x86_64-pc-windows-msvc
           override: true
-    - name: Build
-      run: cargo build --verbose --target ${{ matrix.target }}
-    - name: Test
-      run: cargo test --verbose --target ${{ matrix.target }} -- --nocapture
+    - name: Install latest nightly (i686-pc-windows-msvc)
+      uses: actions-rs/toolchain@v1
+      with:
+          toolchain: nightly
+          target: i686-pc-windows-msvc
+          override: true
+    - name: Build (x86_64-pc-windows-msvc)
+      run: cargo build --verbose --target=x86_64-pc-windows-msvc
+    - name: Build (i686-pc-windows-msvc)
+      run: cargo build --verbose --target=i686-pc-windows-msvc
+    - name: Test (x86_64-pc-windows-msvc)
+      run: cargo test --verbose --target=x86_64-pc-windows-msvc -- --nocapture
+    - name: Test (i686-pc-windows-msvc)
+      run: cargo test --verbose --target=i686-pc-windows-msvc -- --nocapture
