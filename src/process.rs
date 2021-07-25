@@ -169,22 +169,21 @@ impl Process {
 
         let mut bytes_needed = unsafe { bytes_needed_target.assume_init() } as usize;
 
-        let mut module_buf_vec: Vec<_>;
         let modules = if bytes_needed <= module_buf_byte_size {
             // buffer size was sufficient
             let module_buf_len = bytes_needed / mem::size_of::<HMODULE>();
-            let module_buf = unsafe {
-                mem::transmute::<[MaybeUninit<HMODULE>; 1024], [ModuleHandle; 1024]>(module_buf)
+            let module_buf_init = unsafe {
+                MaybeUninit::array_assume_init(module_buf)
             };
-            ArrayOrVecSlice::from_array(module_buf, 0..module_buf_len)
+            ArrayOrVecSlice::from_array(module_buf_init, 0..module_buf_len)
         } else {
             // buffer size was not sufficient
-            module_buf_vec = Vec::new();
+            let mut module_buf_vec = Vec::new();
 
             // we loop here trying to find a buffer size that fits all handles
-            // this needs to be a loop as the returned bytes_needed seems to be more of an estimate and sometimes
-            // more than 1 iteration is necessary. We try to avoid to many iterations by always choosing a buffer at least twice
-            // the previous size.
+            // this needs to be a loop as the returned bytes_needed is only valid for the modules loaded when
+            // the function run, if more modules have loaded in the meantime we need to resize the buffer again.
+            // This can happen often if the process is currently starting up.
             loop {
                 module_buf_byte_size = cmp::max(bytes_needed, module_buf_byte_size * 2);
                 let module_buf_len = module_buf_byte_size / mem::size_of::<HMODULE>();

@@ -198,8 +198,7 @@ impl<'a> ProcessModule<'a> {
         }
 
         let module_name_len = result as usize;
-        let module_name = &module_name[..module_name_len];
-        let module_name = unsafe { mem::transmute::<&[MaybeUninit<u16>], &[u16]>(module_name) };
+        let module_name = unsafe { MaybeUninit::slice_assume_init_ref(&module_name[..module_name_len]) };
         Ok(U16Str::from_slice(module_name).to_os_string().into())
     }
     fn _get_path_of_remote(&self) -> Result<PathBuf, Win32Error> {
@@ -220,8 +219,7 @@ impl<'a> ProcessModule<'a> {
         }
 
         let module_name_len = result as usize;
-        let module_name = &module_name[..module_name_len];
-        let module_name = unsafe { mem::transmute::<&[MaybeUninit<u16>], &[u16]>(module_name) };
+        let module_name = unsafe { MaybeUninit::slice_assume_init_ref(&module_name[..module_name_len]) };
         Ok(U16Str::from_slice(module_name).to_os_string().into())
     }
 
@@ -256,8 +254,7 @@ impl<'a> ProcessModule<'a> {
         }
 
         let module_name_len = result as usize;
-        let module_name = &module_name[..module_name_len];
-        let module_name = unsafe { mem::transmute::<&[MaybeUninit<u16>], &[u16]>(module_name) };
+        let module_name = unsafe { MaybeUninit::slice_assume_init_ref(&module_name[..module_name_len]) };
         Ok(U16Str::from_slice(module_name).to_os_string())
     }
 
