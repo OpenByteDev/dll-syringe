@@ -9,16 +9,10 @@ use crate::{utils::WinPathBuf, Process};
 use path_absolutize::Absolutize;
 use rust_win32error::Win32Error;
 use widestring::U16CString;
-use winapi::{
-    shared::{
-        minwindef::{__some_function, HMODULE},
-        winerror::ERROR_MOD_NOT_FOUND,
-    },
-    um::{
+use winapi::{shared::{minwindef::{HMODULE, MAX_PATH, __some_function}, winerror::ERROR_MOD_NOT_FOUND}, um::{
         libloaderapi::{GetModuleFileNameW, GetModuleHandleW, GetProcAddress},
         psapi::{GetModuleBaseNameW, GetModuleFileNameExW},
-    },
-};
+    }};
 
 /// A handle to a process module.
 /// Note that this is not a `HANDLE` in windows terms but the base address of a loaded module.

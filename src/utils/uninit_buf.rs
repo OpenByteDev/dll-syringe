@@ -45,7 +45,7 @@ impl<T, const SIZE: usize> UninitArrayBuf<T, SIZE> {
 }
 
 #[cfg(windows)]
-pub(crate) struct WinPathBuf<const SIZE: usize>(UninitArrayBuf<u16, SIZE>);
+pub(crate) struct WinPathBuf(UninitArrayBuf<u16, MAX_PATH>);
 
 #[cfg(windows)]
 impl WinPathBuf {
@@ -80,15 +80,15 @@ impl WinPathBuf {
     }
 }
 
-impl<const SIZE: usize> Deref for WinPathBuf<SIZE> {
-    type Target = UninitArrayBuf<u16, SIZE>;
+impl Deref for WinPathBuf {
+    type Target = UninitArrayBuf<u16, MAX_PATH>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<const SIZE: usize> DerefMut for WinPathBuf<SIZE> {
+impl DerefMut for WinPathBuf {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
