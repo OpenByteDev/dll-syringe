@@ -10,7 +10,7 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  setup:
     runs-on: windows-latest
     strategy:
       matrix:
@@ -23,7 +23,23 @@ jobs:
           toolchain: nightly
           target: ${{ matrix.target }}
           override: true
+
+  build:
+    needs: setup
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        target: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+    steps:
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose --target ${{ matrix.target }}
+
+  test:
+    needs: build
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        target: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+    steps:
     - name: Test
-      run: cargo test --verbose
+      run: cargo test --verbose --target ${{ matrix.target }} -- --nocapture
