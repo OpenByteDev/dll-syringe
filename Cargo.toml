@@ -1,7 +1,9 @@
+cargo-features = ["edition2021"]
+
 [package]
 name = "dll-syringe"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 winapi = { version = "0.3", features = ["processthreadsapi", "libloaderapi", "memoryapi", "wow64apiset"] }
