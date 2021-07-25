@@ -14,8 +14,7 @@ use std::{
     ptr,
     time::Duration,
 };
-use wchar::wchz;
-use widestring::{U16CStr, U16CString, U16Str};
+use widestring::{U16CString, U16Str};
 use winapi::{
     shared::{
         minwindef::{BOOL, HMODULE, MAX_PATH},
@@ -31,24 +30,27 @@ use winapi::{
     },
 };
 
-use crate::{ForeignProcessWideString, InjectedModule, Module, ModuleHandle, Process, retry_with_filter};
+use crate::{
+    retry_with_filter, ForeignProcessWideString, InjectedModule, ModuleHandle, Process,
+    ProcessModule,
+};
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
 
 #[derive(Debug)]
 struct InjectHelpData {
-    kernel32_module: Module,
+    kernel32_module: ModuleHandle,
     load_library_offset: usize,
     free_library_offset: usize,
 }
 
 impl InjectHelpData {
     pub fn get_load_library_fn_ptr(&self) -> LoadLibraryWFn {
-        unsafe { mem::transmute(self.kernel32_module.handle() as usize + self.load_library_offset) }
+        unsafe { mem::transmute(self.kernel32_module as usize + self.load_library_offset) }
     }
     pub fn get_free_library_fn_ptr(&self) -> FreeLibraryFn {
-        unsafe { mem::transmute(self.kernel32_module.handle() as usize + self.free_library_offset) }
+        unsafe { mem::transmute(self.kernel32_module as usize + self.free_library_offset) }
     }
 }
 
@@ -70,22 +72,22 @@ impl Syringe {
     ) -> Result<&InjectHelpData, Box<dyn Error>> {
         let is_target_x64 = !process.is_wow64()?;
 
-        #[cfg(target_arch = "x86_64")] {
+        #[cfg(target_arch = "x86_64")]
+        {
             if is_target_x64 {
                 self.x64_data
                     .get_or_try_init(Self::load_inject_help_data_for_current_target)
+            } else if cfg!(feature = "into_x86_from_x64") {
+                self.x86_data
+                    .get_or_try_init(|| Self::load_inject_help_data_for_process(process))
             } else {
-                if cfg!(feature = "into_x86_from_x64") {
-                    self.x86_data
-                        .get_or_try_init(|| Self::load_inject_help_data_for_process(process))
-                } else {
-                    // TODO: proper errors
-                    Err("Not supported".into())
-                }
+                // TODO: proper errors
+                Err("Not supported".into())
             }
         }
-            
-        #[cfg(target_arch = "x86")] {
+
+        #[cfg(target_arch = "x86")]
+        {
             if is_target_x64 {
                 todo!()
             } else {
@@ -152,7 +154,10 @@ impl Syringe {
         }
 
         let injected_module = process.find_module_by_path(module_path)?.unwrap();
-        assert_eq!(injected_module.handle() as u32, truncated_injected_module_handle as u32);
+        assert_eq!(
+            injected_module.handle() as u32,
+            truncated_injected_module_handle as u32
+        );
 
         Ok(InjectedModule {
             syringe: self,
@@ -161,10 +166,10 @@ impl Syringe {
         })
     }
 
-    pub fn eject(
+    pub fn eject<'a>(
         &self,
-        process: &Process,
-        module: impl Into<Module>,
+        process: &'a Process,
+        module: impl Into<ProcessModule<'a>>,
     ) -> Result<(), Box<dyn Error>> {
         let inject_data = self.get_inject_help_data_for_process(process)?;
         let module = module.into();
@@ -209,24 +214,26 @@ impl Syringe {
             return Err("FreeLibrary failed in remote process.".into());
         }
 
-        assert!(!process.get_modules()?.as_ref().contains(&module));
+        assert!(!process
+            .get_module_handles()?
+            .as_ref()
+            .contains(&module.handle()));
 
         Ok(())
     }
 
     fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, Box<dyn Error>> {
-        let kernel32_module =
-            Module::from_name(U16CStr::from_slice_with_nul(wchz!(u16, "kernel32.dll")).unwrap())?;
-        let load_library_fn_ptr = kernel32_module.get_proc_local(cstr!("LoadLibraryW"))?;
-        let free_library_fn_ptr = kernel32_module.get_proc_local(cstr!("FreeLibrary"))?;
+        let kernel32_module = ProcessModule::get_local_from_name("kernel32.dll")?.unwrap(); // TODO: avoid alloc
+        let load_library_fn_ptr = kernel32_module.get_proc(cstr!("LoadLibraryW"))?;
+        let free_library_fn_ptr = kernel32_module.get_proc(cstr!("FreeLibrary"))?;
 
         Ok(InjectHelpData {
-            kernel32_module,
+            kernel32_module: kernel32_module.handle(),
             load_library_offset: load_library_fn_ptr as usize - kernel32_module.handle() as usize,
             free_library_offset: free_library_fn_ptr as usize - kernel32_module.handle() as usize,
         })
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     #[cfg(feature = "into_x86_from_x64")]
     fn load_inject_help_data_for_process(
@@ -266,7 +273,7 @@ impl Syringe {
                 .unwrap();
 
             Ok(InjectHelpData {
-                kernel32_module,
+                kernel32_module: kernel32_module.handle(),
                 load_library_offset: load_library_export.rva,
                 free_library_offset: free_library_export.rva,
             })

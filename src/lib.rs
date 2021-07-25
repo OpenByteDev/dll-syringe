@@ -1,15 +1,14 @@
 #![cfg(windows)]
 #![feature(maybe_uninit_uninit_array, once_cell)]
 #[warn(unsafe_op_in_unsafe_fn)]
-
 mod syringe;
 pub use syringe::*;
 
 mod process;
 pub use process::*;
 
-mod module;
-pub use module::*;
+mod process_module;
+pub use process_module::*;
 
 mod array_or_vec;
 pub(crate) use array_or_vec::*;
@@ -22,3 +21,5 @@ pub(crate) use foreign_process_memory::*;
 
 mod retry;
 pub(crate) use retry::*;
+
+// TODO: proper error handling

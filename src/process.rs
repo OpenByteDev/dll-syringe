@@ -1,23 +1,13 @@
-use std::{
-    cmp,
-    convert::TryInto,
-    error::Error,
-    ffi::OsString,
-    mem::{self, MaybeUninit},
-    os::windows::prelude::IntoRawHandle,
-    path::{Path, PathBuf},
-    process::Child,
-};
+use std::{borrow::Cow, cmp, convert::TryInto, error::Error, ffi::OsStr, mem::{self, MaybeUninit}, os::windows::prelude::IntoRawHandle, path::Path, process::Child};
 
 use rust_win32error::Win32Error;
 use sysinfo::{ProcessExt, SystemExt};
-use widestring::U16Str;
 use winapi::{
-    shared::minwindef::{FALSE, HMODULE, MAX_PATH},
+    shared::minwindef::{FALSE, HMODULE},
     um::{
         handleapi::CloseHandle,
         processthreadsapi::{GetCurrentProcess, OpenProcess, TerminateProcess},
-        psapi::{EnumProcessModulesEx, GetModuleBaseNameW, GetModuleFileNameExW, LIST_MODULES_ALL},
+        psapi::{EnumProcessModulesEx, LIST_MODULES_ALL},
         winnt::{
             PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION,
             PROCESS_VM_READ, PROCESS_VM_WRITE,
@@ -26,7 +16,7 @@ use winapi::{
     },
 };
 
-use crate::{ArrayOrVecSlice, Module};
+use crate::{ArrayOrVecSlice, ModuleHandle, ProcessModule};
 
 pub type ProcessHandle = *mut winapi::ctypes::c_void;
 
@@ -112,15 +102,25 @@ impl Process {
         unsafe { Self::from_handle(handle as *mut _, true) }
     }
 
-    pub fn current() -> Self {
-        let handle = unsafe { GetCurrentProcess() };
+    pub fn current_handle() -> ProcessHandle {
+        unsafe { GetCurrentProcess() }
+    }
 
+    pub fn current() -> Self {
         // the handle is only a pseudo handle representing the current process which does not need to be closed.
-        unsafe { Self::from_handle(handle, false) }
+        unsafe { Self::from_handle(Self::current_handle(), false) }
+    }
+
+    pub fn is_current(&self) -> bool {
+        self.handle() == Self::current_handle()
     }
 
     pub fn handle(&self) -> ProcessHandle {
         self.handle
+    }
+
+    pub fn owns_handle(&self) -> bool {
+        self.owns_handle
     }
 
     pub fn into_handle(mut self) -> (ProcessHandle, bool) {
@@ -137,7 +137,7 @@ impl Process {
     }
 
     fn _close(&mut self) -> Result<(), Win32Error> {
-        if self.owns_handle {
+        if self.owns_handle() {
             let result = unsafe { CloseHandle(self.handle) };
 
             if result != 0 {
@@ -150,7 +150,7 @@ impl Process {
 }
 
 impl Process {
-    pub fn get_modules(&self) -> Result<impl AsRef<[Module]>, Win32Error> {
+    pub fn get_module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, Win32Error> {
         let mut module_buf = MaybeUninit::uninit_array::<1024>();
         let mut module_buf_byte_size = mem::size_of::<HMODULE>() * module_buf.len();
         let mut bytes_needed_target = MaybeUninit::uninit();
@@ -174,7 +174,7 @@ impl Process {
             // buffer size was sufficient
             let module_buf_len = bytes_needed / mem::size_of::<HMODULE>();
             let module_buf = unsafe {
-                mem::transmute::<[MaybeUninit<HMODULE>; 1024], [Module; 1024]>(module_buf)
+                mem::transmute::<[MaybeUninit<HMODULE>; 1024], [ModuleHandle; 1024]>(module_buf)
             };
             ArrayOrVecSlice::from_array(module_buf, 0..module_buf_len)
         } else {
@@ -208,7 +208,9 @@ impl Process {
                 if bytes_needed <= module_buf_byte_size {
                     let module_buf_len = bytes_needed / mem::size_of::<HMODULE>();
                     let module_buf_vec = unsafe {
-                        mem::transmute::<Vec<MaybeUninit<HMODULE>>, Vec<Module>>(module_buf_vec)
+                        mem::transmute::<Vec<MaybeUninit<HMODULE>>, Vec<ModuleHandle>>(
+                            module_buf_vec,
+                        )
                     };
                     break ArrayOrVecSlice::from_vec(module_buf_vec, 0..module_buf_len);
                 }
@@ -221,15 +223,24 @@ impl Process {
     pub fn find_module_by_name(
         &self,
         module_name: impl AsRef<Path>,
-    ) -> Result<Option<Module>, Win32Error> {
-        let target_module_name = module_name.as_ref().as_os_str();
-        let modules = self.get_modules()?;
+    ) -> Result<Option<ProcessModule>, Win32Error> {
+        let target_module_name =  module_name.as_ref();
 
-        for module in modules.as_ref() {
-            let module_name = self.get_module_name(module)?;
+        // add default file extension if missing
+        let target_module_name = if target_module_name.extension().is_some() {
+            Cow::Owned(target_module_name.with_extension("dll").into_os_string())
+        } else {
+            Cow::Borrowed(target_module_name.as_os_str())
+        };
 
-            if module_name.eq_ignore_ascii_case(target_module_name) {
-                return Ok(Some(*module));
+        let modules = self.get_module_handles()?;
+
+        for &module_handle in modules.as_ref() {
+            let module = unsafe { ProcessModule::new_remote(module_handle, self) };
+            let module_name = module.get_base_name()?;
+
+            if module_name.eq_ignore_ascii_case(&target_module_name) {
+                return Ok(Some(module));
             }
         }
 
@@ -239,18 +250,24 @@ impl Process {
     pub fn find_module_by_path(
         &self,
         module_path: impl AsRef<Path>,
-    ) -> Result<Option<Module>, Box<dyn Error>> {
-        let target_module_name = module_path.as_ref().as_os_str();
-        let modules = self.get_modules()?;
+    ) -> Result<Option<ProcessModule>, Box<dyn Error>> {
+        let target_module_path = module_path.as_ref();
 
-        for module in modules.as_ref() {
-            let module_path = self.get_module_path(module)?;
+        // add default file extension if missing
+        let target_module_path = if target_module_path.extension().is_some() {
+            Cow::Owned(target_module_path.with_extension("dll").into_os_string())
+        } else {
+            Cow::Borrowed(target_module_path.as_os_str())
+        };
 
-            if module_path
-                .as_os_str()
-                .eq_ignore_ascii_case(target_module_name)
-            {
-                return Ok(Some(*module));
+        let modules = self.get_module_handles()?;
+
+        for &module_handle in modules.as_ref() {
+            let module = unsafe { ProcessModule::new_remote(module_handle, self) };
+            let module_path = module.get_path()?.into_os_string();
+
+            if module_path.eq_ignore_ascii_case(&target_module_path) {
+                return Ok(Some(module));
             }
         }
 
@@ -264,48 +281,6 @@ impl Process {
             return Err(Win32Error::new());
         }
         Ok(unsafe { is_wow64.assume_init() } != FALSE)
-    }
-
-    pub fn get_module_path(&self, module: &Module) -> Result<PathBuf, Win32Error> {
-        let mut module_name = MaybeUninit::uninit_array::<MAX_PATH>();
-        let module_name_len: u32 = module_name.len().try_into().unwrap();
-        let result = unsafe {
-            GetModuleFileNameExW(
-                self.handle(),
-                module.handle(),
-                module_name[0].as_mut_ptr(),
-                module_name_len,
-            )
-        };
-        if result == 0 {
-            return Err(Win32Error::new());
-        }
-
-        let module_name_len = result as usize;
-        let module_name = &module_name[..module_name_len];
-        let module_name = unsafe { mem::transmute::<&[MaybeUninit<u16>], &[u16]>(module_name) };
-        Ok(U16Str::from_slice(module_name).to_os_string().into())
-    }
-
-    pub fn get_module_name(&self, module: &Module) -> Result<OsString, Win32Error> {
-        let mut module_name = MaybeUninit::uninit_array::<MAX_PATH>();
-        let module_name_len: u32 = module_name.len().try_into().unwrap();
-        let result = unsafe {
-            GetModuleBaseNameW(
-                self.handle(),
-                module.handle(),
-                module_name[0].as_mut_ptr(),
-                module_name_len,
-            )
-        };
-        if result == 0 {
-            return Err(Win32Error::new());
-        }
-
-        let module_name_len = result as usize;
-        let module_name = &module_name[..module_name_len];
-        let module_name = unsafe { mem::transmute::<&[MaybeUninit<u16>], &[u16]>(module_name) };
-        Ok(U16Str::from_slice(module_name).to_os_string())
     }
 
     pub fn kill(self) -> Result<(), Win32Error> {
