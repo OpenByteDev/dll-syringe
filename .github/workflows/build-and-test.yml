@@ -1,4 +1,4 @@
-name: Build
+name: Build and Test
 
 on:
   push:
@@ -12,12 +12,16 @@ env:
 jobs:
   build:
     runs-on: windows-latest
+    strategy:
+      matrix:
+        target: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
     steps:
     - uses: actions/checkout@v2
-    - name: Install latest nightly
+    - name: Install latest nightly for ${{ matrix.target }}
       uses: actions-rs/toolchain@v1
       with:
           toolchain: nightly
+          target: ${{ matrix.target }}
           override: true
     - name: Build
       run: cargo build --verbose
