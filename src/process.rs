@@ -1,4 +1,13 @@
-use std::{borrow::Cow, cmp, convert::TryInto, error::Error, ffi::OsStr, mem::{self, MaybeUninit}, os::windows::prelude::IntoRawHandle, path::Path, process::Child};
+use std::{
+    borrow::Cow,
+    cmp,
+    convert::TryInto,
+    error::Error,
+    mem::{self, MaybeUninit},
+    os::windows::prelude::IntoRawHandle,
+    path::Path,
+    process::Child,
+};
 
 use rust_win32error::Win32Error;
 use sysinfo::{ProcessExt, SystemExt};
@@ -16,7 +25,7 @@ use winapi::{
     },
 };
 
-use crate::{ArrayOrVecSlice, ModuleHandle, ProcessModule};
+use crate::{utils::UninitArrayBuf, ArrayOrVecSlice, ModuleHandle, ProcessModule};
 
 pub type ProcessHandle = *mut winapi::ctypes::c_void;
 
@@ -151,13 +160,13 @@ impl Process {
 
 impl Process {
     pub fn get_module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, Win32Error> {
-        let mut module_buf = MaybeUninit::uninit_array::<1024>();
+        let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
         let mut module_buf_byte_size = mem::size_of::<HMODULE>() * module_buf.len();
         let mut bytes_needed_target = MaybeUninit::uninit();
         let result = unsafe {
             EnumProcessModulesEx(
                 self.handle,
-                module_buf[0].as_mut_ptr(),
+                module_buf.as_mut_ptr(),
                 module_buf_byte_size.try_into().unwrap(),
                 bytes_needed_target.as_mut_ptr(),
                 LIST_MODULES_ALL,
@@ -172,9 +181,7 @@ impl Process {
         let modules = if bytes_needed <= module_buf_byte_size {
             // buffer size was sufficient
             let module_buf_len = bytes_needed / mem::size_of::<HMODULE>();
-            let module_buf_init = unsafe {
-                MaybeUninit::array_assume_init(module_buf)
-            };
+            let module_buf_init = unsafe { module_buf.assume_init_all() };
             ArrayOrVecSlice::from_array(module_buf_init, 0..module_buf_len)
         } else {
             // buffer size was not sufficient
@@ -223,7 +230,7 @@ impl Process {
         &self,
         module_name: impl AsRef<Path>,
     ) -> Result<Option<ProcessModule>, Win32Error> {
-        let target_module_name =  module_name.as_ref();
+        let target_module_name = module_name.as_ref();
 
         // add default file extension if missing
         let target_module_name = if target_module_name.extension().is_some() {

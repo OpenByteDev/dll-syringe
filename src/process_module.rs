@@ -2,17 +2,16 @@ use std::{
     convert::TryInto,
     error::Error,
     ffi::{CStr, OsString},
-    mem::{self, MaybeUninit},
     path::{Path, PathBuf},
 };
 
-use crate::Process;
+use crate::{utils::WinPathBuf, Process};
 use path_absolutize::Absolutize;
 use rust_win32error::Win32Error;
-use widestring::{U16CString, U16Str};
+use widestring::U16CString;
 use winapi::{
     shared::{
-        minwindef::{__some_function, HMODULE, MAX_PATH},
+        minwindef::{__some_function, HMODULE},
         winerror::ERROR_MOD_NOT_FOUND,
     },
     um::{
@@ -35,8 +34,8 @@ pub struct ProcessModule<'a> {
 impl<'a> ProcessModule<'a> {
     /// Contructs a new instance from the given handle and optionaly the process to which the module belongs.
     /// If the module is from the current process [`None`] can be specified.
-    /// 
-    /// # Safety 
+    ///
+    /// # Safety
     /// The caller must guarantee that the given handle is valid and that the module is loaded into the given process
     ///  (and stays that way while interacting).
     pub unsafe fn new(handle: ModuleHandle, mut process: Option<&'a Process>) -> Self {
@@ -46,20 +45,20 @@ impl<'a> ProcessModule<'a> {
         Self { handle, process }
     }
     /// Contructs a new instance from the given module handle of the current process.
-    /// 
-    /// # Safety 
+    ///
+    /// # Safety
     /// The caller must guarantee that the given handle is valid and that it is loaded into the current process
     ///  (and stays that way while interacting).
     pub unsafe fn new_local(handle: ModuleHandle) -> Self {
-        Self::new(handle, None)
+        unsafe { Self::new(handle, None) }
     }
     /// Contructs a new instance from the given module handle of the given remote process.
-    /// 
-    /// # Safety 
+    ///
+    /// # Safety
     /// The caller must guarantee that the given handle is valid and that it is loaded into the given process
     ///  (and stays that way while interacting).
     pub unsafe fn new_remote(handle: ModuleHandle, process: &'a Process) -> Self {
-        Self::new(handle, Some(process))
+        unsafe { Self::new(handle, Some(process)) }
     }
 
     /// Searches for a module with the given name or path in the given process (the current one if [`None`] was specified).
@@ -188,39 +187,43 @@ impl<'a> ProcessModule<'a> {
     fn _get_path_of_local(&self) -> Result<PathBuf, Win32Error> {
         assert!(self.is_local());
 
-        let mut module_name = MaybeUninit::uninit_array::<MAX_PATH>();
-        let module_name_len: u32 = module_name.len().try_into().unwrap();
+        let mut module_path_buf = WinPathBuf::new();
+        let module_path_buf_size: u32 = module_path_buf.len().try_into().unwrap();
         let result = unsafe {
-            GetModuleFileNameW(self.handle(), module_name[0].as_mut_ptr(), module_name_len)
-        };
-        if result == 0 {
-            return Err(dbg!(Win32Error::new()));
-        }
-
-        let module_name_len = result as usize;
-        let module_name = unsafe { MaybeUninit::slice_assume_init_ref(&module_name[..module_name_len]) };
-        Ok(U16Str::from_slice(module_name).to_os_string().into())
-    }
-    fn _get_path_of_remote(&self) -> Result<PathBuf, Win32Error> {
-        assert!(self.is_remote());
-
-        let mut module_name = MaybeUninit::uninit_array::<MAX_PATH>();
-        let module_name_len: u32 = module_name.len().try_into().unwrap();
-        let result = unsafe {
-            GetModuleFileNameExW(
-                self.process.unwrap().handle(),
+            GetModuleFileNameW(
                 self.handle(),
-                module_name[0].as_mut_ptr(),
-                module_name_len,
+                module_path_buf.as_mut_ptr(),
+                module_path_buf_size,
             )
         };
         if result == 0 {
             return Err(dbg!(Win32Error::new()));
         }
 
-        let module_name_len = result as usize;
-        let module_name = unsafe { MaybeUninit::slice_assume_init_ref(&module_name[..module_name_len]) };
-        Ok(U16Str::from_slice(module_name).to_os_string().into())
+        let module_path_len = result as usize;
+        let module_path = unsafe { module_path_buf.assume_init_path_buf(module_path_len) };
+        Ok(module_path)
+    }
+    fn _get_path_of_remote(&self) -> Result<PathBuf, Win32Error> {
+        assert!(self.is_remote());
+
+        let mut module_path_buf = WinPathBuf::new();
+        let module_path_buf_size: u32 = module_path_buf.len().try_into().unwrap();
+        let result = unsafe {
+            GetModuleFileNameExW(
+                self.process.unwrap().handle(),
+                self.handle(),
+                module_path_buf.as_mut_ptr(),
+                module_path_buf_size,
+            )
+        };
+        if result == 0 {
+            return Err(dbg!(Win32Error::new()));
+        }
+
+        let module_path_len = result as usize;
+        let module_path = unsafe { module_path_buf.assume_init_path_buf(module_path_len) };
+        Ok(module_path)
     }
 
     pub fn get_base_name(&self) -> Result<OsString, Win32Error> {
@@ -239,14 +242,14 @@ impl<'a> ProcessModule<'a> {
     fn _get_base_name_of_remote(&self) -> Result<OsString, Win32Error> {
         assert!(self.is_remote());
 
-        let mut module_name = MaybeUninit::uninit_array::<MAX_PATH>();
-        let module_name_len: u32 = module_name.len().try_into().unwrap();
+        let mut module_name_buf = WinPathBuf::new();
+        let module_name_buf_size: u32 = module_name_buf.len().try_into().unwrap();
         let result = unsafe {
             GetModuleBaseNameW(
                 self.process.unwrap().handle(),
                 self.handle(),
-                module_name[0].as_mut_ptr(),
-                module_name_len,
+                module_name_buf.as_mut_ptr(),
+                module_name_buf_size,
             )
         };
         if result == 0 {
@@ -254,8 +257,8 @@ impl<'a> ProcessModule<'a> {
         }
 
         let module_name_len = result as usize;
-        let module_name = unsafe { MaybeUninit::slice_assume_init_ref(&module_name[..module_name_len]) };
-        Ok(U16Str::from_slice(module_name).to_os_string())
+        let module_name = unsafe { module_name_buf.assume_init_os_string(module_name_len) };
+        Ok(module_name)
     }
 
     pub fn get_proc(
