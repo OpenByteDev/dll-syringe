@@ -1,9 +1,4 @@
-use std::{
-    convert::TryInto,
-    error::Error,
-    ffi::{CStr, OsString},
-    path::{Path, PathBuf},
-};
+use std::{convert::TryInto, error::Error, ffi::{CStr, NulError, OsString}, path::{Path, PathBuf}};
 
 use crate::{utils::WinPathBuf, Process};
 use path_absolutize::Absolutize;
@@ -93,16 +88,22 @@ impl<'a> ProcessModule<'a> {
         }
     }
 
+    /// Searches for a module with the given name or path in the current process.
+    /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn get_local(
         module_name_or_path: impl AsRef<Path>,
     ) -> Result<Option<Self>, Box<dyn Error>> {
         Self::get(module_name_or_path, None)
     }
+    /// Searches for a module with the given name in the current process.
+    /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn get_local_from_name(
         module_name: impl AsRef<Path>,
     ) -> Result<Option<Self>, Box<dyn Error>> {
         Self::_get_local_from_name_or_path(module_name)
     }
+    /// Searches for a module with the given path in the current process.
+    /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn get_local_from_path(
         module_path: impl AsRef<Path>,
     ) -> Result<Option<Self>, Box<dyn Error>> {
@@ -128,22 +129,16 @@ impl<'a> ProcessModule<'a> {
         Ok(Some(unsafe { Self::new_local(handle) }))
     }
 
+    /// Searches for a module with the given name or path in the given process.
+    /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn get_remote(
         module_name_or_path: impl AsRef<Path>,
         process: &'a Process,
     ) -> Result<Option<Self>, Box<dyn Error>> {
         Self::get(module_name_or_path, Some(process))
     }
-    pub fn get_remote_from_path(
-        module_path: impl AsRef<Path>,
-        process: &'a Process,
-    ) -> Result<Option<Self>, Box<dyn Error>> {
-        if process.is_current() {
-            Self::get_local_from_path(module_path)
-        } else {
-            process.find_module_by_path(module_path)
-        }
-    }
+    /// Searches for a module with the given name in the given process.
+    /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn get_remote_from_name(
         module_name: impl AsRef<Path>,
         process: &'a Process,
@@ -156,21 +151,38 @@ impl<'a> ProcessModule<'a> {
                 .map_err(|e| e.into()) // TODO:
         }
     }
+    /// Searches for a module with the given path in the given process.
+    /// If the extension is omitted, the default library extension `.dll` is appended.
+    pub fn get_remote_from_path(
+        module_path: impl AsRef<Path>,
+        process: &'a Process,
+    ) -> Result<Option<Self>, Box<dyn Error>> {
+        if process.is_current() {
+            Self::get_local_from_path(module_path)
+        } else {
+            process.find_module_by_path(module_path)
+        }
+    }
 
+    /// Gets the underlying handle to the module.
     pub fn handle(&self) -> ModuleHandle {
         self.handle
     }
+    /// Gets the process this module belongs to or [`None`] if it belongs to the current process.
     pub fn process(&self) -> Option<&'a Process> {
         self.process
     }
 
+    /// Gets a value indicating whether the module is from the current process.
     pub fn is_local(&self) -> bool {
         self.process.is_none()
     }
+    /// Gets a value indicating whether the module is from a remote process (not from the current one).
     pub fn is_remote(&self) -> bool {
         !self.is_local()
     }
 
+    /// Gets the path that the module was loaded from.
     pub fn get_path(&self) -> Result<PathBuf, Win32Error> {
         if self.is_local() {
             self._get_path_of_local()
@@ -220,6 +232,7 @@ impl<'a> ProcessModule<'a> {
         Ok(module_path)
     }
 
+    /// Gets the base name (= file name) of the module.
     pub fn get_base_name(&self) -> Result<OsString, Win32Error> {
         if self.is_local() {
             self._get_base_name_of_local()
@@ -255,16 +268,22 @@ impl<'a> ProcessModule<'a> {
         Ok(module_name)
     }
 
-    pub fn get_proc(
+    /// Gets a pointer to the procedure with the given name from the module.
+    /// This function is only supported for modules in the current process.
+    pub fn get_procedure<'any, S>(
         &self,
-        proc_name: impl AsRef<CStr>,
-    ) -> Result<*const __some_function, Box<dyn Error>> {
+        proc_name: S,
+    ) -> Result<*const __some_function, Box<dyn Error>>
+    where S: TryInto<&'any CStr>,
+          S::Error: Into<Box<dyn Error>>
+    {
         if self.is_remote() {
             // TODO: proper error handling
             return Err("Not supported".into());
         }
 
-        let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ref().as_ptr()) };
+        let proc_name = proc_name.try_into().map_err(|e| e.into())?;
+        let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ptr()) };
         if fn_ptr.is_null() {
             return Err(Win32Error::new().into());
         }

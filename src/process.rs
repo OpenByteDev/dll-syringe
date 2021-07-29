@@ -57,6 +57,7 @@ impl Process {
         }
     }
 
+    /// Creates a new instance from the given pid.
     pub fn from_pid(pid: u32) -> Result<Self, Win32Error> {
         let handle = unsafe {
             OpenProcess(
@@ -78,6 +79,7 @@ impl Process {
         Ok(unsafe { Self::from_handle(handle, true) })
     }
 
+    /// Finds all processes whose name contains the given string.
     pub fn find_all_by_name(name: impl AsRef<str>) -> Vec<Self> {
         // TODO: avoid using sysinfo just for this
         // TODO: deduplicate code
@@ -92,6 +94,7 @@ impl Process {
             .collect()
     }
 
+    /// Finds the first process whose name contains the given string.
     pub fn find_first_by_name(name: impl AsRef<str>) -> Option<Self> {
         // TODO: avoid using sysinfo just for this
         // TODO: deduplicate code
@@ -106,32 +109,24 @@ impl Process {
             .next()
     }
 
+    /// Creates a new instance from the given child process.
     pub fn from_child(child: Child) -> Self {
         let handle = child.into_raw_handle();
         unsafe { Self::from_handle(handle as *mut _, true) }
     }
 
+    /// Returns the pseudo handle of the current process.
     pub fn current_handle() -> ProcessHandle {
         unsafe { GetCurrentProcess() }
     }
 
+    /// Returns an instance representing the current process.
     pub fn current() -> Self {
         // the handle is only a pseudo handle representing the current process which does not need to be closed.
         unsafe { Self::from_handle(Self::current_handle(), false) }
     }
 
-    pub fn is_current(&self) -> bool {
-        self.handle() == Self::current_handle()
-    }
-
-    pub fn handle(&self) -> ProcessHandle {
-        self.handle
-    }
-
-    pub fn owns_handle(&self) -> bool {
-        self.owns_handle
-    }
-
+    /// Consumes this instance and returns the underlying handle and whether the handle was owned by the current instance.
     pub fn into_handle(mut self) -> (ProcessHandle, bool) {
         let did_own_handle = self.owns_handle;
 
@@ -141,6 +136,8 @@ impl Process {
         (self.handle, did_own_handle)
     }
 
+    /// Closes the underlying process handle.
+    /// This is a noop if the handle is not owned.
     pub fn close(mut self) -> Result<(), (Win32Error, Self)> {
         self._close().map_err(|error| (error, self))
     }
@@ -159,6 +156,20 @@ impl Process {
 }
 
 impl Process {
+    /// Returns whether this instance represent the current process.
+    pub fn is_current(&self) -> bool {
+        self.handle() == Self::current_handle()
+    }
+
+    /// Returns the underlying process handle.
+    pub fn handle(&self) -> ProcessHandle {
+        self.handle
+    }
+
+    /// Returns a value indicating whether this instance owns the underlying handle.
+    pub fn owns_handle(&self) -> bool {
+        self.owns_handle
+    }
     pub fn get_module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, Win32Error> {
         let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
         let mut module_buf_byte_size = mem::size_of::<HMODULE>() * module_buf.len();

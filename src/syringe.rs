@@ -224,8 +224,8 @@ impl Syringe {
 
     fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, Box<dyn Error>> {
         let kernel32_module = ProcessModule::get_local_from_name("kernel32.dll")?.unwrap(); // TODO: avoid alloc
-        let load_library_fn_ptr = kernel32_module.get_proc(cstr!("LoadLibraryW"))?;
-        let free_library_fn_ptr = kernel32_module.get_proc(cstr!("FreeLibrary"))?;
+        let load_library_fn_ptr = kernel32_module.get_procedure(cstr!("LoadLibraryW"))?;
+        let free_library_fn_ptr = kernel32_module.get_procedure(cstr!("FreeLibrary"))?;
 
         Ok(InjectHelpData {
             kernel32_module: kernel32_module.handle(),
