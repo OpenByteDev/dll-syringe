@@ -89,7 +89,7 @@ impl Syringe {
         #[cfg(target_arch = "x86")]
         {
             if is_target_x64 {
-                todo!()
+                Err(InjectError::UnsupportedTarget)
             } else {
                 self.x86_data
                     .get_or_try_init(Self::load_inject_help_data_for_current_target)
