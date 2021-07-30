@@ -94,10 +94,20 @@ quick_error! {
         #[cfg(target_arch = "x86_64")]
         #[cfg(feature = "into_x86_from_x64")]
         Goblin(source: goblin::error::Error) {
-            from()
             display("Goblin failed to load pe file: {}", source)
             source(source)
         }
+    }
+}
+
+// This cannot be done with from() like for the other error types as goblin is only present
+// on x64 with the into_x86_from_x64 feature and quick_error includes the From impl
+// unconditionally
+#[cfg(target_arch = "x86_64")]
+#[cfg(feature = "into_x86_from_x64")]
+impl From<goblin::error::Error> for InjectError {
+    fn from(source: goblin::error::Error) -> Self {
+        InjectError::Goblin(source)
     }
 }
 
