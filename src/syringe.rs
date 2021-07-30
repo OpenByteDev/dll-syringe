@@ -39,7 +39,7 @@ use crate::{
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct InjectHelpData {
     kernel32_module: ModuleHandle,
     load_library_offset: usize,
@@ -55,7 +55,28 @@ impl InjectHelpData {
     }
 }
 
-#[derive(Default, Debug)]
+/// An injector that can inject modules (.dll's) into processes.
+/// This struct keeps internal state to allow for faster injcetions if reused.
+///
+/// # Example
+/// ```no_run
+/// use dll_syringe::{Syringe, Process};
+///
+/// // find target process by name
+/// let target_process = Process::find_first_by_name("target_process").unwrap();
+///
+/// // create new syringe (reuse for better performance)
+/// let syringe = Syringe::new();
+///
+/// // inject the payload into the target process
+/// let injected_payload = syringe.inject(&target_process, "injection_payload.dll").unwrap();
+///
+/// // do something else
+///
+/// // eject the payload from the target (this is optional)
+/// injected_payload.eject().unwrap();
+/// ```
+#[derive(Default, Debug, Clone)]
 pub struct Syringe {
     x86_data: OnceCell<InjectHelpData>,
     #[cfg(target_arch = "x86_64")]
@@ -63,6 +84,8 @@ pub struct Syringe {
 }
 
 impl Syringe {
+    /// Creates a new syringe.
+    /// This operation is cheap as internal state is initialized lazily.
     pub fn new() -> Self {
         Self::default()
     }
@@ -97,6 +120,12 @@ impl Syringe {
         }
     }
 
+    /// Inject the module at the given path into the given process.
+    ///
+    /// # Limitations
+    /// - The target process and the given module need to be of the same bitness.
+    /// - If the current process is `x64` the target process can be either `x64` (always available) or `x86` (with the `into_x86_from_x64` feature enabled).
+    /// - If the current process is `x86` the target process can only be `x86`.
     pub fn inject<'a>(
         &'a self,
         process: &'a Process,
@@ -164,6 +193,7 @@ impl Syringe {
         })
     }
 
+    /// Ejects a previously injected module from its target process.
     pub fn eject(&self, module: InjectedModule<'_>) -> Result<(), InjectError> {
         let process = module.target_process();
         let inject_data = self.get_inject_help_data_for_process(module.target_process())?;

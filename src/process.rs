@@ -11,7 +11,10 @@ use std::{
 use rust_win32error::Win32Error;
 use sysinfo::{ProcessExt, SystemExt};
 use winapi::{
-    shared::minwindef::{FALSE, HMODULE},
+    shared::{
+        minwindef::{FALSE, HMODULE},
+        ntdef::HANDLE,
+    },
     um::{
         handleapi::CloseHandle,
         processthreadsapi::{GetCurrentProcess, OpenProcess, TerminateProcess},
@@ -29,8 +32,13 @@ use crate::{
     ModuleHandle, ProcessModule,
 };
 
-pub type ProcessHandle = *mut winapi::ctypes::c_void;
+/// A handle to a process.
+/// Equivalent to a `HANDLE` in windows terms.
+pub type ProcessHandle = HANDLE;
 
+/// A struct representing a running process.
+/// The process may or may not represent the current process.
+/// The underlying handle i
 #[derive(Debug, PartialEq, Eq)]
 pub struct Process {
     handle: ProcessHandle,
@@ -173,6 +181,11 @@ impl Process {
         self.owns_handle
     }
 
+    /// Returns the handles of all the modules currently loaded in this process.
+    ///
+    /// # Note
+    /// If the process is currently starting up and has not loaded all its modules the returned list may be incomplete.
+    /// This can be worked around by repeatedly calling this method.
     pub fn get_module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, Win32Error> {
         let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
         let mut module_buf_byte_size = mem::size_of::<HMODULE>() * module_buf.len();
@@ -240,6 +253,13 @@ impl Process {
         Ok(modules)
     }
 
+    /// Searches the modules in this process for one with the given name.
+    /// The comparison of names is case-insensitive.
+    /// If the extension is omitted, the default library extension `.dll` is appended.
+    ///
+    /// # Note
+    /// If the process is currently starting up and has not loaded all its modules the returned list may be incomplete.
+    /// This can be worked around by repeatedly calling this method.
     pub fn find_module_by_name(
         &self,
         module_name: impl AsRef<Path>,
@@ -267,6 +287,13 @@ impl Process {
         Ok(None)
     }
 
+    /// Searches the modules in this process for one with the given path.
+    /// The comparison of paths is case-insensitive.
+    /// If the extension is omitted, the default library extension `.dll` is appended.
+    ///
+    /// # Note
+    /// If the process is currently starting up and has not loaded all its modules the returned list may be incomplete.
+    /// This can be worked around by repeatedly calling this method.
     pub fn find_module_by_path(
         &self,
         module_path: impl AsRef<Path>,
@@ -294,6 +321,11 @@ impl Process {
         Ok(None)
     }
 
+    /// Returns whether this process is running under [WOW64](https://docs.microsoft.com/en-us/windows/win32/winprog64/running-32-bit-applications).
+    /// This is the case for 32-bit programs running on an 64-bit platform.
+    ///
+    /// # Note
+    /// This method returns `false` for a 32-bit process running under 32-bit Windows or 64-bit Windows 10 on ARM.
     pub fn is_wow64(&self) -> Result<bool, Win32Error> {
         let mut is_wow64 = MaybeUninit::uninit();
         let result = unsafe { IsWow64Process(self.handle, is_wow64.as_mut_ptr()) };
@@ -303,10 +335,12 @@ impl Process {
         Ok(unsafe { is_wow64.assume_init() } != FALSE)
     }
 
+    /// Terminates this process with exit code 1.
     pub fn kill(self) -> Result<(), Win32Error> {
         self.kill_with_exit_code(1)
     }
 
+    /// Terminates this process with the given exit code.
     pub fn kill_with_exit_code(self, exit_code: u32) -> Result<(), Win32Error> {
         let result = unsafe { TerminateProcess(self.handle(), exit_code) };
         if result == 0 {

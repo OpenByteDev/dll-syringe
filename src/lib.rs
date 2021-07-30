@@ -6,7 +6,8 @@
     once_cell,
     const_generics_defaults
 )]
-#![warn(unsafe_op_in_unsafe_fn)]
+#![warn(unsafe_op_in_unsafe_fn, missing_docs)]
+#![doc = include_str!("../crate-doc.md")]
 
 mod syringe;
 pub use syringe::*;
@@ -22,4 +23,5 @@ pub use injected_module::*;
 
 pub(crate) mod utils;
 
+/// Module containing the error enums used in this crate.
 pub mod error;
