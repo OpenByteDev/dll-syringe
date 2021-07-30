@@ -20,7 +20,6 @@ pub use process_module::*;
 mod injected_module;
 pub use injected_module::*;
 
-mod utils;
-pub(crate) use utils::*;
+pub(crate) mod utils;
 
 pub mod error;

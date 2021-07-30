@@ -30,8 +30,8 @@ use winapi::{
     },
 };
 
-use crate::{
-    retry_with_filter, ForeignProcessWideString, InjectedModule, ModuleHandle, Process,
+use crate::{ 
+    utils::{retry_with_filter, ForeignProcessWideString}, InjectedModule, ModuleHandle, Process,
     error::{InjectError},
     ProcessModule,
 };

@@ -24,7 +24,7 @@ use winapi::{
     },
 };
 
-use crate::{utils::UninitArrayBuf, ArrayOrVecSlice, ModuleHandle, ProcessModule};
+use crate::{utils::{UninitArrayBuf, ArrayOrVecSlice}, ModuleHandle, ProcessModule};
 
 pub type ProcessHandle = *mut winapi::ctypes::c_void;
 
