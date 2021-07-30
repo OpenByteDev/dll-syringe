@@ -20,7 +20,7 @@ use winapi::{
 pub type ModuleHandle = HMODULE;
 
 /// A loaded module of a process. This module may or may not be of the current process.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ProcessModule<'a> {
     handle: ModuleHandle,
     process: Option<&'a Process>,

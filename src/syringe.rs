@@ -160,18 +160,16 @@ impl Syringe {
 
         Ok(InjectedModule {
             syringe: self,
-            process,
             module: injected_module,
         })
     }
 
     pub fn eject<'a>(
         &self,
-        process: &'a Process,
-        module: impl Into<ProcessModule<'a>>,
+        module: InjectedModule<'a>,
     ) -> Result<(), InjectError> {
-        let inject_data = self.get_inject_help_data_for_process(process)?;
-        let module = module.into();
+        let process = module.target_process();
+        let inject_data = self.get_inject_help_data_for_process(module.target_process())?;
 
         let thread_handle = unsafe {
             CreateRemoteThread(
@@ -179,7 +177,7 @@ impl Syringe {
                 ptr::null_mut(),
                 0,
                 Some(mem::transmute(inject_data.get_free_library_fn_ptr())),
-                module.handle() as *mut _,
+                module.payload().handle() as *mut _,
                 0,
                 ptr::null_mut(),
             )
@@ -215,7 +213,7 @@ impl Syringe {
         assert!(!process
             .get_module_handles()?
             .as_ref()
-            .contains(&module.handle()));
+            .contains(&module.payload().handle()));
 
         Ok(())
     }
