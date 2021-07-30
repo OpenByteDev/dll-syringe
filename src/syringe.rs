@@ -4,7 +4,6 @@ use dispose::defer;
 #[cfg(feature = "into_x86_from_x64")]
 use goblin::Object;
 use rust_win32error::Win32Error;
-use u16cstr::u16cstr;
 use std::{
     convert::TryInto,
     fs,
@@ -14,6 +13,7 @@ use std::{
     ptr,
     time::Duration,
 };
+use u16cstr::u16cstr;
 use widestring::{U16CString, U16Str};
 use winapi::{
     shared::{
@@ -30,10 +30,10 @@ use winapi::{
     },
 };
 
-use crate::{ 
-    utils::{retry_with_filter, ForeignProcessWideString}, InjectedModule, ModuleHandle, Process,
-    error::{InjectError},
-    ProcessModule,
+use crate::{
+    error::InjectError,
+    utils::{retry_with_filter, ForeignProcessWideString},
+    InjectedModule, ModuleHandle, Process, ProcessModule,
 };
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
@@ -164,10 +164,7 @@ impl Syringe {
         })
     }
 
-    pub fn eject<'a>(
-        &self,
-        module: InjectedModule<'a>,
-    ) -> Result<(), InjectError> {
+    pub fn eject(&self, module: InjectedModule<'_>) -> Result<(), InjectError> {
         let process = module.target_process();
         let inject_data = self.get_inject_help_data_for_process(module.target_process())?;
 
@@ -219,9 +216,14 @@ impl Syringe {
     }
 
     fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, InjectError> {
-        let kernel32_module = ProcessModule::__get_local_from_name_or_abs_path(u16cstr!("kernel32.dll"))?.unwrap();
-        let load_library_fn_ptr = kernel32_module.__get_procedure(cstr!("LoadLibraryW")).unwrap();
-        let free_library_fn_ptr = kernel32_module.__get_procedure(cstr!("FreeLibrary")).unwrap();
+        let kernel32_module =
+            ProcessModule::__get_local_from_name_or_abs_path(u16cstr!("kernel32.dll"))?.unwrap();
+        let load_library_fn_ptr = kernel32_module
+            .__get_procedure(cstr!("LoadLibraryW"))
+            .unwrap();
+        let free_library_fn_ptr = kernel32_module
+            .__get_procedure(cstr!("FreeLibrary"))
+            .unwrap();
 
         Ok(InjectHelpData {
             kernel32_module: kernel32_module.handle(),

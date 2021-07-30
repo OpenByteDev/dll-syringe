@@ -10,7 +10,6 @@ use std::{
 
 use rust_win32error::Win32Error;
 use sysinfo::{ProcessExt, SystemExt};
-use widestring::U16CStr;
 use winapi::{
     shared::minwindef::{FALSE, HMODULE},
     um::{
@@ -25,7 +24,10 @@ use winapi::{
     },
 };
 
-use crate::{utils::{UninitArrayBuf, ArrayOrVecSlice}, ModuleHandle, ProcessModule};
+use crate::{
+    utils::{ArrayOrVecSlice, UninitArrayBuf},
+    ModuleHandle, ProcessModule,
+};
 
 pub type ProcessHandle = *mut winapi::ctypes::c_void;
 

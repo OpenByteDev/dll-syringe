@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 
-use crate::{Process, ProcessModule, Syringe, error::InjectError};
+use crate::{error::InjectError, Process, ProcessModule, Syringe};
 
 pub struct InjectedModule<'a> {
     pub(crate) module: ProcessModule<'a>,
@@ -15,7 +15,7 @@ impl<'a> InjectedModule<'a> {
     pub fn payload(&self) -> &ProcessModule<'a> {
         &self.module
     }
-    
+
     pub fn eject(self) -> Result<(), InjectError> {
         self.syringe.eject(self)
     }
@@ -33,7 +33,7 @@ impl PartialEq for InjectedModule<'_> {
     }
 }
 
-impl <'a> From<InjectedModule<'a>> for ProcessModule<'a> {
+impl<'a> From<InjectedModule<'a>> for ProcessModule<'a> {
     fn from(module: InjectedModule<'a>) -> Self {
         module.module
     }

@@ -62,7 +62,7 @@ impl From<Win32OrNulError> for ModuleFromPathError {
     fn from(err: Win32OrNulError) -> Self {
         match err {
             Win32OrNulError::Nul(e) => ModuleFromPathError::Nul(e),
-            Win32OrNulError::Win32(e) => ModuleFromPathError::Win32(e)
+            Win32OrNulError::Win32(e) => ModuleFromPathError::Win32(e),
         }
     }
 }
@@ -115,7 +115,7 @@ impl From<Win32OrNulError> for InjectError {
     fn from(err: Win32OrNulError) -> Self {
         match err {
             Win32OrNulError::Nul(e) => InjectError::Nul(e),
-            Win32OrNulError::Win32(e) => InjectError::Win32(e)
+            Win32OrNulError::Win32(e) => InjectError::Win32(e),
         }
     }
 }
@@ -125,7 +125,7 @@ impl From<ModuleFromPathError> for InjectError {
         match err {
             ModuleFromPathError::Nul(e) => InjectError::Nul(e),
             ModuleFromPathError::Win32(e) => InjectError::Win32(e),
-            ModuleFromPathError::Io(e) => InjectError::Io(e)
+            ModuleFromPathError::Io(e) => InjectError::Io(e),
         }
     }
 }

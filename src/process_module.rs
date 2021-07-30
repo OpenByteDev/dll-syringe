@@ -1,6 +1,14 @@
-use std::{convert::TryInto, ffi::{CStr, CString, OsString}, path::{Path, PathBuf}};
+use std::{
+    convert::TryInto,
+    ffi::{CStr, CString, OsString},
+    path::{Path, PathBuf},
+};
 
-use crate::{utils::WinPathBuf, error::{Win32OrNulError, ProcedureLoadError, ModuleFromPathError}, Process};
+use crate::{
+    error::{ModuleFromPathError, ProcedureLoadError, Win32OrNulError},
+    utils::WinPathBuf,
+    Process,
+};
 use path_absolutize::Absolutize;
 use rust_win32error::Win32Error;
 use widestring::{U16CStr, U16CString};
@@ -66,8 +74,7 @@ impl<'a> ProcessModule<'a> {
         if module_name_or_path.has_root() {
             Self::from_path(module_name_or_path, process)
         } else {
-            Self::from_name(module_name_or_path, process)
-                .map_err(|e| e.into())
+            Self::from_name(module_name_or_path, process).map_err(|e| e.into())
         }
     }
     /// Searches for a module with the given name in the given process (the current one if [`None`] was specified).
@@ -97,26 +104,35 @@ impl<'a> ProcessModule<'a> {
 
     /// Searches for a module with the given name or path in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn get_local(module_name_or_path: impl AsRef<Path>) -> Result<Option<Self>, ModuleFromPathError> {
+    pub fn get_local(
+        module_name_or_path: impl AsRef<Path>,
+    ) -> Result<Option<Self>, ModuleFromPathError> {
         Self::get(module_name_or_path, None)
     }
     /// Searches for a module with the given name in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn get_local_from_name(module_name: impl AsRef<Path>) -> Result<Option<Self>, Win32OrNulError> {
+    pub fn get_local_from_name(
+        module_name: impl AsRef<Path>,
+    ) -> Result<Option<Self>, Win32OrNulError> {
         Self::_get_local_from_name_or_abs_path(module_name)
     }
     /// Searches for a module with the given path in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn get_local_from_path(module_path: impl AsRef<Path>) -> Result<Option<Self>, ModuleFromPathError> {
+    pub fn get_local_from_path(
+        module_path: impl AsRef<Path>,
+    ) -> Result<Option<Self>, ModuleFromPathError> {
         let absolute_path = module_path.as_ref().absolutize()?;
-        Self::_get_local_from_name_or_abs_path(absolute_path)
-                .map_err(|e| e.into())
+        Self::_get_local_from_name_or_abs_path(absolute_path).map_err(|e| e.into())
     }
-    pub(crate) fn _get_local_from_name_or_abs_path(module: impl AsRef<Path>) -> Result<Option<Self>, Win32OrNulError> {
+    pub(crate) fn _get_local_from_name_or_abs_path(
+        module: impl AsRef<Path>,
+    ) -> Result<Option<Self>, Win32OrNulError> {
         let wide_string = U16CString::from_os_str(module.as_ref().as_os_str())?;
         Self::__get_local_from_name_or_abs_path(&wide_string)
     }
-    pub(crate) fn __get_local_from_name_or_abs_path(module: &U16CStr) -> Result<Option<Self>, Win32OrNulError> {
+    pub(crate) fn __get_local_from_name_or_abs_path(
+        module: &U16CStr,
+    ) -> Result<Option<Self>, Win32OrNulError> {
         let handle = unsafe { GetModuleHandleW(module.as_ptr()) };
         if handle.is_null() {
             let err = Win32Error::new();
@@ -273,11 +289,17 @@ impl<'a> ProcessModule<'a> {
 
     /// Gets a pointer to the procedure with the given name from the module.
     /// This function is only supported for modules in the current process.
-    pub fn get_procedure(&self, proc_name: impl AsRef<str>) -> Result<*const __some_function, ProcedureLoadError> {
+    pub fn get_procedure(
+        &self,
+        proc_name: impl AsRef<str>,
+    ) -> Result<*const __some_function, ProcedureLoadError> {
         self.__get_procedure(&CString::new(proc_name.as_ref())?)
     }
 
-    pub(crate) fn __get_procedure(&self, proc_name: &CStr) -> Result<*const __some_function, ProcedureLoadError> {
+    pub(crate) fn __get_procedure(
+        &self,
+        proc_name: &CStr,
+    ) -> Result<*const __some_function, ProcedureLoadError> {
         if self.is_remote() {
             return Err(ProcedureLoadError::UnsupportedTarget);
         }
