@@ -7,6 +7,7 @@
     const_generics_defaults
 )]
 #![warn(unsafe_op_in_unsafe_fn)]
+
 mod syringe;
 pub use syringe::*;
 
@@ -22,4 +23,4 @@ pub use injected_module::*;
 mod utils;
 pub(crate) use utils::*;
 
-// TODO: proper error handling
+pub mod error;

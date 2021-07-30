@@ -1,6 +1,4 @@
-use std::error::Error;
-
-use crate::{Process, ProcessModule, Syringe};
+use crate::{error::InjectError, Process, ProcessModule, Syringe};
 
 // TODO:
 pub struct InjectedModule<'a> {
@@ -10,7 +8,7 @@ pub struct InjectedModule<'a> {
 }
 
 impl<'a> InjectedModule<'a> {
-    pub fn eject(self) -> Result<(), Box<dyn Error>> {
+    pub fn eject(self) -> Result<(), InjectError> {
         self.syringe.eject(self.process, self.module)
     }
 }

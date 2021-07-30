@@ -2,7 +2,6 @@ use std::{
     borrow::Cow,
     cmp,
     convert::TryInto,
-    error::Error,
     mem::{self, MaybeUninit},
     os::windows::prelude::IntoRawHandle,
     path::Path,
@@ -170,6 +169,7 @@ impl Process {
     pub fn owns_handle(&self) -> bool {
         self.owns_handle
     }
+
     pub fn get_module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, Win32Error> {
         let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
         let mut module_buf_byte_size = mem::size_of::<HMODULE>() * module_buf.len();
@@ -267,7 +267,7 @@ impl Process {
     pub fn find_module_by_path(
         &self,
         module_path: impl AsRef<Path>,
-    ) -> Result<Option<ProcessModule>, Box<dyn Error>> {
+    ) -> Result<Option<ProcessModule>, Win32Error> {
         let target_module_path = module_path.as_ref();
 
         // add default file extension if missing

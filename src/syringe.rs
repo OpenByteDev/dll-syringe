@@ -6,7 +6,6 @@ use goblin::Object;
 use rust_win32error::Win32Error;
 use std::{
     convert::TryInto,
-    error::Error,
     fs,
     lazy::OnceCell,
     mem::{self, MaybeUninit},
@@ -32,6 +31,7 @@ use winapi::{
 
 use crate::{
     retry_with_filter, ForeignProcessWideString, InjectedModule, ModuleHandle, Process,
+    error::{InjectError},
     ProcessModule,
 };
 
@@ -69,7 +69,7 @@ impl Syringe {
     fn get_inject_help_data_for_process(
         &self,
         process: &Process,
-    ) -> Result<&InjectHelpData, Box<dyn Error>> {
+    ) -> Result<&InjectHelpData, InjectError> {
         let is_target_x64 = !process.is_wow64()?;
 
         #[cfg(target_arch = "x86_64")]
@@ -81,8 +81,7 @@ impl Syringe {
                 self.x86_data
                     .get_or_try_init(|| Self::load_inject_help_data_for_process(process))
             } else {
-                // TODO: proper errors
-                Err("Not supported".into())
+                Err(InjectError::UnsupportedTarget)
             }
         }
 
@@ -101,7 +100,7 @@ impl Syringe {
         &'a self,
         process: &'a Process,
         payload_path: impl AsRef<Path>,
-    ) -> Result<InjectedModule<'a>, Box<dyn Error>> {
+    ) -> Result<InjectedModule<'a>, InjectError> {
         let inject_data = self.get_inject_help_data_for_process(process)?;
 
         let module_path = payload_path.as_ref();
@@ -149,8 +148,7 @@ impl Syringe {
         let truncated_injected_module_handle =
             unsafe { mem::transmute::<usize, ModuleHandle>(exit_code as usize) };
         if truncated_injected_module_handle.is_null() {
-            // TODO: proper error enum
-            return Err("LoadLibrary failed in remote process.".into());
+            return Err(InjectError::RemoteOperationFailed);
         }
 
         let injected_module = process.find_module_by_path(module_path)?.unwrap();
@@ -170,7 +168,7 @@ impl Syringe {
         &self,
         process: &'a Process,
         module: impl Into<ProcessModule<'a>>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), InjectError> {
         let inject_data = self.get_inject_help_data_for_process(process)?;
         let module = module.into();
 
@@ -210,8 +208,7 @@ impl Syringe {
 
         let free_library_result = unsafe { mem::transmute::<u32, BOOL>(exit_code) };
         if free_library_result == 0 {
-            // TODO: proper error enum
-            return Err("FreeLibrary failed in remote process.".into());
+            return Err(InjectError::RemoteOperationFailed);
         }
 
         assert!(!process
@@ -222,10 +219,10 @@ impl Syringe {
         Ok(())
     }
 
-    fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, Box<dyn Error>> {
         let kernel32_module = ProcessModule::get_local_from_name("kernel32.dll")?.unwrap(); // TODO: avoid alloc
         let load_library_fn_ptr = kernel32_module.get_procedure(cstr!("LoadLibraryW"))?;
         let free_library_fn_ptr = kernel32_module.get_procedure(cstr!("FreeLibrary"))?;
+    fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, InjectError> {
 
         Ok(InjectHelpData {
             kernel32_module: kernel32_module.handle(),
@@ -236,9 +233,7 @@ impl Syringe {
 
     #[cfg(target_arch = "x86_64")]
     #[cfg(feature = "into_x86_from_x64")]
-    fn load_inject_help_data_for_process(
-        process: &Process,
-    ) -> Result<InjectHelpData, Box<dyn Error>> {
+    fn load_inject_help_data_for_process(process: &Process) -> Result<InjectHelpData, InjectError> {
         // get kernel32 handle of target process
         let kernel32_module = retry_with_filter(
             || process.find_module_by_name("kernel32.dll"),
