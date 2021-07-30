@@ -210,7 +210,7 @@ impl<'a> ProcessModule<'a> {
             )
         };
         if result == 0 {
-            return Err(dbg!(Win32Error::new()));
+            return Err(Win32Error::new());
         }
 
         let module_path_len = result as usize;
@@ -231,7 +231,7 @@ impl<'a> ProcessModule<'a> {
             )
         };
         if result == 0 {
-            return Err(dbg!(Win32Error::new()));
+            return Err(Win32Error::new());
         }
 
         let module_path_len = result as usize;
@@ -267,7 +267,7 @@ impl<'a> ProcessModule<'a> {
             )
         };
         if result == 0 {
-            return Err(dbg!(Win32Error::new()));
+            return Err(Win32Error::new());
         }
 
         let module_name_len = result as usize;
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn find_local_by_name_absent() {
         let result = ProcessModule::get_local_from_name("kernel33.dll");
-        assert!(dbg!(&result).is_ok());
+        assert!(&result.is_ok());
         assert!(result.unwrap().is_none());
     }
 }

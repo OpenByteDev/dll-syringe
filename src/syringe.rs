@@ -133,7 +133,7 @@ impl Syringe {
 
         let reason = unsafe { WaitForSingleObject(thread_handle, INFINITE) };
         if reason == WAIT_FAILED {
-            return Err(dbg!(Win32Error::new()).into());
+            return Err(Win32Error::new().into());
         }
 
         let mut exit_code = MaybeUninit::uninit();
