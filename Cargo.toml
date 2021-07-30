@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 winapi = { version = "0.3", features = ["processthreadsapi", "libloaderapi", "memoryapi", "wow64apiset"] }
 cstr = "0.2"
-wchar = "0.10"
 sysinfo = "0.19"
 widestring = "0.4"
 rust_win32error = "0.8"
@@ -16,6 +15,7 @@ path-absolutize = "3.0"
 dispose = "0.3"
 stopwatch = "0.0"
 quick-error = "2.0"
+u16cstr = "0.1.1"
 
 [target.'cfg(target_arch = "x86")'.dependencies]
 

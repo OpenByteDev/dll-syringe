@@ -4,6 +4,7 @@ use dispose::defer;
 #[cfg(feature = "into_x86_from_x64")]
 use goblin::Object;
 use rust_win32error::Win32Error;
+use u16cstr::u16cstr;
 use std::{
     convert::TryInto,
     fs,
@@ -219,10 +220,10 @@ impl Syringe {
         Ok(())
     }
 
-        let kernel32_module = ProcessModule::get_local_from_name("kernel32.dll")?.unwrap(); // TODO: avoid alloc
-        let load_library_fn_ptr = kernel32_module.get_procedure(cstr!("LoadLibraryW"))?;
-        let free_library_fn_ptr = kernel32_module.get_procedure(cstr!("FreeLibrary"))?;
     fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, InjectError> {
+        let kernel32_module = ProcessModule::__get_local_from_name_or_abs_path(u16cstr!("kernel32.dll"))?.unwrap(); // TODO: avoid alloc
+        let load_library_fn_ptr = kernel32_module.__get_procedure(cstr!("LoadLibraryW"))?;
+        let free_library_fn_ptr = kernel32_module.__get_procedure(cstr!("FreeLibrary"))?;
 
         Ok(InjectHelpData {
             kernel32_module: kernel32_module.handle(),
