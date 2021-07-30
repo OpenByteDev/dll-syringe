@@ -3,7 +3,16 @@ cargo-features = ["edition2021"]
 [package]
 name = "dll-syringe"
 version = "0.1.0"
+description = "A windows dll injection library written in rust."
+readme = "README.md"
+repository = "https://github.com/OpenByteDev/dll-syringe" 
+homepage = "https://github.com/OpenByteDev/dll-syringe"
+documentation = "https://docs.rs/dll-syringe"
+license = "MIT"
+authors = ["OpenByte <development.openbyte@gmail.com>"]
 edition = "2021"
+categories = []
+keywords = ["dll-injection", "dll", "inject", "windows"]
 
 [dependencies]
 winapi = { version = "0.3", features = ["processthreadsapi", "libloaderapi", "memoryapi", "wow64apiset"] }
