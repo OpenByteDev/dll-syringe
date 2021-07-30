@@ -10,11 +10,13 @@ pub struct InjectedModule<'a> {
 
 impl<'a> InjectedModule<'a> {
     /// Returns the process this module is injected into.
+    #[must_use]
     pub fn target_process(&self) -> &'a Process {
         self.module.process().unwrap()
     }
 
     /// Returns the underlying module that was injected into the target process.
+    #[must_use]
     pub fn payload(&self) -> &ProcessModule<'a> {
         &self.module
     }

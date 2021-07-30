@@ -44,7 +44,7 @@ impl<'a> ForeignProcessWideString<'a> {
             WriteProcessMemory(
                 process.handle(),
                 remote_string_ptr,
-                str.as_ptr() as *const _,
+                str.as_ptr().cast(),
                 str_byte_count,
                 bytes_written.as_mut_ptr(),
             )
@@ -57,7 +57,7 @@ impl<'a> ForeignProcessWideString<'a> {
 
         Ok(Self {
             process,
-            ptr: remote_string_ptr as *mut _,
+            ptr: remote_string_ptr.cast(),
             byte_count: str_byte_count,
         })
     }

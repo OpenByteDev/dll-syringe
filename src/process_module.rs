@@ -43,7 +43,7 @@ impl<'a> ProcessModule<'a> {
     ///  (and stays that way while interacting).
     pub unsafe fn new(handle: ModuleHandle, mut process: Option<&'a Process>) -> Self {
         if process.is_some() && process.unwrap().is_current() {
-            process = None
+            process = None;
         }
         Self { handle, process }
     }
@@ -184,19 +184,23 @@ impl<'a> ProcessModule<'a> {
     }
 
     /// Gets the underlying handle to the module.
+    #[must_use]
     pub fn handle(&self) -> ModuleHandle {
         self.handle
     }
     /// Gets the process this module belongs to or [`None`] if it belongs to the current process.
+    #[must_use]
     pub fn process(&self) -> Option<&'a Process> {
         self.process
     }
 
     /// Gets a value indicating whether the module is from the current process.
+    #[must_use]
     pub fn is_local(&self) -> bool {
         self.process.is_none()
     }
     /// Gets a value indicating whether the module is from a remote process (not from the current one).
+    #[must_use]
     pub fn is_remote(&self) -> bool {
         !self.is_local()
     }

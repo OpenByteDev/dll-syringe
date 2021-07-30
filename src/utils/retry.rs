@@ -11,13 +11,13 @@ pub(crate) fn retry_with_filter<R, E>(
     predicate: impl Fn(&R) -> bool,
     timeout: Duration,
 ) -> Result<R, E> {
-    retry_with_args_and_filter(|_| operation(), predicate, timeout, ())
+    retry_with_args_and_filter(|_| operation(), predicate, timeout, &())
 }
 
 pub(crate) fn retry_with_args<A, R, E>(
     operation: impl Fn(&A) -> Result<R, E>,
     timeout: Duration,
-    args: A,
+    args: &A,
 ) -> Result<R, E> {
     retry_with_args_and_filter(operation, |_| true, timeout, args)
 }
@@ -26,11 +26,11 @@ pub(crate) fn retry_with_args_and_filter<A, R, E>(
     operation: impl Fn(&A) -> Result<R, E>,
     predicate: impl Fn(&R) -> bool,
     timeout: Duration,
-    args: A,
+    args: &A,
 ) -> Result<R, E> {
     let stopwatch = Stopwatch::start_new();
     loop {
-        match operation(&args) {
+        match operation(args) {
             Ok(result) => {
                 if predicate(&result) {
                     return Ok(result);

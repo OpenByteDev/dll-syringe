@@ -55,11 +55,11 @@ impl Process {
     /// - The caller is not allowed to close the given handle.
     /// - If `owns_handle` is `false` the handle has to be valid for the lifetime of the created instance.
     /// - The handle needs to have the following [privileges](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights):
-    ///     - PROCESS_CREATE_THREAD
-    ///     - PROCESS_QUERY_INFORMATION
-    ///     - PROCESS_VM_OPERATION
-    ///     - PROCESS_VM_WRITE
-    ///     - PROCESS_VM_READ
+    ///     - `PROCESS_CREATE_THREAD`
+    ///     - `PROCESS_QUERY_INFORMATION`
+    ///     - `PROCESS_VM_OPERATION`
+    ///     - `PROCESS_VM_WRITE`
+    ///     - `PROCESS_VM_READ`
     pub unsafe fn from_handle(handle: ProcessHandle, owns_handle: bool) -> Self {
         Self {
             handle,
@@ -115,28 +115,31 @@ impl Process {
             .values()
             .filter(move |process| process.name().contains(name.as_ref()))
             .map(|process| process.pid())
-            .filter_map(|pid| Process::from_pid(pid as _).ok())
-            .next()
+            .find_map(|pid| Process::from_pid(pid as _).ok())
     }
 
     /// Creates a new instance from the given child process.
+    #[must_use]
     pub fn from_child(child: Child) -> Self {
         let handle = child.into_raw_handle();
-        unsafe { Self::from_handle(handle as *mut _, true) }
+        unsafe { Self::from_handle(handle.cast(), true) }
     }
 
     /// Returns the pseudo handle of the current process.
+    #[must_use]
     pub fn current_handle() -> ProcessHandle {
         unsafe { GetCurrentProcess() }
     }
 
     /// Returns an instance representing the current process.
+    #[must_use]
     pub fn current() -> Self {
         // the handle is only a pseudo handle representing the current process which does not need to be closed.
         unsafe { Self::from_handle(Self::current_handle(), false) }
     }
 
     /// Consumes this instance and returns the underlying handle and whether the handle was owned by the current instance.
+    #[must_use]
     pub fn into_handle(mut self) -> (ProcessHandle, bool) {
         let did_own_handle = self.owns_handle;
 
@@ -167,16 +170,19 @@ impl Process {
 
 impl Process {
     /// Returns whether this instance represent the current process.
+    #[must_use]
     pub fn is_current(&self) -> bool {
         self.handle() == Self::current_handle()
     }
 
     /// Returns the underlying process handle.
+    #[must_use]
     pub fn handle(&self) -> ProcessHandle {
         self.handle
     }
 
     /// Returns a value indicating whether this instance owns the underlying handle.
+    #[must_use]
     pub fn owns_handle(&self) -> bool {
         self.owns_handle
     }
@@ -220,7 +226,7 @@ impl Process {
             // This can happen often if the process is currently starting up.
             loop {
                 module_buf_byte_size = cmp::max(bytes_needed, module_buf_byte_size * 2);
-                let module_buf_len = module_buf_byte_size / mem::size_of::<HMODULE>();
+                let mut module_buf_len = module_buf_byte_size / mem::size_of::<HMODULE>();
                 module_buf_vec.resize_with(module_buf_len, MaybeUninit::uninit);
 
                 bytes_needed_target = MaybeUninit::uninit();
@@ -239,7 +245,7 @@ impl Process {
                 bytes_needed = unsafe { bytes_needed_target.assume_init() } as usize;
 
                 if bytes_needed <= module_buf_byte_size {
-                    let module_buf_len = bytes_needed / mem::size_of::<HMODULE>();
+                    module_buf_len = bytes_needed / mem::size_of::<HMODULE>();
                     let module_buf_vec = unsafe {
                         mem::transmute::<Vec<MaybeUninit<HMODULE>>, Vec<ModuleHandle>>(
                             module_buf_vec,

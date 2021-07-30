@@ -20,11 +20,11 @@ impl<T, const SIZE: usize> UninitArrayBuf<T, SIZE> {
     }
 
     pub const fn as_ptr(&self) -> *const T {
-        self.0.as_ptr() as *const _
+        self.0.as_ptr().cast()
     }
 
     pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.0.as_mut_ptr() as *mut _
+        self.0.as_mut_ptr().cast()
     }
 
     pub unsafe fn assume_init_all(self) -> [T; SIZE] {

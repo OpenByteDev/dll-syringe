@@ -204,7 +204,7 @@ impl Syringe {
                 ptr::null_mut(),
                 0,
                 Some(mem::transmute(inject_data.get_free_library_fn_ptr())),
-                module.payload().handle() as *mut _,
+                module.payload().handle().cast(),
                 0,
                 ptr::null_mut(),
             )
@@ -268,7 +268,7 @@ impl Syringe {
         // get kernel32 handle of target process
         let kernel32_module = retry_with_filter(
             || process.find_module_by_name("kernel32.dll"),
-            |o| o.is_some(),
+            Option::is_some,
             Duration::from_secs(1),
         )?
         .unwrap();

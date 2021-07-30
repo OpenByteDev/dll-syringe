@@ -9,7 +9,7 @@ A crate for DLL injection on windows.
 | 64-bit           | 64-bit         | Yes                                        |
 
 ## Example
-```rust
+```rust no_run
 use dll_syringe::{Syringe, Process};
 
 // find target process by name
