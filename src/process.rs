@@ -10,6 +10,7 @@ use std::{
 
 use rust_win32error::Win32Error;
 use sysinfo::{ProcessExt, SystemExt};
+use widestring::U16CStr;
 use winapi::{
     shared::minwindef::{FALSE, HMODULE},
     um::{

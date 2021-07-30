@@ -1,8 +1,4 @@
-use std::{
-    convert::TryInto,
-    ffi::{CStr, OsString},
-    path::{Path, PathBuf},
-};
+use std::{convert::TryInto, ffi::{CStr, CString, OsString}, path::{Path, PathBuf}};
 
 use crate::{utils::WinPathBuf, error::{Win32OrNulError, ProcedureLoadError, ModuleFromPathError}, Process};
 use path_absolutize::Absolutize;
@@ -277,13 +273,8 @@ impl<'a> ProcessModule<'a> {
 
     /// Gets a pointer to the procedure with the given name from the module.
     /// This function is only supported for modules in the current process.
-    pub fn get_procedure<'any, S>(&self, proc_name: S) -> Result<*const __some_function, ProcedureLoadError>
-    where
-        S: TryInto<&'any CStr>,
-        S::Error: Into<ProcedureLoadError>,
-    {
-        let proc_name = proc_name.try_into().map_err(|e| e.into())?;
-        self.__get_procedure(proc_name)
+    pub fn get_procedure(&self, proc_name: impl AsRef<str>) -> Result<*const __some_function, ProcedureLoadError> {
+        self.__get_procedure(&CString::new(proc_name.as_ref())?)
     }
 
     pub(crate) fn __get_procedure(&self, proc_name: &CStr) -> Result<*const __some_function, ProcedureLoadError> {

@@ -1,4 +1,4 @@
-use std::{convert::Infallible, io};
+use std::io;
 
 use quick_error::quick_error;
 
@@ -21,7 +21,7 @@ quick_error! {
 quick_error! {
     #[derive(Debug)]
     pub enum ProcedureLoadError {
-        Nul(source: widestring::NulError<u16>) {
+        Nul(source: std::ffi::NulError) {
             from()
             display("Invalid nul value in argument: {}", source)
             source(source)
@@ -33,15 +33,6 @@ quick_error! {
         }
         UnsupportedTarget {
             display("The requested operation is not supported for the target process.")
-        }
-    }
-}
-
-impl From<Win32OrNulError> for ProcedureLoadError {
-    fn from(err: Win32OrNulError) -> Self {
-        match err {
-            Win32OrNulError::Nul(e) => ProcedureLoadError::Nul(e),
-            Win32OrNulError::Win32(e) => ProcedureLoadError::Win32(e)
         }
     }
 }
@@ -119,16 +110,6 @@ impl From<Win32OrNulError> for InjectError {
     }
 }
 
-impl From<ProcedureLoadError> for InjectError {
-    fn from(err: ProcedureLoadError) -> Self {
-        match err {
-            ProcedureLoadError::Nul(e) => InjectError::Nul(e),
-            ProcedureLoadError::Win32(e) => InjectError::Win32(e),
-            ProcedureLoadError::UnsupportedTarget => InjectError::UnsupportedTarget
-        }
-    }
-}
-
 impl From<ModuleFromPathError> for InjectError {
     fn from(err: ModuleFromPathError) -> Self {
         match err {
@@ -138,29 +119,3 @@ impl From<ModuleFromPathError> for InjectError {
         }
     }
 }
-
-/*
-impl From<Infallible> for Win32OrNulError {
-    fn from(_: Infallible) -> Self {
-        unreachable!()
-    }
-}
-
-impl From<Infallible> for ProcedureLoadError {
-    fn from(_: Infallible) -> Self {
-        unreachable!()
-    }
-}
-
-impl From<Infallible> for ModuleFromPathError {
-    fn from(_: Infallible) -> Self {
-        unreachable!()
-    }
-}
-
-impl From<Infallible> for InjectError {
-    fn from(_: Infallible) -> Self {
-        unreachable!()
-    }
-}
-*/
