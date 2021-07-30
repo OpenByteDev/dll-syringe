@@ -139,7 +139,7 @@ impl Syringe {
             U16CString::from_os_str(module_path.as_os_str())?,
         )?;
 
-        // creating a thread that will call LoadLibraryA with payload_path_ptr as argument
+        // creating a thread that will call LoadLibraryW with a pointer to payload_path as argument
         let thread_handle = unsafe {
             CreateRemoteThread(
                 process.handle(),
