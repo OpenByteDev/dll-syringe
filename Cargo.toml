@@ -24,7 +24,7 @@ path-absolutize = "3.0"
 dispose = "0.3"
 stopwatch = "0.0"
 quick-error = "2.0"
-u16cstr = "0.1.1"
+u16cstr = "0.2"
 
 [target.'cfg(target_arch = "x86")'.dependencies]
 
