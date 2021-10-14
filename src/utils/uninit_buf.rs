@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
 };
 
-use widestring::{MissingNulError, U16CStr, U16Str};
+use widestring::{error::MissingNulTerminator, U16CStr, U16Str};
 use winapi::shared::minwindef::MAX_PATH;
 
 pub(crate) struct UninitArrayBuf<T, const SIZE: usize>([MaybeUninit<T>; SIZE]);
@@ -69,14 +69,14 @@ impl WinPathBuf {
     pub unsafe fn assume_init_u16_str_with_nul(
         &self,
         len: usize,
-    ) -> Result<&U16CStr, MissingNulError<u16>> {
+    ) -> Result<&U16CStr, MissingNulTerminator> {
         let slice = unsafe { self.0.assume_init_slice(..len) };
-        U16CStr::from_slice_with_nul(slice)
+        U16CStr::from_slice_truncate(slice)
     }
 
     pub unsafe fn assume_init_u16_str_with_nul_unchecked(&self, len: usize) -> &U16CStr {
         let slice = unsafe { self.0.assume_init_slice(..len) };
-        unsafe { U16CStr::from_slice_with_nul_unchecked(slice) }
+        unsafe { U16CStr::from_slice_unchecked(slice) }
     }
 }
 
