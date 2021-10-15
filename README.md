@@ -1,6 +1,6 @@
 # dll-syringe
 
-[![Build](https://github.com/OpenByteDev/dll-syringe/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/OpenByteDev/dll-syringe/actions/workflows/build-and-test.yml)
+[![CI](https://github.com/OpenByteDev/dll-syringe/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenByteDev/dll-syringe/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/dll-syringe.svg)](https://crates.io/crates/dll-syringe)
 [![Documentation](https://docs.rs/dll-syringe/badge.svg)](https://docs.rs/dll-syringe)
 [![dependency status](https://deps.rs/repo/github/openbytedev/dll-syringe/status.svg)](https://deps.rs/repo/github/openbytedev/dll-syringe)
