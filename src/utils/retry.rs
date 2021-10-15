@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use stopwatch::Stopwatch;
 
+#[allow(dead_code)]
 pub(crate) fn retry<R, E>(operation: impl Fn() -> Result<R, E>, timeout: Duration) -> Result<R, E> {
     retry_with_filter(operation, |_| true, timeout)
 }
@@ -14,6 +15,7 @@ pub(crate) fn retry_with_filter<R, E>(
     retry_with_args_and_filter(|_| operation(), predicate, timeout, &())
 }
 
+#[allow(dead_code)]
 pub(crate) fn retry_with_args<A, R, E>(
     operation: impl Fn(&A) -> Result<R, E>,
     timeout: Duration,

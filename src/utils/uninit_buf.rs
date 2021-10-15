@@ -19,6 +19,7 @@ impl<T, const SIZE: usize> UninitArrayBuf<T, SIZE> {
         self.0.len()
     }
 
+    #[allow(dead_code)]
     pub const fn as_ptr(&self) -> *const T {
         self.0.as_ptr().cast()
     }
@@ -37,6 +38,7 @@ impl<T, const SIZE: usize> UninitArrayBuf<T, SIZE> {
         unsafe { MaybeUninit::slice_assume_init_ref(slice) }
     }
 
+    #[allow(dead_code)] 
     pub unsafe fn assume_init_slice_mut(&mut self, range: impl RangeBounds<usize>) -> &mut [T] {
         // TODO: this has to be easier some other way
         let slice = &mut (&mut self.0)[(range.start_bound().cloned(), range.end_bound().cloned())];
@@ -66,6 +68,7 @@ impl WinPathBuf {
         U16Str::from_slice(slice)
     }
 
+    #[allow(dead_code)]
     pub unsafe fn assume_init_u16_str_with_nul(
         &self,
         len: usize,
@@ -74,6 +77,7 @@ impl WinPathBuf {
         U16CStr::from_slice_truncate(slice)
     }
 
+    #[allow(dead_code)]
     pub unsafe fn assume_init_u16_str_with_nul_unchecked(&self, len: usize) -> &U16CStr {
         let slice = unsafe { self.0.assume_init_slice(..len) };
         unsafe { U16CStr::from_slice_unchecked(slice) }

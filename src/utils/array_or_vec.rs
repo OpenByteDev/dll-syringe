@@ -67,7 +67,8 @@ impl<T, const SIZE: usize> ArrayOrVecSlice<T, SIZE> {
             range: (range.start_bound().cloned(), range.end_bound().cloned()),
         }
     }
-
+    
+    #[allow(dead_code)]
     pub fn as_slice(&self) -> &[T] {
         match self.data {
             ArrayOrVec::Array(ref array) => &array[self.range],
