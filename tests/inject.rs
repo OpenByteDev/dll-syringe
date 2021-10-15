@@ -1,10 +1,9 @@
 #![feature(try_blocks)]
 
-use dll_syringe::Process;
-use dll_syringe::Syringe;
-use std::path::Path;
+use dll_syringe::{Process, Syringe};
 use std::{
     error::Error,
+    path::Path,
     process::{Command, Stdio},
 };
 
