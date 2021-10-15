@@ -7,6 +7,7 @@
     const_generics_defaults
 )]
 #![warn(unsafe_op_in_unsafe_fn, missing_docs)]
+#![cfg_attr(not(target_arch = "x86_64"), allow(unused_imports))]
 #![doc = include_str!("../crate-doc.md")]
 
 mod syringe;
