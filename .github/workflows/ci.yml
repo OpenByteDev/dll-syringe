@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: "--deny warnings"
+  RUSTFLAGS: "--deny warnings"
+      
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        toolchain: ["nightly"]
+        os: ["windows-latest"]
+        target: ["x86_64-pc-windows-gnu", "x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install latest ${{ matrix.toolchain }}
+      uses: actions-rs/toolchain@v1
+      with:
+          target: ${{ matrix.target }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+    - name: Build
+      run: cargo build --target ${{ matrix.target }}
+    - name: Test
+      run: cargo test --target ${{ matrix.target }} --all-targets --all-features -- --nocapture
+
+  documentation:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["windows-latest"]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install latest nightly
+      uses: actions-rs/toolchain@v1
+      with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+    - name: Generate documentation
+      run: cargo doc --all-features
+    - name: Install cargo-deadlinks
+      run: cargo install cargo-deadlinks
+    - name: Check dead links in doc
+      run: cargo deadlinks
+
+  clippy:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["windows-latest"]
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            components: clippy
+            override: true
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
