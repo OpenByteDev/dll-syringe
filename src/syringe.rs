@@ -308,6 +308,7 @@ impl Syringe {
         }
     }
 
+    #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
     fn get_wow64_dir() -> Result<PathBuf, Win32Error> {
         let mut path_buf = MaybeUninit::uninit_array::<MAX_PATH>();
         let path_buf_len: u32 = path_buf.len().try_into().unwrap();
