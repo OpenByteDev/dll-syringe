@@ -15,11 +15,11 @@ keywords = ["dll-injection", "dll", "inject", "windows"]
 [dependencies]
 winapi = { version = "0.3", features = ["processthreadsapi", "libloaderapi", "memoryapi", "wow64apiset"] }
 cstr = "0.2"
-sysinfo = "0.20"
+sysinfo = "0.23"
 widestring = "0.5"
 rust_win32error = "0.8"
 path-absolutize = "3.0"
-dispose = "0.3"
+dispose = "0.4"
 stopwatch = "0.0"
 quick-error = "2.0"
 u16cstr = "0.3"

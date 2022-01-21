@@ -9,7 +9,7 @@ use std::{
 };
 
 use rust_win32error::Win32Error;
-use sysinfo::{ProcessExt, SystemExt};
+use sysinfo::{ProcessExt, SystemExt, PidExt};
 use winapi::{
     shared::{
         minwindef::{FALSE, HMODULE},
@@ -100,7 +100,7 @@ impl Process {
             .values()
             .filter(move |process| process.name().contains(name.as_ref()))
             .map(|process| process.pid())
-            .filter_map(|pid| Process::from_pid(pid as _).ok())
+            .filter_map(|pid| Process::from_pid(pid.as_u32()).ok())
             .collect()
     }
 
@@ -115,7 +115,7 @@ impl Process {
             .values()
             .filter(move |process| process.name().contains(name.as_ref()))
             .map(|process| process.pid())
-            .find_map(|pid| Process::from_pid(pid as _).ok())
+            .find_map(|pid| Process::from_pid(pid.as_u32()).ok())
     }
 
     /// Creates a new instance from the given child process.

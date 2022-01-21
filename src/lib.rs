@@ -3,8 +3,7 @@
     maybe_uninit_uninit_array,
     maybe_uninit_slice,
     maybe_uninit_array_assume_init,
-    once_cell,
-    const_generics_defaults
+    once_cell
 )]
 #![warn(unsafe_op_in_unsafe_fn, missing_docs)]
 #![cfg_attr(not(target_arch = "x86_64"), allow(unused_imports))]
