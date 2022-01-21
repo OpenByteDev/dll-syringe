@@ -9,7 +9,7 @@ use std::{
 };
 
 use rust_win32error::Win32Error;
-use sysinfo::{ProcessExt, SystemExt, PidExt};
+use sysinfo::{PidExt, ProcessExt, SystemExt};
 use winapi::{
     shared::{
         minwindef::{FALSE, HMODULE},

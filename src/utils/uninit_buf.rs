@@ -38,7 +38,7 @@ impl<T, const SIZE: usize> UninitArrayBuf<T, SIZE> {
         unsafe { MaybeUninit::slice_assume_init_ref(slice) }
     }
 
-    #[allow(dead_code)] 
+    #[allow(dead_code)]
     pub unsafe fn assume_init_slice_mut(&mut self, range: impl RangeBounds<usize>) -> &mut [T] {
         // TODO: this has to be easier some other way
         let slice = &mut (&mut self.0)[(range.start_bound().cloned(), range.end_bound().cloned())];

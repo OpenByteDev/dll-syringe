@@ -61,7 +61,7 @@ impl<'a> ForeignProcessWideString<'a> {
             byte_count: str_byte_count,
         })
     }
-    
+
     #[allow(dead_code)]
     pub fn as_ptr(&mut self) -> *const winapi::ctypes::c_void {
         self.ptr
