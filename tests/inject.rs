@@ -7,6 +7,7 @@ use std::{
     process::{Command, Stdio},
 };
 
+#[allow(unused)]
 mod common;
 
 #[test]
