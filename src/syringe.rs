@@ -7,7 +7,6 @@ use rust_win32error::Win32Error;
 use std::{
     convert::TryInto,
     fs,
-    lazy::OnceCell,
     mem::{self, MaybeUninit},
     path::{Path, PathBuf},
     ptr,
@@ -46,6 +45,8 @@ struct InjectHelpData {
     free_library_offset: usize,
 }
 
+unsafe impl Send for InjectHelpData {}
+
 impl InjectHelpData {
     pub fn get_load_library_fn_ptr(&self) -> LoadLibraryWFn {
         unsafe { mem::transmute(self.kernel32_module as usize + self.load_library_offset) }
@@ -78,9 +79,15 @@ impl InjectHelpData {
 /// ```
 #[derive(Default, Debug, Clone)]
 pub struct Syringe {
-    x86_data: OnceCell<InjectHelpData>,
-    #[cfg(target_arch = "x86_64")]
-    x64_data: OnceCell<InjectHelpData>,
+    #[cfg(not(feature = "sync_send_syringe"))]
+    x86_data: std::lazy::OnceCell<InjectHelpData>,
+    #[cfg(all(not(feature = "sync_send_syringe"), target_arch = "x86_64"))]
+    x64_data: std::lazy::OnceCell<InjectHelpData>,
+
+    #[cfg(feature = "sync_send_syringe")]
+    x86_data: std::lazy::SyncOnceCell<InjectHelpData>,
+    #[cfg(all(feature = "sync_send_syringe", target_arch = "x86_64"))]
+    x64_data: std::lazy::SyncOnceCell<InjectHelpData>,
 }
 
 impl Syringe {
@@ -320,5 +327,20 @@ impl Syringe {
         let path_len = result as usize;
         let path = unsafe { MaybeUninit::slice_assume_init_ref(&path_buf[..path_len]) };
         Ok(PathBuf::from(U16Str::from_slice(path).to_os_string()))
+    }
+}
+
+#[cfg(all(test, feature = "sync_send_syringe"))]
+mod tests {
+    #[test]
+    fn syringe_is_send() {
+        fn assert_send<T: Send>() {}
+        assert_send::<super::Syringe>();
+    }
+
+    #[test]
+    fn syringe_is_sync() {
+        fn assert_sync<T: Send>() {}
+        assert_sync::<super::Syringe>();
     }
 }
