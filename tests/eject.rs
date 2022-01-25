@@ -12,7 +12,7 @@ mod common;
 
 #[test]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-fn eject_32_from_32() -> Result<(), Box<dyn Error>> {
+fn eject_32() -> Result<(), Box<dyn Error>> {
     eject_test(
         common::build_test_payload_x86()?,
         common::build_test_target_x86()?,
@@ -21,7 +21,7 @@ fn eject_32_from_32() -> Result<(), Box<dyn Error>> {
 
 #[test]
 #[cfg(target_arch = "x86_64")]
-fn eject_64_from_64() -> Result<(), Box<dyn Error>> {
+fn eject_64() -> Result<(), Box<dyn Error>> {
     eject_test(
         common::build_test_payload_x64()?,
         common::build_test_target_x64()?,
