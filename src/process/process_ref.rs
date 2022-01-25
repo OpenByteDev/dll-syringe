@@ -231,7 +231,7 @@ impl<'a> ProcessRef<'a> {
         let modules = self.get_module_handles()?;
 
         for &module_handle in modules.as_ref() {
-            let module = unsafe { ProcessModule::new(module_handle, self.clone()) };
+            let module = unsafe { ProcessModule::new(module_handle, *self) };
             let module_name = module.get_base_name()?;
 
             if module_name.eq_ignore_ascii_case(&target_module_name) {
@@ -265,7 +265,7 @@ impl<'a> ProcessRef<'a> {
         let modules = self.get_module_handles()?;
 
         for &module_handle in modules.as_ref() {
-            let module = unsafe { ProcessModule::new(module_handle, self.clone()) };
+            let module = unsafe { ProcessModule::new(module_handle, *self) };
             let module_path = module.get_path()?.into_os_string();
 
             if module_path.eq_ignore_ascii_case(&target_module_path) {
