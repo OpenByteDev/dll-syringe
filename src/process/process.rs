@@ -96,14 +96,19 @@ impl Deref for Process {
 
     fn deref(&self) -> &Self::Target {
         // Safety: ProcessRef is layout-compatible with Process.
-        unsafe { &*(&self.0 as *const OwnedHandle as *const BorrowedHandle<'_> as *const ProcessRef<'_>) }
+        unsafe {
+            &*(&self.0 as *const OwnedHandle as *const BorrowedHandle<'_> as *const ProcessRef<'_>)
+        }
     }
 }
 
 impl DerefMut for Process {
     fn deref_mut(&mut self) -> &mut Self::Target {
         // Safety: ProcessRef is layout-compatible with Process.
-        unsafe { &mut *(&mut self.0 as *mut OwnedHandle as *mut BorrowedHandle<'_> as *mut ProcessRef<'_>) }
+        unsafe {
+            &mut *(&mut self.0 as *mut OwnedHandle as *mut BorrowedHandle<'_>
+                as *mut ProcessRef<'_>)
+        }
     }
 }
 
@@ -196,7 +201,7 @@ impl Process {
     /// Creates a new owning [`Process`] instance for this process by duplicating the underlying handle.
     pub fn try_clone(&self) -> Result<Self, Win32Error> {
         self.get_ref().promote_to_owned()
-    } 
+    }
 
     /// Leak the underlying handle and return it as a non-owning [`ProcessRef`] instance.
     pub fn leak(self) -> ProcessRef<'static> {
