@@ -10,17 +10,17 @@ use winapi::um::{
     winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE},
 };
 
-use crate::Process;
+use crate::ProcessRef;
 
 pub(crate) struct ForeignProcessWideString<'a> {
-    process: &'a Process,
+    process: ProcessRef<'a>,
     ptr: *mut winapi::ctypes::c_void,
     byte_count: usize,
 }
 
 impl<'a> ForeignProcessWideString<'a> {
     pub fn allocate_in_process(
-        process: &'a Process,
+        process: ProcessRef<'a>,
         str: impl AsRef<U16CStr>,
     ) -> Result<Self, Win32Error> {
         let str = str.as_ref();

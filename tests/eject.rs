@@ -41,7 +41,7 @@ fn eject_test(
 
     let syringe = Syringe::new();
     let module = syringe.inject(&dummy_process, payload_path.as_ref())?;
-    module.eject()?;
+    syringe.eject(module)?;
 
     dummy_process.kill()?;
 

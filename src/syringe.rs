@@ -1,13 +1,14 @@
 use cstr::cstr;
-use dispose::defer;
 #[cfg(target_arch = "x86_64")]
 #[cfg(feature = "into_x86_from_x64")]
 use goblin::Object;
+use path_absolutize::Absolutize;
 use rust_win32error::Win32Error;
 use std::{
     convert::TryInto,
     fs,
     mem::{self, MaybeUninit},
+    os::windows::prelude::{AsRawHandle, FromRawHandle, OwnedHandle},
     path::{Path, PathBuf},
     ptr,
     time::Duration,
@@ -20,7 +21,6 @@ use winapi::{
         ntdef::LPCWSTR,
     },
     um::{
-        handleapi::CloseHandle,
         minwinbase::STILL_ACTIVE,
         processthreadsapi::{CreateRemoteThread, GetExitCodeThread},
         synchapi::WaitForSingleObject,
@@ -32,7 +32,7 @@ use winapi::{
 use crate::{
     error::InjectError,
     utils::{retry_with_filter, ForeignProcessWideString},
-    InjectedModule, ModuleHandle, Process, ProcessModule,
+    ModuleHandle, ProcessModule, ProcessRef,
 };
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
@@ -74,8 +74,8 @@ impl InjectHelpData {
 ///
 /// // do something else
 ///
-/// // eject the payload from the target (this is optional)
-/// injected_payload.eject().unwrap();
+/// // eject the payload from the target (optional)
+/// syringe.eject(injected_payload).unwrap();
 /// ```
 #[derive(Default, Debug, Clone)]
 pub struct Syringe {
@@ -99,7 +99,7 @@ impl Syringe {
 
     fn get_inject_help_data_for_process(
         &self,
-        process: &Process,
+        process: ProcessRef,
     ) -> Result<&InjectHelpData, InjectError> {
         let is_target_x64 = !process.is_wow64()?;
 
@@ -134,13 +134,14 @@ impl Syringe {
     /// - If the current process is `x64` the target process can be either `x64` (always available) or `x86` (with the `into_x86_from_x64` feature enabled).
     /// - If the current process is `x86` the target process can only be `x86`.
     pub fn inject<'a>(
-        &'a self,
-        process: &'a Process,
+        &self,
+        process: impl Into<ProcessRef<'a>>,
         payload_path: impl AsRef<Path>,
-    ) -> Result<InjectedModule<'a>, InjectError> {
+    ) -> Result<ProcessModule<'a>, InjectError> {
+        let process = process.into();
         let inject_data = self.get_inject_help_data_for_process(process)?;
+        let module_path = payload_path.as_ref().absolutize()?;
 
-        let module_path = payload_path.as_ref();
         let mut foreign_string = ForeignProcessWideString::allocate_in_process(
             process,
             U16CString::from_os_str(module_path.as_os_str())?,
@@ -161,19 +162,17 @@ impl Syringe {
         if thread_handle.is_null() {
             return Err(Win32Error::new().into());
         }
-
         // ensure handle is closed once we exit this function
-        let _h = defer(|| unsafe {
-            CloseHandle(thread_handle);
-        });
+        let thread_handle = unsafe { OwnedHandle::from_raw_handle(thread_handle) };
 
-        let reason = unsafe { WaitForSingleObject(thread_handle, INFINITE) };
+        let reason = unsafe { WaitForSingleObject(thread_handle.as_raw_handle(), INFINITE) };
         if reason == WAIT_FAILED {
             return Err(Win32Error::new().into());
         }
 
         let mut exit_code = MaybeUninit::uninit();
-        let result = unsafe { GetExitCodeThread(thread_handle, exit_code.as_mut_ptr()) };
+        let result =
+            unsafe { GetExitCodeThread(thread_handle.as_raw_handle(), exit_code.as_mut_ptr()) };
         if result == 0 {
             return Err(Win32Error::new().into());
         }
@@ -194,16 +193,13 @@ impl Syringe {
             truncated_injected_module_handle as u32
         );
 
-        Ok(InjectedModule {
-            syringe: self,
-            module: injected_module,
-        })
+        Ok(injected_module)
     }
 
     /// Ejects a previously injected module from its target process.
-    pub fn eject(&self, module: InjectedModule<'_>) -> Result<(), InjectError> {
-        let process = module.target_process();
-        let inject_data = self.get_inject_help_data_for_process(module.target_process())?;
+    pub fn eject(&self, module: ProcessModule) -> Result<(), InjectError> {
+        let process = module.process();
+        let inject_data = self.get_inject_help_data_for_process(module.process())?;
 
         let thread_handle = unsafe {
             CreateRemoteThread(
@@ -211,7 +207,7 @@ impl Syringe {
                 ptr::null_mut(),
                 0,
                 Some(mem::transmute(inject_data.get_free_library_fn_ptr())),
-                module.payload().handle().cast(),
+                module.handle().cast(),
                 0,
                 ptr::null_mut(),
             )
@@ -219,19 +215,17 @@ impl Syringe {
         if thread_handle.is_null() {
             return Err(Win32Error::new().into());
         }
-
         // ensure handle is closed once we exit this function
-        let _h = defer(|| unsafe {
-            CloseHandle(thread_handle);
-        });
+        let thread_handle = unsafe { OwnedHandle::from_raw_handle(thread_handle) };
 
-        let reason = unsafe { WaitForSingleObject(thread_handle, INFINITE) };
+        let reason = unsafe { WaitForSingleObject(thread_handle.as_raw_handle(), INFINITE) };
         if reason == WAIT_FAILED {
             return Err(Win32Error::new().into());
         }
 
         let mut exit_code = MaybeUninit::uninit();
-        let result = unsafe { GetExitCodeThread(thread_handle, exit_code.as_mut_ptr()) };
+        let result =
+            unsafe { GetExitCodeThread(thread_handle.as_raw_handle(), exit_code.as_mut_ptr()) };
         if result == 0 {
             return Err(Win32Error::new().into());
         }
@@ -247,14 +241,14 @@ impl Syringe {
         assert!(!process
             .get_module_handles()?
             .as_ref()
-            .contains(&module.payload().handle()));
+            .contains(&module.handle()));
 
         Ok(())
     }
 
     fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, InjectError> {
         let kernel32_module =
-            ProcessModule::__get_local_from_name_or_abs_path(u16cstr!("kernel32.dll"))?.unwrap();
+            ProcessModule::__find_local_by_name_or_abs_path(u16cstr!("kernel32.dll"))?.unwrap();
         let load_library_fn_ptr = kernel32_module
             .__get_procedure(cstr!("LoadLibraryW"))
             .unwrap();
@@ -271,7 +265,9 @@ impl Syringe {
 
     #[cfg(target_arch = "x86_64")]
     #[cfg(feature = "into_x86_from_x64")]
-    fn load_inject_help_data_for_process(process: &Process) -> Result<InjectHelpData, InjectError> {
+    fn load_inject_help_data_for_process(
+        process: ProcessRef,
+    ) -> Result<InjectHelpData, InjectError> {
         // get kernel32 handle of target process
         let kernel32_module = retry_with_filter(
             || process.find_module_by_name("kernel32.dll"),

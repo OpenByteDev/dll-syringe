@@ -2,189 +2,138 @@ use std::{
     borrow::Cow,
     cmp,
     convert::TryInto,
+    hash::{Hash, Hasher},
     mem::{self, MaybeUninit},
-    os::windows::prelude::IntoRawHandle,
+    os::windows::{
+        prelude::{AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle},
+        raw::HANDLE,
+    },
     path::Path,
-    process::Child,
 };
 
 use rust_win32error::Win32Error;
-use sysinfo::{PidExt, ProcessExt, SystemExt};
 use winapi::{
-    shared::{
-        minwindef::{FALSE, HMODULE},
-        ntdef::HANDLE,
-    },
+    shared::minwindef::{FALSE, HMODULE},
     um::{
-        handleapi::CloseHandle,
-        processthreadsapi::{GetCurrentProcess, OpenProcess, TerminateProcess},
+        handleapi::DuplicateHandle,
+        processthreadsapi::{GetCurrentProcess, TerminateProcess},
         psapi::{EnumProcessModulesEx, LIST_MODULES_ALL},
-        winnt::{
-            PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION,
-            PROCESS_VM_READ, PROCESS_VM_WRITE,
-        },
+        winnt::DUPLICATE_SAME_ACCESS,
         wow64apiset::IsWow64Process,
     },
 };
 
 use crate::{
     utils::{ArrayOrVecSlice, UninitArrayBuf},
-    ModuleHandle, ProcessModule,
+    ModuleHandle, Process, ProcessHandle, ProcessModule,
 };
 
-/// A handle to a process.
-/// Equivalent to a `HANDLE` in windows terms.
-pub type ProcessHandle = HANDLE;
+/// A struct representing a running process (including the current one).
+/// This struct owns the underlying process handle.
+///
+/// # Note
+/// The underlying handle has to have the following [privileges](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights):
+///  - `PROCESS_CREATE_THREAD`
+///  - `PROCESS_QUERY_INFORMATION`
+///  - `PROCESS_VM_OPERATION`
+///  - `PROCESS_VM_WRITE`
+///  - `PROCESS_VM_READ`
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy)]
+pub struct ProcessRef<'a>(BorrowedHandle<'a>);
 
-/// A struct representing a running process.
-/// The process may or may not represent the current process.
-/// The underlying handle i
-#[derive(Debug, PartialEq, Eq)]
-pub struct Process {
-    handle: ProcessHandle,
-    owns_handle: bool,
+impl AsRawHandle for ProcessRef<'_> {
+    fn as_raw_handle(&self) -> HANDLE {
+        self.0.as_raw_handle()
+    }
 }
 
-// Creation and Destruction
-impl Process {
-    /// Creates a new instance from the given raw handle.
+impl AsHandle for ProcessRef<'_> {
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.0.as_handle()
+    }
+}
+
+impl PartialEq for ProcessRef<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_raw_handle() == other.as_raw_handle()
+    }
+}
+
+impl Eq for ProcessRef<'_> {}
+
+impl Hash for ProcessRef<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_raw_handle().hash(state)
+    }
+}
+
+impl<'a> From<&'a Process> for ProcessRef<'a> {
+    fn from(process: &'a Process) -> Self {
+        process.get_ref()
+    }
+}
+
+impl<'a> ProcessRef<'a> {
+    /// Creates a new instance from a borrowed handle.
     ///
     /// # Safety
-    /// - The given handle needs to be a valid process handle.
-    /// - If `owns_handle` is `true` the given handle needs to have been owned by the caller and it has to be valid to close the handle.
-    /// - The caller is not allowed to close the given handle.
-    /// - If `owns_handle` is `false` the handle has to be valid for the lifetime of the created instance.
-    /// - The handle needs to have the following [privileges](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights):
-    ///     - `PROCESS_CREATE_THREAD`
-    ///     - `PROCESS_QUERY_INFORMATION`
-    ///     - `PROCESS_VM_OPERATION`
-    ///     - `PROCESS_VM_WRITE`
-    ///     - `PROCESS_VM_READ`
-    pub unsafe fn from_handle(handle: ProcessHandle, owns_handle: bool) -> Self {
-        Self {
-            handle,
-            owns_handle,
-        }
+    /// The handle needs to fulfill the priviliges listed in the [struct documentation](ProcessRef).
+    pub unsafe fn borrow_from_handle(handle: BorrowedHandle<'a>) -> Self {
+        Self(handle)
     }
 
-    /// Creates a new instance from the given pid.
-    pub fn from_pid(pid: u32) -> Result<Self, Win32Error> {
-        let handle = unsafe {
-            OpenProcess(
-                // access required for performing dll injection
-                PROCESS_CREATE_THREAD
-                    | PROCESS_QUERY_INFORMATION
-                    | PROCESS_VM_OPERATION
-                    | PROCESS_VM_WRITE
-                    | PROCESS_VM_READ,
-                FALSE,
-                pid,
-            )
-        };
-
-        if handle.is_null() {
-            return Err(Win32Error::new());
-        }
-
-        Ok(unsafe { Self::from_handle(handle, true) })
-    }
-
-    /// Finds all processes whose name contains the given string.
-    pub fn find_all_by_name(name: impl AsRef<str>) -> Vec<Self> {
-        // TODO: avoid using sysinfo just for this
-        // TODO: deduplicate code
-        let mut system = sysinfo::System::new();
-        system.refresh_processes();
-        system
-            .processes()
-            .values()
-            .filter(move |process| process.name().contains(name.as_ref()))
-            .map(|process| process.pid())
-            .filter_map(|pid| Process::from_pid(pid.as_u32()).ok())
-            .collect()
-    }
-
-    /// Finds the first process whose name contains the given string.
-    pub fn find_first_by_name(name: impl AsRef<str>) -> Option<Self> {
-        // TODO: avoid using sysinfo just for this
-        // TODO: deduplicate code
-        let mut system = sysinfo::System::new();
-        system.refresh_processes();
-        system
-            .processes()
-            .values()
-            .filter(move |process| process.name().contains(name.as_ref()))
-            .map(|process| process.pid())
-            .find_map(|pid| Process::from_pid(pid.as_u32()).ok())
-    }
-
-    /// Creates a new instance from the given child process.
+    /// Returns the pseudo handle representing the current process.
     #[must_use]
-    pub fn from_child(child: Child) -> Self {
-        let handle = child.into_raw_handle();
-        unsafe { Self::from_handle(handle.cast(), true) }
+    pub fn current_handle() -> BorrowedHandle<'static> {
+        // the handle is only a pseudo handle representing the current process which does not need to be closed.
+        unsafe { BorrowedHandle::borrow_raw_handle(Self::raw_current_handle()) }
     }
 
-    /// Returns the pseudo handle of the current process.
+    /// Returns the raw pseudo handle representing the current process.
     #[must_use]
-    pub fn current_handle() -> ProcessHandle {
+    pub fn raw_current_handle() -> ProcessHandle {
         unsafe { GetCurrentProcess() }
     }
 
     /// Returns an instance representing the current process.
     #[must_use]
     pub fn current() -> Self {
-        // the handle is only a pseudo handle representing the current process which does not need to be closed.
-        unsafe { Self::from_handle(Self::current_handle(), false) }
+        Self(Self::current_handle())
     }
 
-    /// Consumes this instance and returns the underlying handle and whether the handle was owned by the current instance.
-    #[must_use]
-    pub fn into_handle(mut self) -> (ProcessHandle, bool) {
-        let did_own_handle = self.owns_handle;
-
-        // mark as non-owning to avoid closing the handle
-        self.owns_handle = false;
-
-        (self.handle, did_own_handle)
-    }
-
-    /// Closes the underlying process handle.
-    /// This is a noop if the handle is not owned.
-    pub fn close(mut self) -> Result<(), (Win32Error, Self)> {
-        self._close().map_err(|error| (error, self))
-    }
-
-    fn _close(&mut self) -> Result<(), Win32Error> {
-        if self.owns_handle() {
-            let result = unsafe { CloseHandle(self.handle) };
-
-            if result != 0 {
-                return Err(Win32Error::new());
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl Process {
-    /// Returns whether this instance represent the current process.
+    /// Returns whether this instance represents the current process.
     #[must_use]
     pub fn is_current(&self) -> bool {
-        self.handle() == Self::current_handle()
+        self.handle() == ProcessRef::raw_current_handle()
     }
 
-    /// Returns the underlying process handle.
+    /// Returns the underlying raw process handle.
     #[must_use]
     pub fn handle(&self) -> ProcessHandle {
-        self.handle
+        self.as_raw_handle()
     }
 
-    /// Returns a value indicating whether this instance owns the underlying handle.
-    #[must_use]
-    pub fn owns_handle(&self) -> bool {
-        self.owns_handle
+    /// Promotes this instance to an owning [`Process`] instance.
+    pub fn promote_to_owned(&self) -> Result<Process, Win32Error> {
+        let raw_handle = self.as_raw_handle();
+        let process = unsafe { GetCurrentProcess() };
+        let mut new_handle = MaybeUninit::uninit();
+        let result = unsafe {
+            DuplicateHandle(
+                process,
+                raw_handle,
+                process,
+                new_handle.as_mut_ptr(),
+                0,
+                FALSE,
+                DUPLICATE_SAME_ACCESS,
+            )
+        };
+        if result == 0 {
+            return Err(Win32Error::new());
+        }
+        Ok(unsafe { Process::from_raw_handle(new_handle.assume_init()) })
     }
 
     /// Returns the handles of all the modules currently loaded in this process.
@@ -198,7 +147,7 @@ impl Process {
         let mut bytes_needed_target = MaybeUninit::uninit();
         let result = unsafe {
             EnumProcessModulesEx(
-                self.handle,
+                self.handle(),
                 module_buf.as_mut_ptr(),
                 module_buf_byte_size.try_into().unwrap(),
                 bytes_needed_target.as_mut_ptr(),
@@ -232,7 +181,7 @@ impl Process {
                 bytes_needed_target = MaybeUninit::uninit();
                 let result = unsafe {
                     EnumProcessModulesEx(
-                        self.handle,
+                        self.handle(),
                         module_buf_vec[0].as_mut_ptr(),
                         module_buf_byte_size.try_into().unwrap(),
                         bytes_needed_target.as_mut_ptr(),
@@ -269,7 +218,7 @@ impl Process {
     pub fn find_module_by_name(
         &self,
         module_name: impl AsRef<Path>,
-    ) -> Result<Option<ProcessModule>, Win32Error> {
+    ) -> Result<Option<ProcessModule<'a>>, Win32Error> {
         let target_module_name = module_name.as_ref();
 
         // add default file extension if missing
@@ -282,7 +231,7 @@ impl Process {
         let modules = self.get_module_handles()?;
 
         for &module_handle in modules.as_ref() {
-            let module = unsafe { ProcessModule::new_remote(module_handle, self) };
+            let module = unsafe { ProcessModule::new(module_handle, self.clone()) };
             let module_name = module.get_base_name()?;
 
             if module_name.eq_ignore_ascii_case(&target_module_name) {
@@ -303,7 +252,7 @@ impl Process {
     pub fn find_module_by_path(
         &self,
         module_path: impl AsRef<Path>,
-    ) -> Result<Option<ProcessModule>, Win32Error> {
+    ) -> Result<Option<ProcessModule<'a>>, Win32Error> {
         let target_module_path = module_path.as_ref();
 
         // add default file extension if missing
@@ -316,7 +265,7 @@ impl Process {
         let modules = self.get_module_handles()?;
 
         for &module_handle in modules.as_ref() {
-            let module = unsafe { ProcessModule::new_remote(module_handle, self) };
+            let module = unsafe { ProcessModule::new(module_handle, self.clone()) };
             let module_path = module.get_path()?.into_os_string();
 
             if module_path.eq_ignore_ascii_case(&target_module_path) {
@@ -334,7 +283,7 @@ impl Process {
     /// This method returns `false` for a 32-bit process running under 32-bit Windows or 64-bit Windows 10 on ARM.
     pub fn is_wow64(&self) -> Result<bool, Win32Error> {
         let mut is_wow64 = MaybeUninit::uninit();
-        let result = unsafe { IsWow64Process(self.handle, is_wow64.as_mut_ptr()) };
+        let result = unsafe { IsWow64Process(self.handle(), is_wow64.as_mut_ptr()) };
         if result == 0 {
             return Err(Win32Error::new());
         }
@@ -353,23 +302,5 @@ impl Process {
             return Err(Win32Error::new());
         }
         Ok(())
-    }
-}
-
-impl Drop for Process {
-    fn drop(&mut self) {
-        let _ = self._close();
-    }
-}
-
-impl From<Process> for ProcessHandle {
-    fn from(process: Process) -> Self {
-        process.handle()
-    }
-}
-
-impl From<Child> for Process {
-    fn from(child: Child) -> Self {
-        Self::from_child(child)
     }
 }

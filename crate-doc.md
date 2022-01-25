@@ -23,6 +23,6 @@ let injected_payload = syringe.inject(&target_process, "injection_payload.dll").
 
 // do something else
 
-// eject the payload from the target (this is optional)
-injected_payload.eject().unwrap();
+// eject the payload from the target (optional)
+syringe.eject(injected_payload).unwrap();
 ```

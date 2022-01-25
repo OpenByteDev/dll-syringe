@@ -7,7 +7,7 @@ use std::{
 use crate::{
     error::{ModuleFromPathError, ProcedureLoadError, Win32OrNulError},
     utils::WinPathBuf,
-    Process,
+    ProcessRef,
 };
 use path_absolutize::Absolutize;
 use rust_win32error::Win32Error;
@@ -28,109 +28,95 @@ use winapi::{
 pub type ModuleHandle = HMODULE;
 
 /// A loaded module of a process. This module may or may not be of the current process.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ProcessModule<'a> {
     handle: ModuleHandle,
-    process: Option<&'a Process>,
+    process: ProcessRef<'a>,
 }
 
 impl<'a> ProcessModule<'a> {
-    /// Contructs a new instance from the given handle and optionaly the process to which the module belongs.
-    /// If the module is from the current process [`None`] can be specified.
+    /// Contructs a new instance from the given module handle and its corresponding process.
     ///
     /// # Safety
-    /// The caller must guarantee that the given handle is valid and that the module is loaded into the given process
-    ///  (and stays that way while interacting).
-    pub unsafe fn new(handle: ModuleHandle, mut process: Option<&'a Process>) -> Self {
-        if process.is_some() && process.unwrap().is_current() {
-            process = None;
-        }
+    /// The caller must guarantee that the given handle is valid and that the module is loaded into the given process. (and stays that way while interacting).
+    pub unsafe fn new(handle: ModuleHandle, process: ProcessRef<'a>) -> Self {
         Self { handle, process }
     }
-    /// Contructs a new instance from the given module handle of the current process.
+    /// Contructs a new instance from the given module handle loaded in the current process.
     ///
     /// # Safety
-    /// The caller must guarantee that the given handle is valid and that it is loaded into the current process
-    ///  (and stays that way while interacting).
+    /// The caller must guarantee that the given handle is valid and that it is loaded into the current process. (and stays that way while interacting).
     pub unsafe fn new_local(handle: ModuleHandle) -> Self {
-        unsafe { Self::new(handle, None) }
-    }
-    /// Contructs a new instance from the given module handle of the given remote process.
-    ///
-    /// # Safety
-    /// The caller must guarantee that the given handle is valid and that it is loaded into the given process
-    ///  (and stays that way while interacting).
-    pub unsafe fn new_remote(handle: ModuleHandle, process: &'a Process) -> Self {
-        unsafe { Self::new(handle, Some(process)) }
+        unsafe { Self::new(handle, ProcessRef::current()) }
     }
 
     /// Searches for a module with the given name or path in the given process (the current one if [`None`] was specified).
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn get(
+    pub fn find(
         module_name_or_path: impl AsRef<Path>,
-        process: Option<&'a Process>,
+        process: ProcessRef<'a>,
     ) -> Result<Option<Self>, ModuleFromPathError> {
         let module_name_or_path = module_name_or_path.as_ref();
         if module_name_or_path.has_root() {
-            Self::from_path(module_name_or_path, process)
+            Self::find_by_path(module_name_or_path, process)
         } else {
-            Self::from_name(module_name_or_path, process).map_err(|e| e.into())
+            Self::find_by_name(module_name_or_path, process).map_err(|e| e.into())
         }
     }
     /// Searches for a module with the given name in the given process (the current one if [`None`] was specified).
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn from_name(
+    pub fn find_by_name(
         module_name: impl AsRef<Path>,
-        process: Option<&'a Process>,
+        process: ProcessRef<'a>,
     ) -> Result<Option<Self>, Win32OrNulError> {
-        if let Some(process) = process {
-            Self::get_remote_from_name(module_name, process)
+        if process.is_current() {
+            Self::find_local_by_name(module_name)
         } else {
-            Self::get_local_from_name(module_name)
+            Self::_find_remote_by_name(module_name, process)
         }
     }
     /// Searches for a module with the given path in the given process (the current one if [`None`] was specified).
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn from_path(
+    pub fn find_by_path(
         module_path: impl AsRef<Path>,
-        process: Option<&'a Process>,
+        process: ProcessRef<'a>,
     ) -> Result<Option<Self>, ModuleFromPathError> {
-        if let Some(process) = process {
-            Self::get_remote_from_path(module_path, process)
+        if process.is_current() {
+            Self::find_local_by_path(module_path)
         } else {
-            Self::get_local_from_path(module_path)
+            Self::_find_remote_by_path(module_path, process)
         }
     }
 
     /// Searches for a module with the given name or path in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn get_local(
+    pub fn find_local(
         module_name_or_path: impl AsRef<Path>,
     ) -> Result<Option<Self>, ModuleFromPathError> {
-        Self::get(module_name_or_path, None)
+        Self::find(module_name_or_path, ProcessRef::current())
     }
     /// Searches for a module with the given name in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn get_local_from_name(
+    pub fn find_local_by_name(
         module_name: impl AsRef<Path>,
     ) -> Result<Option<Self>, Win32OrNulError> {
-        Self::_get_local_from_name_or_abs_path(module_name)
+        Self::_find_local_by_name_or_abs_path(module_name)
     }
     /// Searches for a module with the given path in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn get_local_from_path(
+    pub fn find_local_by_path(
         module_path: impl AsRef<Path>,
     ) -> Result<Option<Self>, ModuleFromPathError> {
         let absolute_path = module_path.as_ref().absolutize()?;
-        Self::_get_local_from_name_or_abs_path(absolute_path).map_err(|e| e.into())
+        Self::_find_local_by_name_or_abs_path(absolute_path).map_err(|e| e.into())
     }
-    pub(crate) fn _get_local_from_name_or_abs_path(
+    pub(crate) fn _find_local_by_name_or_abs_path(
         module: impl AsRef<Path>,
     ) -> Result<Option<Self>, Win32OrNulError> {
         let wide_string = U16CString::from_os_str(module.as_ref().as_os_str())?;
-        Self::__get_local_from_name_or_abs_path(&wide_string)
+        Self::__find_local_by_name_or_abs_path(&wide_string)
     }
-    pub(crate) fn __get_local_from_name_or_abs_path(
+    pub(crate) fn __find_local_by_name_or_abs_path(
         module: &U16CStr,
     ) -> Result<Option<Self>, Win32OrNulError> {
         let handle = unsafe { GetModuleHandleW(module.as_ptr()) };
@@ -146,41 +132,29 @@ impl<'a> ProcessModule<'a> {
         Ok(Some(unsafe { Self::new_local(handle) }))
     }
 
-    /// Searches for a module with the given name or path in the given process.
-    /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn get_remote(
-        module_name_or_path: impl AsRef<Path>,
-        process: &'a Process,
-    ) -> Result<Option<Self>, ModuleFromPathError> {
-        Self::get(module_name_or_path, Some(process))
-    }
     /// Searches for a module with the given name in the given process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn get_remote_from_name(
+    fn _find_remote_by_name(
         module_name: impl AsRef<Path>,
-        process: &'a Process,
-    ) -> Result<Option<Self>, Win32OrNulError> {
-        if process.is_current() {
-            Self::get_local_from_name(module_name)
-        } else {
-            process
-                .find_module_by_name(module_name)
-                .map_err(|e| e.into())
-        }
+        process: ProcessRef<'a>,
+    ) -> Result<Option<ProcessModule<'a>>, Win32OrNulError> {
+        assert!(!process.is_current());
+
+        process
+            .find_module_by_name(module_name)
+            .map_err(|e| e.into())
     }
     /// Searches for a module with the given path in the given process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn get_remote_from_path(
+    fn _find_remote_by_path(
         module_path: impl AsRef<Path>,
-        process: &'a Process,
+        process: ProcessRef<'a>,
     ) -> Result<Option<Self>, ModuleFromPathError> {
-        if process.is_current() {
-            Self::get_local_from_path(module_path)
-        } else {
-            process
-                .find_module_by_path(module_path)
-                .map_err(|e| e.into())
-        }
+        assert!(!process.is_current());
+
+        process
+            .find_module_by_path(module_path)
+            .map_err(|e| e.into())
     }
 
     /// Gets the underlying handle to the module.
@@ -188,16 +162,16 @@ impl<'a> ProcessModule<'a> {
     pub fn handle(&self) -> ModuleHandle {
         self.handle
     }
-    /// Gets the process this module belongs to or [`None`] if it belongs to the current process.
+    /// Gets the process this module belongs to.
     #[must_use]
-    pub fn process(&self) -> Option<&'a Process> {
+    pub fn process(&self) -> ProcessRef {
         self.process
     }
 
     /// Gets a value indicating whether the module is from the current process.
     #[must_use]
     pub fn is_local(&self) -> bool {
-        self.process.is_none()
+        self.process().is_current()
     }
     /// Gets a value indicating whether the module is from a remote process (not from the current one).
     #[must_use]
@@ -240,7 +214,7 @@ impl<'a> ProcessModule<'a> {
         let module_path_buf_size: u32 = module_path_buf.len().try_into().unwrap();
         let result = unsafe {
             GetModuleFileNameExW(
-                self.process.unwrap().handle(),
+                self.process.handle(),
                 self.handle(),
                 module_path_buf.as_mut_ptr(),
                 module_path_buf_size,
@@ -276,7 +250,7 @@ impl<'a> ProcessModule<'a> {
         let module_name_buf_size: u32 = module_name_buf.len().try_into().unwrap();
         let result = unsafe {
             GetModuleBaseNameW(
-                self.process.unwrap().handle(),
+                self.process.handle(),
                 self.handle(),
                 module_name_buf.as_mut_ptr(),
                 module_name_buf_size,
@@ -322,7 +296,7 @@ mod tests {
 
     #[test]
     fn find_local_by_name_present() {
-        let result = ProcessModule::get_local_from_name("kernel32.dll");
+        let result = ProcessModule::find_local_by_name("kernel32.dll");
         assert!(result.is_ok());
         assert!(result.as_ref().unwrap().is_some());
 
@@ -333,7 +307,7 @@ mod tests {
 
     #[test]
     fn find_local_by_name_absent() {
-        let result = ProcessModule::get_local_from_name("kernel33.dll");
+        let result = ProcessModule::find_local_by_name("kernel33.dll");
         assert!(&result.is_ok());
         assert!(result.unwrap().is_none());
     }
