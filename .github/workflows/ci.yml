@@ -18,7 +18,12 @@ jobs:
       matrix:
         toolchain: ["nightly"]
         os: ["windows-latest"]
-        target: ["x86_64-pc-windows-gnu", "x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+        target: ["x86_64-pc-windows-gnu", "i686-pc-windows-gnu", "x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+        include:
+          - target: x86_64-pc-windows-gnu
+            target32: i686-pc-windows-gnu
+          - target: x86_64-pc-windows-msvc
+            target32: i686-pc-windows-msvc
     steps:
     - uses: actions/checkout@v2
     - name: Install latest ${{ matrix.toolchain }} for ${{ matrix.target }}
@@ -27,11 +32,11 @@ jobs:
           target: ${{ matrix.target }}
           toolchain: ${{ matrix.toolchain }}
           override: true
-    - name: Install latest ${{ matrix.toolchain }} for i686-pc-windows-msvc
-      if: matrix.target == 'x86_64-pc-windows-msvc'
+    - name: Install latest ${{ matrix.toolchain }} for ${{ matrix.target32 }}
+      if: matrix.target32
       uses: actions-rs/toolchain@v1
       with:
-          target: i686-pc-windows-msvc
+          target: ${{ matrix.target32 }}
           toolchain: ${{ matrix.toolchain }}
           override: true
     - name: Build
