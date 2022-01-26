@@ -15,6 +15,7 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         toolchain: ["nightly"]
         os: ["windows-latest"]
@@ -26,30 +27,36 @@ jobs:
             target32: i686-pc-windows-msvc
     steps:
     - uses: actions/checkout@v2
-    - name: Install latest ${{ matrix.toolchain }} for ${{ matrix.target }}
+    
+    - name: Setup MinGW32
+      if: contains(matrix.target, 'gnu')
+      uses: egor-tensin/setup-mingw@v2
+      with:
+        platform: x86
+    - name: Setup MinGW64
+      if: contains(matrix.target, 'gnu') && matrix.target32
+      uses: egor-tensin/setup-mingw@v2
+      with:
+        platform: x64
+        
+    - name: Install latest rust ${{ matrix.toolchain }} for ${{ matrix.target }}
       uses: actions-rs/toolchain@v1
       with:
           target: ${{ matrix.target }}
           toolchain: ${{ matrix.toolchain }}
           override: true
-    - name: Install latest ${{ matrix.toolchain }} for x86 version of target
+          
+    - name: Install latest rust ${{ matrix.toolchain }} for x86 version of target
       if: matrix.target32
       uses: actions-rs/toolchain@v1
       with:
           target: ${{ matrix.target32 }}
           toolchain: ${{ matrix.toolchain }}
           override: true
-    - name: Add mingw32 to PATH
-      run: |
-        echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
-      if: matrix.target == 'i686-pc-windows-gnu' || matrix.target32 == 'i686-pc-windows-gnu'
-      shell: bash
-    - name: Add mingw64 to PATH
-      run: echo "C:\msys64\mingw64\bin" >> $GITHUB_PATH
-      if: matrix.target == 'x86_64-pc-windows-gnu'
-      shell: bash
+      
     - name: Build
       run: cargo build --target ${{ matrix.target }}
+      
     - name: Test
       run: cargo test --target ${{ matrix.target }} --all-targets --all-features -- --nocapture
 
