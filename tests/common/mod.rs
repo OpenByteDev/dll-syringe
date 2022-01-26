@@ -1,19 +1,33 @@
 use std::{error::Error, path::PathBuf, process::Command, str::FromStr};
 
+use platforms::target::Arch;
+
 pub fn build_test_payload_x86() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate("test_payload", Some("i686-pc-windows-msvc"), false, "dll")
+    build_helper_crate("test_payload", Some(&find_x86_variant_of_target()), false, "dll")
 }
 
 pub fn build_test_target_x86() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate("test_target", Some("i686-pc-windows-msvc"), false, "exe")
+    build_helper_crate("test_target", Some(&find_x86_variant_of_target()), false, "exe")
 }
 
 pub fn build_test_payload_x64() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate("test_payload", Some("x86_64-pc-windows-msvc"), false, "dll")
+    build_helper_crate("test_payload", Some(&find_x64_variant_of_target()), false, "dll")
 }
 
 pub fn build_test_target_x64() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate("test_target", Some("x86_64-pc-windows-msvc"), false, "exe")
+    build_helper_crate("test_target", Some(&find_x64_variant_of_target()), false, "exe")
+}
+
+fn find_x64_variant_of_target() -> String {
+    let mut platform = platforms::Platform::guess_current().unwrap().clone();
+    platform.target_arch = Arch::X86_64;
+    platform.to_string()
+}
+
+fn find_x86_variant_of_target() -> String {
+    let mut platform = platforms::Platform::guess_current().unwrap().clone();
+    platform.target_arch = Arch::X86;
+    platform.to_string()
 }
 
 pub fn build_helper_crate(

@@ -28,6 +28,9 @@ u16cstr = { version = "0.3", default-features = false }
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 goblin = { version = "0.4", optional = true, default-features = false, features = ["std", "pe32"] }
 
+[dev-dependencies]
+platforms = { version = "2.0", default-features = false }
+
 [features]
 default = ["into_x86_from_x64"]
 sync_send_syringe = []
