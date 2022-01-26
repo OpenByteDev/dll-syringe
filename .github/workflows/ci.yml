@@ -19,26 +19,13 @@ jobs:
       matrix:
         toolchain: ["nightly"]
         os: ["windows-latest"]
-        target: ["x86_64-pc-windows-gnu", "i686-pc-windows-gnu", "x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+        target: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
         include:
-          - target: x86_64-pc-windows-gnu
-            target32: i686-pc-windows-gnu
           - target: x86_64-pc-windows-msvc
             target32: i686-pc-windows-msvc
     steps:
     - uses: actions/checkout@v2
     
-    - name: Setup MinGW32
-      if: contains(matrix.target, 'gnu')
-      uses: egor-tensin/setup-mingw@v2
-      with:
-        platform: x86
-    - name: Setup MinGW64
-      if: contains(matrix.target, 'gnu') && matrix.target32
-      uses: egor-tensin/setup-mingw@v2
-      with:
-        platform: x64
-        
     - name: Install latest rust ${{ matrix.toolchain }} for ${{ matrix.target }}
       uses: actions-rs/toolchain@v1
       with:
