@@ -1,7 +1,7 @@
 use cstr::cstr;
 #[cfg(target_arch = "x86_64")]
 #[cfg(feature = "into_x86_from_x64")]
-use goblin::Object;
+use goblin::pe::PE;
 use path_absolutize::Absolutize;
 use rust_win32error::Win32Error;
 use std::{
@@ -288,27 +288,24 @@ impl Syringe {
 
         // load the dll as a pe and extract the fn offsets
         let module_file_buffer = fs::read(kernel32_path)?;
-        if let Object::PE(pe) = Object::parse(&module_file_buffer)? {
-            let load_library_export = pe
-                .exports
-                .iter()
-                .find(|export| matches!(export.name, Some("LoadLibraryW")))
-                .unwrap();
+        let pe = PE::parse(&module_file_buffer)?;
+        let load_library_export = pe
+            .exports
+            .iter()
+            .find(|export| matches!(export.name, Some("LoadLibraryW")))
+            .unwrap();
 
-            let free_library_export = pe
-                .exports
-                .iter()
-                .find(|export| matches!(export.name, Some("FreeLibrary")))
-                .unwrap();
+        let free_library_export = pe
+            .exports
+            .iter()
+            .find(|export| matches!(export.name, Some("FreeLibrary")))
+            .unwrap();
 
-            Ok(InjectHelpData {
-                kernel32_module: kernel32_module.handle(),
-                load_library_offset: load_library_export.rva,
-                free_library_offset: free_library_export.rva,
-            })
-        } else {
-            unreachable!()
-        }
+        Ok(InjectHelpData {
+            kernel32_module: kernel32_module.handle(),
+            load_library_offset: load_library_export.rva,
+            free_library_offset: free_library_export.rva,
+        })
     }
 
     #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]

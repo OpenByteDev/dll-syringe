@@ -13,20 +13,20 @@ categories = []
 keywords = ["dll-injection", "dll", "inject", "windows"]
 
 [dependencies]
-winapi = { version = "0.3", features = ["processthreadsapi", "libloaderapi", "memoryapi", "wow64apiset"] }
-cstr = "0.2"
-sysinfo = "0.23"
-widestring = "0.5"
-rust_win32error = "0.8"
-path-absolutize = "3.0"
-stopwatch = "0.0"
-quick-error = "2.0"
-u16cstr = "0.3"
+winapi = { version = "0.3", features = ["processthreadsapi", "libloaderapi", "memoryapi", "wow64apiset"], default-features = false }
+cstr = { version = "0.2", default-features = false }
+sysinfo = { version = "0.23", default-features = false }
+widestring = { version = "0.5", default-features = false }
+rust_win32error = { version = "0.8", default-features = false }
+path-absolutize = { version = "3.0", default-features = false }
+stopwatch = { version = "0.0", default-features = false }
+quick-error = { version = "2.0", default-features = false }
+u16cstr = { version = "0.3", default-features = false }
 
 [target.'cfg(target_arch = "x86")'.dependencies]
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-goblin = { version = "0.4", optional = true }
+goblin = { version = "0.4", optional = true, default-features = false, features = ["std", "pe32"] }
 
 [features]
 default = ["into_x86_from_x64"]
