@@ -32,3 +32,6 @@ goblin = { version = "0.4", optional = true, default-features = false, features 
 default = ["into_x86_from_x64"]
 sync_send_syringe = []
 into_x86_from_x64 = ["goblin"]
+
+[package.metadata.docs.rs]
+targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
