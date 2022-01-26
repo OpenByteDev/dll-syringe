@@ -32,13 +32,22 @@ jobs:
           target: ${{ matrix.target }}
           toolchain: ${{ matrix.toolchain }}
           override: true
-    - name: Install latest ${{ matrix.toolchain }} for ${{ matrix.target32 }}
+    - name: Install latest ${{ matrix.toolchain }} for x86 version of target
       if: matrix.target32
       uses: actions-rs/toolchain@v1
       with:
           target: ${{ matrix.target32 }}
           toolchain: ${{ matrix.toolchain }}
           override: true
+    - name: Add mingw32 to PATH
+      run: |
+        echo "C:\msys64\mingw32\bin" >> $GITHUB_PATH
+      if: matrix.target == 'i686-pc-windows-gnu' && matrix.channel == 'nightly'
+      shell: bash
+    - name: Add mingw64 to PATH
+      run: echo "C:\msys64\mingw64\bin" >> $GITHUB_PATH
+      if: matrix.target == 'x86_64-pc-windows-gnu' && matrix.channel == 'nightly'
+      shell: bash
     - name: Build
       run: cargo build --target ${{ matrix.target }}
     - name: Test
