@@ -3,19 +3,39 @@ use std::{error::Error, path::PathBuf, process::Command, str::FromStr};
 use platforms::target::Arch;
 
 pub fn build_test_payload_x86() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate("test_payload", Some(&find_x86_variant_of_target()), false, "dll")
+    build_helper_crate(
+        "test_payload",
+        Some(&find_x86_variant_of_target()),
+        false,
+        "dll",
+    )
 }
 
 pub fn build_test_target_x86() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate("test_target", Some(&find_x86_variant_of_target()), false, "exe")
+    build_helper_crate(
+        "test_target",
+        Some(&find_x86_variant_of_target()),
+        false,
+        "exe",
+    )
 }
 
 pub fn build_test_payload_x64() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate("test_payload", Some(&find_x64_variant_of_target()), false, "dll")
+    build_helper_crate(
+        "test_payload",
+        Some(&find_x64_variant_of_target()),
+        false,
+        "dll",
+    )
 }
 
 pub fn build_test_target_x64() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate("test_target", Some(&find_x64_variant_of_target()), false, "exe")
+    build_helper_crate(
+        "test_target",
+        Some(&find_x64_variant_of_target()),
+        false,
+        "exe",
+    )
 }
 
 fn find_x64_variant_of_target() -> String {
