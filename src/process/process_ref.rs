@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// A struct representing a running process (including the current one).
-/// This struct owns the underlying process handle.
+/// This struct does NOT own the underlying process handle.
 ///
 /// # Note
 /// The underlying handle has to have the following [privileges](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights):

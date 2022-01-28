@@ -24,10 +24,10 @@ use winapi::{
 };
 
 /// A handle to a process module.
-/// Note that this is not a `HANDLE` in windows terms but the base address of a loaded module.
+/// Note that this is not a `HANDLE` in windows terms but the base address of a loaded module (`HMODULE`).
 pub type ModuleHandle = HMODULE;
 
-/// A loaded module of a process. This module may or may not be of the current process.
+/// A loaded module of a running process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ProcessModule<'a> {
     handle: ModuleHandle,
