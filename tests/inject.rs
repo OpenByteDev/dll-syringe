@@ -38,11 +38,13 @@ fn inject_test(
         .stderr(Stdio::null())
         .spawn()?
         .into();
+    let dummy_process_clone = dummy_process.try_clone().unwrap();
+    let _guard = dispose::defer(|| {
+        dummy_process_clone.kill().unwrap();
+    });
 
     let syringe = Syringe::new();
     syringe.inject(&dummy_process, payload_path.as_ref())?;
-
-    dummy_process.kill()?;
 
     Ok(())
 }
