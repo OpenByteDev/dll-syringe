@@ -8,7 +8,7 @@ use std::{
         prelude::{AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle},
         raw::HANDLE,
     },
-    path::Path,
+    path::Path, num::NonZeroU32,
 };
 
 use rust_win32error::Win32Error;
@@ -16,7 +16,7 @@ use winapi::{
     shared::minwindef::{FALSE, HMODULE},
     um::{
         handleapi::DuplicateHandle,
-        processthreadsapi::{GetCurrentProcess, TerminateProcess},
+        processthreadsapi::{GetCurrentProcess, TerminateProcess, GetProcessId},
         psapi::{EnumProcessModulesEx, LIST_MODULES_ALL},
         winnt::DUPLICATE_SAME_ACCESS,
         wow64apiset::IsWow64Process,
@@ -54,9 +54,24 @@ impl AsHandle for ProcessRef<'_> {
     }
 }
 
-impl PartialEq for ProcessRef<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_raw_handle() == other.as_raw_handle()
+impl <'a, 'b> PartialEq<ProcessRef<'a>> for ProcessRef<'b> {
+    fn eq(&self, other: &ProcessRef<'a>) -> bool {
+        // TODO: (unsafe { CompareObjectHandles(self.handle(), other.handle()) }) != FALSE
+
+        self.handle() == other.handle() || 
+        self.pid().map_or(0, |v| v.get()) == other.pid().map_or(0, |v| v.get())
+    }
+}
+
+impl PartialEq<Process> for ProcessRef<'_> {
+    fn eq(&self, other: &Process) -> bool {
+        self == &other.get_ref()
+    }
+}
+
+impl PartialEq<ProcessRef<'_>> for Process {
+    fn eq(&self, other: &ProcessRef<'_>) -> bool {
+        &self.get_ref() == other
     }
 }
 
@@ -64,7 +79,7 @@ impl Eq for ProcessRef<'_> {}
 
 impl Hash for ProcessRef<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_raw_handle().hash(state)
+        self.handle().hash(state)
     }
 }
 
@@ -83,17 +98,17 @@ impl<'a> ProcessRef<'a> {
         Self(handle)
     }
 
+    /// Returns the raw pseudo handle representing the current process.
+    #[must_use]
+    pub fn raw_current_handle() -> ProcessHandle {
+        unsafe { GetCurrentProcess() }
+    }
+
     /// Returns the pseudo handle representing the current process.
     #[must_use]
     pub fn current_handle() -> BorrowedHandle<'static> {
         // the handle is only a pseudo handle representing the current process which does not need to be closed.
         unsafe { BorrowedHandle::borrow_raw_handle(Self::raw_current_handle()) }
-    }
-
-    /// Returns the raw pseudo handle representing the current process.
-    #[must_use]
-    pub fn raw_current_handle() -> ProcessHandle {
-        unsafe { GetCurrentProcess() }
     }
 
     /// Returns an instance representing the current process.
@@ -105,7 +120,7 @@ impl<'a> ProcessRef<'a> {
     /// Returns whether this instance represents the current process.
     #[must_use]
     pub fn is_current(&self) -> bool {
-        self.handle() == ProcessRef::raw_current_handle()
+        self == &ProcessRef::current()
     }
 
     /// Returns the underlying raw process handle.
@@ -134,6 +149,13 @@ impl<'a> ProcessRef<'a> {
             return Err(Win32Error::new());
         }
         Ok(unsafe { Process::from_raw_handle(new_handle.assume_init()) })
+    }
+
+    /// Returns the id of this process.
+    #[must_use]
+    pub fn pid(&self) -> Result<NonZeroU32, Win32Error> {
+        let result = unsafe { GetProcessId(self.handle()) };
+        NonZeroU32::new(result).ok_or_else(|| Win32Error::new())
     }
 
     /// Returns the handles of all the modules currently loaded in this process.
@@ -302,5 +324,37 @@ impl<'a> ProcessRef<'a> {
             return Err(Win32Error::new());
         }
         Ok(())
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn current_process_is_current() {
+        let process = ProcessRef::current();
+        assert!(process.is_current());
+
+        let process = Process::from_pid(process.pid().unwrap().get()).unwrap();
+        assert!(process.is_current());
+    }
+
+    #[test]
+    fn remote_process_is_not_current() {
+        let process = Process::all().into_iter().next().unwrap();
+        assert!(!process.is_current());
+    }
+
+    #[test]
+    fn current_pseudo_process_eq_current_process() {
+        let pseudo = ProcessRef::current();
+        let normal = Process::from_pid(pseudo.pid().unwrap().get()).unwrap();
+
+        assert_eq!(pseudo, normal.get_ref());
+        assert_eq!(pseudo, normal);
+        assert_eq!(ProcessRef::promote_to_owned(&pseudo).unwrap(), normal);
+        assert_eq!(pseudo, ProcessRef::promote_to_owned(&normal).unwrap());
     }
 }

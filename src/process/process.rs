@@ -79,7 +79,7 @@ impl From<Child> for Process {
 
 impl PartialEq for Process {
     fn eq(&self, other: &Self) -> bool {
-        self.as_raw_handle() == other.as_raw_handle()
+        self.get_ref() == other.get_ref()
     }
 }
 
@@ -87,7 +87,7 @@ impl Eq for Process {}
 
 impl Hash for Process {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_raw_handle().hash(state)
+        self.get_ref().hash(state)
     }
 }
 
