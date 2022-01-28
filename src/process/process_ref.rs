@@ -4,11 +4,12 @@ use std::{
     convert::TryInto,
     hash::{Hash, Hasher},
     mem::{self, MaybeUninit},
+    num::NonZeroU32,
     os::windows::{
         prelude::{AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle},
         raw::HANDLE,
     },
-    path::Path, num::NonZeroU32,
+    path::Path,
 };
 
 use rust_win32error::Win32Error;
@@ -16,7 +17,7 @@ use winapi::{
     shared::minwindef::{FALSE, HMODULE},
     um::{
         handleapi::DuplicateHandle,
-        processthreadsapi::{GetCurrentProcess, TerminateProcess, GetProcessId},
+        processthreadsapi::{GetCurrentProcess, GetProcessId, TerminateProcess},
         psapi::{EnumProcessModulesEx, LIST_MODULES_ALL},
         winnt::DUPLICATE_SAME_ACCESS,
         wow64apiset::IsWow64Process,
@@ -54,12 +55,12 @@ impl AsHandle for ProcessRef<'_> {
     }
 }
 
-impl <'a, 'b> PartialEq<ProcessRef<'a>> for ProcessRef<'b> {
+impl<'a, 'b> PartialEq<ProcessRef<'a>> for ProcessRef<'b> {
     fn eq(&self, other: &ProcessRef<'a>) -> bool {
         // TODO: (unsafe { CompareObjectHandles(self.handle(), other.handle()) }) != FALSE
 
-        self.handle() == other.handle() || 
-        self.pid().map_or(0, |v| v.get()) == other.pid().map_or(0, |v| v.get())
+        self.handle() == other.handle()
+            || self.pid().map_or(0, |v| v.get()) == other.pid().map_or(0, |v| v.get())
     }
 }
 
@@ -325,7 +326,6 @@ impl<'a> ProcessRef<'a> {
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
