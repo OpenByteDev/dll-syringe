@@ -152,10 +152,9 @@ impl<'a> ProcessRef<'a> {
     }
 
     /// Returns the id of this process.
-    #[must_use]
     pub fn pid(&self) -> Result<NonZeroU32, Win32Error> {
         let result = unsafe { GetProcessId(self.handle()) };
-        NonZeroU32::new(result).ok_or_else(|| Win32Error::new())
+        NonZeroU32::new(result).ok_or_else(Win32Error::new)
     }
 
     /// Returns the handles of all the modules currently loaded in this process.
