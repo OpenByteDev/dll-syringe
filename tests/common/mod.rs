@@ -39,15 +39,15 @@ pub fn build_test_target_x64() -> Result<PathBuf, Box<dyn Error>> {
 }
 
 fn find_x64_variant_of_target() -> String {
-    let mut platform = platforms::Platform::guess_current().unwrap().clone();
-    platform.target_arch = Arch::X86_64;
-    platform.to_string()
+    let platform = platforms::Platform::guess_current().unwrap();
+    let x64_triple = platform.target_triple.replace("i686", "x86_64");
+    platforms::Platform::find(&x64_triple).unwrap().to_string()
 }
 
 fn find_x86_variant_of_target() -> String {
-    let mut platform = platforms::Platform::guess_current().unwrap().clone();
-    platform.target_arch = Arch::X86;
-    platform.to_string()
+    let platform = platforms::Platform::guess_current().unwrap();
+    let x64_triple = platform.target_triple.replace("x86_64", "i686");
+    platforms::Platform::find(&x64_triple).unwrap().to_string()
 }
 
 pub fn build_helper_crate(
@@ -56,6 +56,12 @@ pub fn build_helper_crate(
     release: bool,
     ext: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
+    println!(
+        "Building helper crate {} for target {}",
+        crate_name,
+        target.unwrap_or("default")
+    );
+
     let payload_crate_path = PathBuf::from_str(".\\tests\\helpers")?
         .join(crate_name)
         .canonicalize()?;
