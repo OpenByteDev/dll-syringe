@@ -239,7 +239,7 @@ impl Syringe {
         }
 
         assert!(!process
-            .get_module_handles()?
+            .module_handles()?
             .as_ref()
             .contains(&module.handle()));
 
@@ -279,11 +279,11 @@ impl Syringe {
         // get path of kernel32 used in target process
         let kernel32_path = if process.is_wow64()? {
             // we need to manually construct the path to the kernel32.dll used in WOW64 processes
-            let mut wow64_path = Self::get_wow64_dir()?;
+            let mut wow64_path = Self::wow64_dir()?;
             wow64_path.push("kernel32.dll");
             wow64_path
         } else {
-            kernel32_module.get_path()?
+            kernel32_module.path()?
         };
 
         // load the dll as a pe and extract the fn offsets
@@ -309,7 +309,7 @@ impl Syringe {
     }
 
     #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
-    fn get_wow64_dir() -> Result<PathBuf, Win32Error> {
+    fn wow64_dir() -> Result<PathBuf, Win32Error> {
         let mut path_buf = MaybeUninit::uninit_array::<MAX_PATH>();
         let path_buf_len: u32 = path_buf.len().try_into().unwrap();
         let result = unsafe { GetSystemWow64DirectoryW(path_buf[0].as_mut_ptr(), path_buf_len) };

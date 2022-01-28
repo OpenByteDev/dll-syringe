@@ -180,7 +180,7 @@ impl<'a> ProcessModule<'a> {
     }
 
     /// Gets the path that the module was loaded from.
-    pub fn get_path(&self) -> Result<PathBuf, Win32Error> {
+    pub fn path(&self) -> Result<PathBuf, Win32Error> {
         if self.is_local() {
             self._get_path_of_local()
         } else {
@@ -230,7 +230,7 @@ impl<'a> ProcessModule<'a> {
     }
 
     /// Gets the base name (= file name) of the module.
-    pub fn get_base_name(&self) -> Result<OsString, Win32Error> {
+    pub fn base_name(&self) -> Result<OsString, Win32Error> {
         if self.is_local() {
             self._get_base_name_of_local()
         } else {

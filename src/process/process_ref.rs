@@ -130,9 +130,9 @@ impl<'a> ProcessRef<'a> {
         self.as_raw_handle()
     }
 
-    /// Promotes this instance to an owning [`Process`] instance.
-    pub fn promote_to_owned(&self) -> Result<Process, Win32Error> {
-        let raw_handle = self.as_raw_handle();
+    /// Promotes the given instance to an owning [`Process`] instance.
+    pub fn promote_to_owned(borrowed: &Self) -> Result<Process, Win32Error> {
+        let raw_handle = borrowed.as_raw_handle();
         let process = unsafe { GetCurrentProcess() };
         let mut new_handle = MaybeUninit::uninit();
         let result = unsafe {
@@ -163,7 +163,7 @@ impl<'a> ProcessRef<'a> {
     /// # Note
     /// If the process is currently starting up and has not loaded all its modules the returned list may be incomplete.
     /// This can be worked around by repeatedly calling this method.
-    pub fn get_module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, Win32Error> {
+    pub fn module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, Win32Error> {
         let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
         let mut module_buf_byte_size = mem::size_of::<HMODULE>() * module_buf.len();
         let mut bytes_needed_target = MaybeUninit::uninit();
@@ -250,11 +250,11 @@ impl<'a> ProcessRef<'a> {
             Cow::Borrowed(target_module_name.as_os_str())
         };
 
-        let modules = self.get_module_handles()?;
+        let modules = self.module_handles()?;
 
         for &module_handle in modules.as_ref() {
             let module = unsafe { ProcessModule::new(module_handle, *self) };
-            let module_name = module.get_base_name()?;
+            let module_name = module.base_name()?;
 
             if module_name.eq_ignore_ascii_case(&target_module_name) {
                 return Ok(Some(module));
@@ -284,11 +284,11 @@ impl<'a> ProcessRef<'a> {
             Cow::Borrowed(target_module_path.as_os_str())
         };
 
-        let modules = self.get_module_handles()?;
+        let modules = self.module_handles()?;
 
         for &module_handle in modules.as_ref() {
             let module = unsafe { ProcessModule::new(module_handle, *self) };
-            let module_path = module.get_path()?.into_os_string();
+            let module_path = module.path()?.into_os_string();
 
             if module_path.eq_ignore_ascii_case(&target_module_path) {
                 return Ok(Some(module));

@@ -200,7 +200,7 @@ impl Process {
 
     /// Creates a new owning [`Process`] instance for this process by duplicating the underlying handle.
     pub fn try_clone(&self) -> Result<Self, Win32Error> {
-        self.get_ref().promote_to_owned()
+        ProcessRef::promote_to_owned(&self.get_ref())
     }
 
     /// Leak the underlying handle and return it as a non-owning [`ProcessRef`] instance.
