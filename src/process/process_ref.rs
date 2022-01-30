@@ -128,6 +128,10 @@ impl<'a> ProcessRef<'a> {
         self == &ProcessRef::current()
     }
 
+    /// Returns whether this process is still alive and running.
+    /// 
+    /// # Note
+    /// If the operation to determine the status fails, this function assumes that the process has exited.
     pub fn is_alive(&self) -> bool {
         let mut exit_code = MaybeUninit::uninit();
         let result = unsafe { GetExitCodeProcess(self.handle(), exit_code.as_mut_ptr()) };
