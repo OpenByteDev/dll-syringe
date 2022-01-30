@@ -38,16 +38,18 @@ impl<'a> SharedMemory<'a> {
         allocation_type: DWORD,
         protection: DWORD,
     ) -> Result<Self, Win32Error> {
-        // TODO: use VirtualAlloc (non Ex) to allocate memory in the local process
-
-        let ptr = unsafe {
-            VirtualAllocEx(
-                process.handle(),
-                ptr::null_mut(),
-                len,
-                allocation_type,
-                protection,
-            )
+        let ptr = if process.is_current() {
+            unsafe { VirtualAlloc(ptr::null_mut(), len, allocation_type, protection) }
+        } else {
+            unsafe {
+                VirtualAllocEx(
+                    process.handle(),
+                    ptr::null_mut(),
+                    len,
+                    allocation_type,
+                    protection,
+                )
+            }
         };
         return if ptr.is_null() {
             Err(Win32Error::new())
@@ -106,6 +108,13 @@ impl<'a> SharedMemory<'a> {
             panic!("read out of bounds");
         }
 
+        if self.is_local() {
+            unsafe {
+                ptr::copy_nonoverlapping(self.ptr.add(offset), buf.as_mut_ptr(), buf.len());
+            }
+            return Ok(());
+        }
+
         let mut bytes_read = 0;
         let res = unsafe {
             ReadProcessMemory(
@@ -135,6 +144,13 @@ impl<'a> SharedMemory<'a> {
     pub fn write(&self, offset: usize, buf: &[u8]) -> Result<(), Win32Error> {
         if offset + buf.len() > self.len {
             panic!("write out of bounds");
+        }
+
+        if self.is_local() {
+            unsafe {
+                ptr::copy_nonoverlapping(buf.as_ptr(), self.ptr.add(offset), buf.len());
+            }
+            return Ok(());
         }
 
         let mut bytes_written = 0;
@@ -182,13 +198,19 @@ impl<'a> SharedMemory<'a> {
         unsafe { self._free() }
     }
     unsafe fn _free(&mut self) -> Result<(), Win32Error> {
-        let result = unsafe {
-            VirtualFreeEx(
-                self.process().handle(),
-                self.as_mut_ptr().cast(),
-                self.len(),
-                MEM_RELEASE,
-            )
+        assert!(self.is_owner);
+
+        let result = if self.is_local() {
+            unsafe { VirtualFree(self.as_mut_ptr().cast(), self.len(), MEM_RELEASE) }
+        } else {
+            unsafe {
+                VirtualFreeEx(
+                    self.process.handle(),
+                    self.as_mut_ptr().cast(),
+                    self.len(),
+                    MEM_RELEASE,
+                )
+            }
         };
 
         self.is_owner = false;
