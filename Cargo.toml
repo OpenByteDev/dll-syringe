@@ -22,6 +22,7 @@ path-absolutize = { version = "3.0", default-features = false }
 stopwatch = { version = "0.0", default-features = false }
 quick-error = { version = "2.0", default-features = false }
 u16cstr = { version = "0.3", default-features = false }
+iced-x86 = { version = "1.15", features = ["std", "code_asm"], default-features = false, optional = true }
 
 [target.'cfg(target_arch = "x86")'.dependencies]
 
@@ -33,9 +34,10 @@ platforms = { version = "2.0", default-features = false }
 dispose = { version = "0.4", default-features = false }
 
 [features]
-default = ["into_x86_from_x64"]
+default = ["into_x86_from_x64", "call_remote_procedure"]
 sync_send_syringe = []
 into_x86_from_x64 = ["goblin"]
+call_remote_procedure = ["iced-x86"]
 
 [package.metadata.docs.rs]
 targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]

@@ -9,7 +9,8 @@ use std::{
         prelude::{AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle},
         raw::HANDLE,
     },
-    path::Path,
+    path::{Path, PathBuf},
+    ptr,
 };
 
 use rust_win32error::Win32Error;
@@ -17,15 +18,18 @@ use winapi::{
     shared::minwindef::{FALSE, HMODULE},
     um::{
         handleapi::DuplicateHandle,
-        processthreadsapi::{GetCurrentProcess, GetProcessId, TerminateProcess},
-        psapi::{EnumProcessModulesEx, LIST_MODULES_ALL},
+        libloaderapi::GetModuleFileNameW,
+        processthreadsapi::{
+            GetCurrentProcess, GetExitCodeProcess, GetProcessId, TerminateProcess,
+        },
+        psapi::{EnumProcessModulesEx, GetModuleFileNameExW, LIST_MODULES_ALL},
         winnt::DUPLICATE_SAME_ACCESS,
         wow64apiset::IsWow64Process,
     },
 };
 
 use crate::{
-    utils::{ArrayOrVecSlice, UninitArrayBuf},
+    utils::{ArrayOrVecSlice, UninitArrayBuf, WinPathBuf},
     ModuleHandle, Process, ProcessHandle, ProcessModule,
 };
 
@@ -122,6 +126,12 @@ impl<'a> ProcessRef<'a> {
     #[must_use]
     pub fn is_current(&self) -> bool {
         self == &ProcessRef::current()
+    }
+
+    pub fn is_alive(&self) -> bool {
+        let mut exit_code = MaybeUninit::uninit();
+        let result = unsafe { GetExitCodeProcess(self.handle(), exit_code.as_mut_ptr()) };
+        result != FALSE && unsafe { exit_code.assume_init() } == 0
     }
 
     /// Returns the underlying raw process handle.
@@ -312,6 +322,57 @@ impl<'a> ProcessRef<'a> {
         Ok(unsafe { is_wow64.assume_init() } != FALSE)
     }
 
+    /// Gets the executable path of this process.
+    // TODO: deduplicate with ProcessModule::get_path
+    pub fn path(&self) -> Result<PathBuf, Win32Error> {
+        if self.is_current() {
+            self._get_path_of_current()
+        } else {
+            self._get_path_of_remote()
+        }
+    }
+    fn _get_path_of_current(&self) -> Result<PathBuf, Win32Error> {
+        assert!(self.is_current());
+
+        let mut module_path_buf = WinPathBuf::new();
+        let module_path_buf_size: u32 = module_path_buf.len().try_into().unwrap();
+        let result = unsafe {
+            GetModuleFileNameW(
+                ptr::null_mut(),
+                module_path_buf.as_mut_ptr(),
+                module_path_buf_size,
+            )
+        };
+        if result == 0 {
+            return Err(Win32Error::new());
+        }
+
+        let module_path_len = result as usize;
+        let module_path = unsafe { module_path_buf.assume_init_path_buf(module_path_len) };
+        Ok(module_path)
+    }
+    fn _get_path_of_remote(&self) -> Result<PathBuf, Win32Error> {
+        assert!(!self.is_current());
+
+        let mut module_path_buf = WinPathBuf::new();
+        let module_path_buf_size: u32 = module_path_buf.len().try_into().unwrap();
+        let result = unsafe {
+            GetModuleFileNameExW(
+                self.handle(),
+                ptr::null_mut(),
+                module_path_buf.as_mut_ptr(),
+                module_path_buf_size,
+            )
+        };
+        if result == 0 {
+            return Err(Win32Error::new());
+        }
+
+        let module_path_len = result as usize;
+        let module_path = unsafe { module_path_buf.assume_init_path_buf(module_path_len) };
+        Ok(module_path)
+    }
+
     /// Terminates this process with exit code 1.
     pub fn kill(self) -> Result<(), Win32Error> {
         self.kill_with_exit_code(1)
@@ -342,8 +403,10 @@ mod tests {
 
     #[test]
     fn remote_process_is_not_current() {
-        let process = Process::all().into_iter().next().unwrap();
-        assert!(!process.is_current());
+        let mut all = Process::all().into_iter();
+        let process_a = all.next().unwrap();
+        let process_b = all.next().unwrap();
+        assert!(!process_a.is_current() || !process_b.is_current());
     }
 
     #[test]
