@@ -108,7 +108,7 @@ impl Syringe {
         &self,
         process: ProcessRef,
     ) -> Result<&InjectHelpData, InjectError> {
-        let is_target_x64 = !process.is_wow64()?;
+        let is_target_x64 = process.is_x64()?;
 
         #[cfg(target_arch = "x86_64")]
         {
@@ -208,7 +208,7 @@ impl Syringe {
 
         // Allocate memory in remote process and build a method stub.
         let code_mem = SharedMemory::allocate_code(process, 4096)?;
-        let code = if process.is_wow64()? {
+        let code = if process.is_x86()? {
             Syringe::build_get_proc_address_x86(
                 code_mem.as_ptr().cast(),
                 get_proc_address_ptr_mem.as_ptr().cast(),
@@ -216,6 +216,7 @@ impl Syringe {
             )
             .unwrap()
         } else {
+            assert!(process.is_x64().unwrap_or(false));
             Syringe::build_get_proc_address_x64(
                 code_mem.as_ptr().cast(),
                 get_proc_address_ptr_mem.as_ptr().cast(),
@@ -258,7 +259,7 @@ impl Syringe {
         let param_mem = SharedMemory::allocate_struct(process, parameter)?;
         let code_mem = SharedMemory::allocate_code(process, 4096)?;
 
-        let code = if process.is_wow64()? {
+        let code = if process.is_x86()? {
             Syringe::build_call_procedure_x86(
                 code_mem.as_ptr().cast(),
                 procedure,
@@ -266,6 +267,7 @@ impl Syringe {
             )
             .unwrap()
         } else {
+            assert!(process.is_x64().unwrap_or(false));
             Syringe::build_call_procedure_x64(
                 code_mem.as_ptr().cast(),
                 procedure,
@@ -546,8 +548,8 @@ impl Syringe {
         .unwrap();
 
         // get path of kernel32 used in target process
-        let kernel32_path = if process.is_wow64()? {
-            // we need to manually construct the path to the kernel32.dll used in WOW64 processes
+        let kernel32_path = if process.is_x86()? {
+            // We need to manually construct the path to the kernel32.dll used in WOW64 processes.
             let mut wow64_path = Self::wow64_dir()?;
             wow64_path.push("kernel32.dll");
             wow64_path

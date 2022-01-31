@@ -15,7 +15,10 @@ use std::{
 
 use rust_win32error::Win32Error;
 use winapi::{
-    shared::minwindef::{FALSE, HMODULE},
+    shared::{
+        minwindef::{FALSE, HMODULE},
+        winerror::ERROR_CALL_NOT_IMPLEMENTED,
+    },
     um::{
         handleapi::DuplicateHandle,
         libloaderapi::GetModuleFileNameW,
@@ -24,7 +27,7 @@ use winapi::{
         },
         psapi::{EnumProcessModulesEx, GetModuleFileNameExW, LIST_MODULES_ALL},
         winnt::DUPLICATE_SAME_ACCESS,
-        wow64apiset::IsWow64Process,
+        wow64apiset::{GetSystemWow64DirectoryA, IsWow64Process},
     },
 };
 
@@ -129,7 +132,7 @@ impl<'a> ProcessRef<'a> {
     }
 
     /// Returns whether this process is still alive and running.
-    /// 
+    ///
     /// # Note
     /// If the operation to determine the status fails, this function assumes that the process has exited.
     pub fn is_alive(&self) -> bool {
@@ -324,6 +327,29 @@ impl<'a> ProcessRef<'a> {
             return Err(Win32Error::new());
         }
         Ok(unsafe { is_wow64.assume_init() } != FALSE)
+    }
+
+    /// Returns whether this process is a 64-bit process.
+    pub fn is_x64(&self) -> Result<bool, Win32Error> {
+        Ok(Self::is_x64_windows()? && !self.is_wow64()?)
+    }
+
+    /// Returns whether this process is a 32-bit process.
+    pub fn is_x86(&self) -> Result<bool, Win32Error> {
+        Ok(Self::is_x32_windows()? || Self::is_x64_windows()? && self.is_wow64()?)
+    }
+
+    fn is_x32_windows() -> Result<bool, Win32Error> {
+        // TODO: cache?
+        // TODO: use GetNativeSystemInfo() instead?
+        let result = unsafe { GetSystemWow64DirectoryA(ptr::null_mut(), 0) };
+        if result == 0 {
+            return Err(Win32Error::new());
+        }
+        Ok(Win32Error::new().get_error_code() == ERROR_CALL_NOT_IMPLEMENTED)
+    }
+    fn is_x64_windows() -> Result<bool, Win32Error> {
+        Self::is_x32_windows().map(|r| !r)
     }
 
     /// Gets the executable path of this process.
