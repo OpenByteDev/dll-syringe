@@ -8,7 +8,14 @@
 )]
 #![allow(clippy::module_inception)]
 #![warn(unsafe_op_in_unsafe_fn, missing_docs)]
-#![cfg_attr(not(target_arch = "x86_64"), allow(unused_imports))]
+#![cfg_attr(
+    any(
+        not(target_arch = "x86_64"),
+        not(feature = "into_x86_from_x64"),
+        not(feature = "call_remote_procedure")
+    ),
+    allow(unused_imports)
+)]
 #![doc = include_str!("../crate-doc.md")]
 
 mod syringe;
