@@ -15,8 +15,8 @@ mod common;
 #[test]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[cfg(feature = "call_remote_procedure")]
-fn get_proc_address_32() -> Result<(), Box<dyn Error>> {
-    get_proc_address_test(
+fn get_procedure_address_32() -> Result<(), Box<dyn Error>> {
+    get_procedure_address_test(
         common::build_test_payload_x86()?,
         common::build_test_target_x86()?,
     )
@@ -25,15 +25,15 @@ fn get_proc_address_32() -> Result<(), Box<dyn Error>> {
 #[test]
 #[cfg(target_arch = "x86_64")]
 #[cfg(feature = "call_remote_procedure")]
-fn get_proc_address_64() -> Result<(), Box<dyn Error>> {
-    get_proc_address_test(
+fn get_procedure_address_64() -> Result<(), Box<dyn Error>> {
+    get_procedure_address_test(
         common::build_test_payload_x64()?,
         common::build_test_target_x64()?,
     )
 }
 
 #[cfg(feature = "call_remote_procedure")]
-fn get_proc_address_test(
+fn get_procedure_address_test(
     payload_path: impl AsRef<Path>,
     target_path: impl AsRef<Path>,
 ) -> Result<(), Box<dyn Error>> {
@@ -51,10 +51,10 @@ fn get_proc_address_test(
     let syringe = Syringe::new();
     let module = syringe.inject(&dummy_process, payload_path.as_ref())?;
 
-    let dll_main = syringe.get_proc_address(module, "DllMain")?;
+    let dll_main = syringe.get_procedure_address(module, "DllMain")?;
     assert_ne!(dll_main, ptr::null());
 
-    let open_process = syringe.get_proc_address(
+    let open_process = syringe.get_procedure_address(
         dummy_process.find_module_by_name("kernel32.dll")?.unwrap(),
         "OpenProcess",
     )?;
@@ -102,7 +102,7 @@ fn call_procedure_fast_test(
     let syringe = Syringe::new();
     let module = syringe.inject(&dummy_process, payload_path.as_ref())?;
 
-    let remote_echo = syringe.get_proc_address(module, "echo")?;
+    let remote_echo = syringe.get_procedure_address(module, "echo")?;
     assert_ne!(remote_echo, ptr::null());
 
     let echo_value = 0x1234_5678_9abc_def0u64 as LPVOID;
@@ -154,14 +154,14 @@ fn call_procedure_test(
     let syringe = Syringe::new();
     let module = syringe.inject(&dummy_process, payload_path.as_ref())?;
 
-    let remote_echo2 = syringe.get_proc_address(module, "echo2")?;
+    let remote_echo2 = syringe.get_procedure_address(module, "echo2")?;
     assert_ne!(remote_echo2, ptr::null());
 
     let echo2_result: u32 =
         unsafe { syringe.call_procedure(&dummy_process, remote_echo2, &0x1234_5678u32) }?;
     assert_eq!(echo2_result, 0x1234_5678u32);
 
-    let remote_add = syringe.get_proc_address(module, "add")?;
+    let remote_add = syringe.get_procedure_address(module, "add")?;
     assert_ne!(remote_add, ptr::null());
 
     let add_result: f64 =

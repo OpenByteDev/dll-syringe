@@ -178,7 +178,7 @@ impl Syringe {
 
     #[cfg(feature = "call_remote_procedure")]
     /// Load the address of the given function from the given module in the remote process.
-    pub fn get_proc_address(
+    pub fn get_procedure_address(
         &self,
         module: ProcessModule,
         name: impl AsRef<str>,
