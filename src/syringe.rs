@@ -241,7 +241,7 @@ impl Syringe {
     }
 
     #[cfg(feature = "call_remote_procedure")]
-    /// Calls the function pointer retrieved using [Syringe::get_proc_address] in the remote process.
+    /// Calls the function pointer retrieved using [Syringe::get_procedure_address] in the remote process.
     /// The target function has to have the following signature: `extern "system" fn(parameter: *const P, result: *mut R)`.
     ///
     /// # Safety
@@ -291,7 +291,7 @@ impl Syringe {
     }
 
     #[cfg(feature = "call_remote_procedure")]
-    /// Calls the function specified by `procedure` retrieved using [Syringe::get_proc_address] in the remote process.
+    /// Calls the function specified by `procedure` retrieved using [Syringe::get_procedure_address] in the remote process.
     /// The target function has to have the following signature: `extern "system" fn(*mut c_void) -> u32`.
     ///
     /// # Note
