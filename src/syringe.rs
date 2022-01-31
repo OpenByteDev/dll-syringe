@@ -2,6 +2,7 @@ use cstr::cstr;
 #[cfg(target_arch = "x86_64")]
 #[cfg(feature = "into_x86_from_x64")]
 use goblin::pe::PE;
+#[cfg(feature = "call_remote_procedure")]
 use iced_x86::{code_asm::*, IcedError};
 use path_absolutize::Absolutize;
 use rust_win32error::Win32Error;
