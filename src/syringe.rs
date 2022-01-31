@@ -241,6 +241,9 @@ impl Syringe {
     #[cfg(feature = "call_remote_procedure")]
     /// Calls the function pointer retrieved using [Syringe::get_proc_address] in the remote process.
     /// The target function has to have the following signature: `extern "system" fn(parameter: *const P, result: *mut R)`.
+    ///
+    /// # Safety
+    /// The caller has to ensure that the given function pointer is valid and that it points to a function in the target process with the correct signature.
     pub unsafe fn call_procedure<'a, R, P>(
         &self,
         process: impl Into<ProcessRef<'a>>,
@@ -287,13 +290,18 @@ impl Syringe {
     #[cfg(feature = "call_remote_procedure")]
     /// Calls the function specified by `procedure` retrieved using [Syringe::get_proc_address] in the remote process.
     /// The target function has to have the following signature: `extern "system" fn(*mut c_void) -> u32`.
-    /// Note that a pointer to a structure in the current process can not be accessed from the remote process.
+    ///
+    /// # Note
+    /// Pointers to memory in the current process will not be accessible from the remote process.
+    ///
+    /// # Safety
+    /// The caller has to ensure that the given function pointer is valid and that it points to a function in the target process with the correct signature.
     pub unsafe fn call_procedure_fast<'a>(
         &self,
         process: impl Into<ProcessRef<'a>>,
         procedure: *const c_void,
         parameter: *mut c_void,
-    ) -> Result<DWORD, Win32Error> {
+    ) -> Result<u32, Win32Error> {
         Self::run_remote_thread(
             process.into(),
             unsafe { mem::transmute(procedure) },
