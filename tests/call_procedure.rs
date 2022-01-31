@@ -60,6 +60,9 @@ fn get_procedure_address_test(
     )?;
     assert_ne!(open_process, ptr::null());
 
+    let remote_invalid = syringe.get_procedure_address(module, "Invalid")?;
+    assert_eq!(remote_invalid, ptr::null());
+
     Ok(())
 }
 
@@ -154,6 +157,7 @@ fn call_procedure_test(
     let syringe = Syringe::new();
     let module = syringe.inject(&dummy_process, payload_path.as_ref())?;
 
+    // Simple echo test
     let remote_echo2 = syringe.get_procedure_address(module, "echo2")?;
     assert_ne!(remote_echo2, ptr::null());
 
@@ -161,6 +165,7 @@ fn call_procedure_test(
         unsafe { syringe.call_procedure(&dummy_process, remote_echo2, &0x1234_5678u32) }?;
     assert_eq!(echo2_result, 0x1234_5678u32);
 
+    // "Complex" addition test
     let remote_add = syringe.get_procedure_address(module, "add")?;
     assert_ne!(remote_add, ptr::null());
 
