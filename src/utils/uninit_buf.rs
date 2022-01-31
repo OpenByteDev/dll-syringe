@@ -19,7 +19,6 @@ impl<T, const SIZE: usize> UninitArrayBuf<T, SIZE> {
         self.0.len()
     }
 
-    #[allow(dead_code)]
     pub const fn as_ptr(&self) -> *const T {
         self.0.as_ptr().cast()
     }
@@ -46,10 +45,8 @@ impl<T, const SIZE: usize> UninitArrayBuf<T, SIZE> {
     }
 }
 
-#[cfg(windows)]
 pub(crate) struct WinPathBuf(UninitArrayBuf<u16, MAX_PATH>);
 
-#[cfg(windows)]
 impl WinPathBuf {
     pub const fn new() -> Self {
         Self(UninitArrayBuf::new())
@@ -68,7 +65,6 @@ impl WinPathBuf {
         U16Str::from_slice(slice)
     }
 
-    #[allow(dead_code)]
     pub unsafe fn assume_init_u16_str_with_nul(
         &self,
         len: usize,
@@ -77,7 +73,6 @@ impl WinPathBuf {
         U16CStr::from_slice_truncate(slice)
     }
 
-    #[allow(dead_code)]
     pub unsafe fn assume_init_u16_str_with_nul_unchecked(&self, len: usize) -> &U16CStr {
         let slice = unsafe { self.0.assume_init_slice(..len) };
         unsafe { U16CStr::from_slice_unchecked(slice) }
