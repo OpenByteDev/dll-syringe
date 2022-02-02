@@ -4,7 +4,8 @@
     maybe_uninit_slice,
     maybe_uninit_array_assume_init,
     once_cell,
-    io_safety
+    io_safety,
+    linked_list_cursors
 )]
 #![allow(clippy::module_inception)]
 #![warn(unsafe_op_in_unsafe_fn, missing_docs)]
