@@ -20,7 +20,7 @@ widestring = { version = "0.5", default-features = false }
 rust_win32error = { version = "0.8", default-features = false }
 path-absolutize = { version = "3.0", default-features = false }
 stopwatch = { version = "0.0", default-features = false }
-quick-error = { version = "2.0", default-features = false }
+thiserror = { version = "1.0", default-features = false }
 u16cstr = { version = "0.3", default-features = false }
 iced-x86 = { version = "1.15", features = ["std", "code_asm"], default-features = false, optional = true }
 
