@@ -470,37 +470,11 @@ impl Syringe {
         let process = module.process();
         let inject_data = self.get_inject_help_data_for_process(module.process())?;
 
-        let thread_handle = unsafe {
-            CreateRemoteThread(
-                process.handle(),
-                ptr::null_mut(),
-                0,
-                Some(mem::transmute(inject_data.get_free_library_fn_ptr())),
-                module.handle().cast(),
-                0,
-                ptr::null_mut(),
-            )
-        };
-        if thread_handle.is_null() {
-            return Err(Win32Error::new().into());
-        }
-        // ensure handle is closed once we exit this function
-        let thread_handle = unsafe { OwnedHandle::from_raw_handle(thread_handle) };
-
-        let reason = unsafe { WaitForSingleObject(thread_handle.as_raw_handle(), INFINITE) };
-        if reason == WAIT_FAILED {
-            return Err(Win32Error::new().into());
-        }
-
-        let mut exit_code = MaybeUninit::uninit();
-        let result =
-            unsafe { GetExitCodeThread(thread_handle.as_raw_handle(), exit_code.as_mut_ptr()) };
-        if result == 0 {
-            return Err(Win32Error::new().into());
-        }
-        assert_ne!(result, STILL_ACTIVE.try_into().unwrap());
-
-        let exit_code = unsafe { exit_code.assume_init() };
+        let exit_code = Self::run_remote_thread(
+            process,
+            unsafe { mem::transmute(inject_data.get_free_library_fn_ptr()) },
+            module.handle().cast(),
+        )?;
 
         let free_library_result = unsafe { mem::transmute::<u32, BOOL>(exit_code) };
         if free_library_result == 0 {
@@ -542,7 +516,7 @@ impl Syringe {
     fn load_inject_help_data_for_process(
         process: ProcessRef,
     ) -> Result<InjectHelpData, InjectError> {
-        // get kernel32 handle of target process
+        // get kernel32 handle of target process (may fail if target process is currently starting and has not loaded kernel32 yet)
         let kernel32_module = retry_with_filter(
             || process.find_module_by_name("kernel32.dll"),
             Option::is_some,

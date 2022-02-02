@@ -15,13 +15,29 @@ pub struct SharedMemory<'a> {
     process: ProcessRef<'a>,
     len: usize,
     is_owner: bool,
+    data: PhantomData<&'a [u8]>,
+}
+
+impl PartialEq for SharedMemory<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ptr == other.ptr && self.process == other.process
+    }
+}
+
+impl Eq for SharedMemory<'_> {}
+
+impl Hash for SharedMemory<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ptr.hash(state);
+        self.process.hash(state);
+    }
 }
 
 impl<'a> SharedMemory<'a> {
-    pub fn allocate_local(len: usize) -> Result<Self, Win32Error> {
-        Self::allocate(ProcessRef::current(), len)
-    }
     pub fn allocate(process: ProcessRef<'a>, len: usize) -> Result<Self, Win32Error> {
+        Self::allocate_code(process, len)
+    }
+    pub fn allocate_data(process: ProcessRef<'a>, len: usize) -> Result<Self, Win32Error> {
         Self::allocate_with_options(process, len, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE)
     }
     pub fn allocate_code(process: ProcessRef<'a>, len: usize) -> Result<Self, Win32Error> {
@@ -32,7 +48,7 @@ impl<'a> SharedMemory<'a> {
             PAGE_EXECUTE_READWRITE,
         )
     }
-    pub fn allocate_with_options(
+    fn allocate_with_options(
         process: ProcessRef<'a>,
         len: usize,
         allocation_type: DWORD,
@@ -51,6 +67,7 @@ impl<'a> SharedMemory<'a> {
                 )
             }
         };
+
         return if ptr.is_null() {
             Err(Win32Error::new())
         } else {
@@ -58,10 +75,10 @@ impl<'a> SharedMemory<'a> {
         };
     }
     pub fn allocate_uninit_struct<T>(process: ProcessRef<'a>) -> Result<Self, Win32Error> {
-        Self::allocate(process, mem::size_of::<T>())
+        Self::allocate_data(process, mem::size_of::<T>())
     }
     pub fn allocate_struct<T: ?Sized>(process: ProcessRef<'a>, s: &T) -> Result<Self, Win32Error> {
-        let buf = Self::allocate(process, mem::size_of_val(s))?;
+        let buf = Self::allocate_data(process, mem::size_of_val(s))?;
         buf.write_struct(0, s)?;
         Ok(buf)
     }
@@ -77,6 +94,7 @@ impl<'a> SharedMemory<'a> {
             process,
             len,
             is_owner,
+            data: PhantomData,
         }
     }
     pub unsafe fn local_from_parts(ptr: *mut u8, len: usize, owned: bool) -> Self {
