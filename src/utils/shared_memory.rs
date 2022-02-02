@@ -184,6 +184,26 @@ impl<'a> SharedMemory<'a> {
         self.ptr
     }
 
+    pub fn flush_instruction_cache(&self) -> Result<(), Win32Error> {
+        self.flush_instruction_cache_of_range(..)
+    }
+
+    pub fn flush_instruction_cache_of_range(
+        &self,
+        bounds: impl RangeBounds<usize>,
+    ) -> Result<(), Win32Error> {
+        let range = range_from_bounds(0, self.len(), &bounds);
+        let base_ptr = unsafe { self.ptr.add(range.start) };
+        let range_len = range.len();
+
+        let res =
+            unsafe { FlushInstructionCache(self.process.handle(), base_ptr.cast(), range_len) };
+        if res == 0 {
+            Err(Win32Error::new())
+        } else {
+            Ok(())
+        }
+    }
     pub fn into_parts(mut self) -> (*mut u8, usize, bool) {
         let was_owner = self.is_owner;
         self.is_owner = false;

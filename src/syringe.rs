@@ -226,6 +226,7 @@ impl Syringe {
             .unwrap()
         };
         code_mem.write(0, &code)?;
+        code_mem.flush_instruction_cache()?;
 
         let exit_code = Self::run_remote_thread(
             process,
@@ -277,6 +278,7 @@ impl Syringe {
             .unwrap()
         };
         code_mem.write(0, &code)?;
+        code_mem.flush_instruction_cache()?;
 
         let exit_code = Self::run_remote_thread(
             process,
