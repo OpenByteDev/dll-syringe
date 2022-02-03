@@ -15,7 +15,7 @@ pub enum Win32OrNulError {
 
 /// Error enum for errors during a call to [`ProcessModule::get_procedure`].
 ///
-/// [`ProcessModule::get_procedure`]: ProcessModule::get_procedure
+/// [`ProcessModule::get_procedure`]: crate::ProcessModule::get_procedure
 #[derive(Debug, Error)]
 pub enum ProcedureLoadError {
     /// Variant representing an illegal interior nul value.
@@ -29,11 +29,11 @@ pub enum ProcedureLoadError {
     UnsupportedTarget,
 }
 
-/// Error enum for errors during a call to [`ProcessModule::from_path`] and related methods.
+/// Error enum for errors during a call to [`ProcessModule::find_by_path`] and related methods.
 ///
-/// [`ProcessModule::from_path`]: ProcessModule::from_path
+/// [`ProcessModule::find_by_path`]: crate::ProcessModule::find_by_path
 #[derive(Debug, Error)]
-pub enum ModuleFromPathError {
+pub enum FindModuleByPathError {
     /// Variant representing an illegal interior nul value.
     #[error("interior nul found")]
     Nul(#[from] widestring::NulError<u16>),
@@ -45,7 +45,7 @@ pub enum ModuleFromPathError {
     Io(#[from] io::Error),
 }
 
-impl From<Win32OrNulError> for ModuleFromPathError {
+impl From<Win32OrNulError> for FindModuleByPathError {
     fn from(err: Win32OrNulError) -> Self {
         match err {
             Win32OrNulError::Nul(e) => Self::Nul(e),
@@ -88,12 +88,12 @@ impl From<Win32OrNulError> for InjectError {
     }
 }
 
-impl From<ModuleFromPathError> for InjectError {
-    fn from(err: ModuleFromPathError) -> Self {
+impl From<FindModuleByPathError> for InjectError {
+    fn from(err: FindModuleByPathError) -> Self {
         match err {
-            ModuleFromPathError::Nul(e) => Self::Nul(e),
-            ModuleFromPathError::Win32(e) => Self::Win32(e),
-            ModuleFromPathError::Io(e) => Self::Io(e),
+            FindModuleByPathError::Nul(e) => Self::Nul(e),
+            FindModuleByPathError::Win32(e) => Self::Win32(e),
+            FindModuleByPathError::Io(e) => Self::Io(e),
         }
     }
 }

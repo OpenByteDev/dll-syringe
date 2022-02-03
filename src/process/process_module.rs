@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    error::{ModuleFromPathError, ProcedureLoadError, Win32OrNulError},
+    error::{FindModuleByPathError, ProcedureLoadError, Win32OrNulError},
     utils::WinPathBuf,
     ProcessRef,
 };
@@ -55,7 +55,7 @@ impl<'a> ProcessModule<'a> {
     pub fn find(
         module_name_or_path: impl AsRef<Path>,
         process: ProcessRef<'a>,
-    ) -> Result<Option<Self>, ModuleFromPathError> {
+    ) -> Result<Option<Self>, FindModuleByPathError> {
         let module_name_or_path = module_name_or_path.as_ref();
         if module_name_or_path.has_root() {
             Self::find_by_path(module_name_or_path, process)
@@ -80,7 +80,7 @@ impl<'a> ProcessModule<'a> {
     pub fn find_by_path(
         module_path: impl AsRef<Path>,
         process: ProcessRef<'a>,
-    ) -> Result<Option<Self>, ModuleFromPathError> {
+    ) -> Result<Option<Self>, FindModuleByPathError> {
         if process.is_current() {
             Self::find_local_by_path(module_path)
         } else {
@@ -92,7 +92,7 @@ impl<'a> ProcessModule<'a> {
     /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn find_local(
         module_name_or_path: impl AsRef<Path>,
-    ) -> Result<Option<Self>, ModuleFromPathError> {
+    ) -> Result<Option<Self>, FindModuleByPathError> {
         Self::find(module_name_or_path, ProcessRef::current())
     }
     /// Searches for a module with the given name in the current process.
@@ -106,7 +106,7 @@ impl<'a> ProcessModule<'a> {
     /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn find_local_by_path(
         module_path: impl AsRef<Path>,
-    ) -> Result<Option<Self>, ModuleFromPathError> {
+    ) -> Result<Option<Self>, FindModuleByPathError> {
         let absolute_path = module_path.as_ref().absolutize()?;
         Self::_find_local_by_name_or_abs_path(absolute_path).map_err(|e| e.into())
     }
@@ -149,7 +149,7 @@ impl<'a> ProcessModule<'a> {
     fn _find_remote_by_path(
         module_path: impl AsRef<Path>,
         process: ProcessRef<'a>,
-    ) -> Result<Option<Self>, ModuleFromPathError> {
+    ) -> Result<Option<Self>, FindModuleByPathError> {
         assert!(!process.is_current());
 
         process

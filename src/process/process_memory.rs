@@ -99,11 +99,11 @@ impl<'a> ProcessMemoryBuffer<'a> {
         };
     }
 
-    /// Allocates a new buffer with enough space to store a value of type [`T`] in the given process.
+    /// Allocates a new buffer with enough space to store a value of type `T` in the given process.
     pub fn allocate_for<T>(process: ProcessRef<'a>) -> Result<Self, Win32Error> {
         Self::allocate_data(process, mem::size_of::<T>())
     }
-    /// Allocates a new buffer with enough space to store a value of type [`T`] in the given process.
+    /// Allocates a new buffer with enough space to store a value of type `T` in the given process.
     pub fn allocate_and_write<T: ?Sized>(
         process: ProcessRef<'a>,
         s: &T,
@@ -259,13 +259,13 @@ impl<'a> ProcessMemorySlice<'a> {
         }
     }
 
-    /// Reads a value of type [`T`] from this buffer at the given offset.
+    /// Reads a value of type `T` from this buffer at the given offset.
     ///
     /// # Panics
     /// This function will panic if the given offset plus the size of the value exceeds this buffer's length.
     /// 
     /// # Safety
-    /// The caller must ensure that the designated region of memory contains a valid instance of type [`T`] at the given offset.
+    /// The caller must ensure that the designated region of memory contains a valid instance of type `T` at the given offset.
     pub unsafe fn read_struct<T>(&self, offset: usize) -> Result<T, Win32Error> {
         let mut uninit_value = MaybeUninit::uninit();
         self.read(offset, unsafe {
@@ -308,7 +308,7 @@ impl<'a> ProcessMemorySlice<'a> {
         }
     }
 
-    /// Writes a value of type [`T`] to this buffer at the given offset.
+    /// Writes a value of type `T` to this buffer at the given offset.
     ///
     /// # Panics
     /// This function will panic if the given offset plus the given buffer length exceeds this buffer's length.
