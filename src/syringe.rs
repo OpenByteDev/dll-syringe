@@ -33,9 +33,8 @@ use winapi::{
 };
 
 use crate::{
-    error::InjectError,
-    utils::{retry_with_filter, SharedMemory},
-    ModuleHandle, ProcessModule, ProcessRef,
+    error::InjectError, utils::retry_with_filter, ModuleHandle, ProcessMemoryBuffer, ProcessModule,
+    ProcessRef, RemoteBoxAllocator
 };
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
@@ -152,7 +151,8 @@ impl Syringe {
 
         let wide_module_path =
             U16CString::from_os_str(module_path.as_os_str())?.into_vec_with_nul();
-        let module_path_buf = SharedMemory::allocate_struct(process, wide_module_path.as_slice())?;
+        let module_path_buf =
+            ProcessMemoryBuffer::allocate_and_write(process, wide_module_path.as_slice())?;
 
         // creating a thread that will call LoadLibraryW with a pointer to payload_path as argument
         let exit_code = Self::run_remote_thread(
@@ -191,54 +191,42 @@ impl Syringe {
             .get_proc_address_fn_ptr();
 
         // Allocate memory in remote process to store the parameter and the return value.
-        // TODO: store in a single reusable buffer.
-        let get_proc_address_ptr_mem =
-            SharedMemory::allocate_struct(process, &remote_get_proc_address)?;
-        let return_value_mem = SharedMemory::allocate_uninit_struct::<FARPROC>(process)?;
-        let name_mem = SharedMemory::allocate_struct(
-            process,
-            CString::new(name).unwrap().as_bytes_with_nul(),
-        )?;
-        let param_mem = SharedMemory::allocate_struct(
-            process,
-            &GetProcAddressParams {
-                module_handle: module.handle() as u64,
-                name: name_mem.as_ptr() as u64,
-            },
-        )?;
+        let mut remote_allocator = RemoteBoxAllocator::new(process);
+        let mut result = remote_allocator.alloc_uninit::<FARPROC>()?;
+        let mut name = remote_allocator.alloc_and_copy(CString::new(name).unwrap().as_bytes_with_nul())?;
+        let mut parameters = remote_allocator.alloc_and_copy(&GetProcAddressParams {
+            module_handle: module.handle() as u64,
+            name: name.as_ptr() as u64,
+        })?;
 
         // Allocate memory in remote process and build a method stub.
-        let code_mem = SharedMemory::allocate_code(process, 4096)?;
         let code = if process.is_x86()? {
             Syringe::build_get_proc_address_x86(
-                code_mem.as_ptr().cast(),
-                get_proc_address_ptr_mem.as_ptr().cast(),
-                return_value_mem.as_mut_ptr().cast(),
+                remote_get_proc_address as *const _,
+                result.as_mut_ptr().cast(),
             )
             .unwrap()
         } else {
             assert!(process.is_x64().unwrap_or(false));
             Syringe::build_get_proc_address_x64(
-                code_mem.as_ptr().cast(),
-                get_proc_address_ptr_mem.as_ptr().cast(),
-                return_value_mem.as_mut_ptr().cast(),
+                remote_get_proc_address as *const _,
+                result.as_mut_ptr().cast(),
             )
             .unwrap()
         };
-        code_mem.write(0, &code)?;
-        code_mem.flush_instruction_cache()?;
+        let mut function_stub = remote_allocator.alloc_and_copy(code.as_slice())?;
+        function_stub.memory().flush_instruction_cache()?;
 
         let exit_code = Self::run_remote_thread(
             process,
-            unsafe { mem::transmute(code_mem.as_mut_ptr()) },
-            param_mem.as_mut_ptr().cast(),
+            unsafe { mem::transmute(function_stub.as_mut_ptr()) },
+            parameters.as_mut_ptr().cast(),
         )?;
         if exit_code != 0u32 {
             return Err(InjectError::RemoteOperationFailed);
         }
 
-        let return_value = unsafe { return_value_mem.read_struct::<FARPROC>(0) }?;
-        Ok(return_value.cast())
+        Ok(result.read()?.cast())
     }
 
     #[cfg(feature = "call_remote_procedure")]
@@ -256,40 +244,37 @@ impl Syringe {
         let process = process.into();
 
         // Allocate memory in remote process to store the parameter, the return value and the method stub.
-        // TODO: store in a single reusable buffer.
-        let return_value_mem = SharedMemory::allocate_uninit_struct::<R>(process)?;
-        let param_mem = SharedMemory::allocate_struct(process, parameter)?;
-        let code_mem = SharedMemory::allocate_code(process, 4096)?;
+        let mut remote_allocator = RemoteBoxAllocator::new(process);
+        let mut result = remote_allocator.alloc_uninit::<R>()?;
+        let mut parameter = remote_allocator.alloc_and_copy(parameter)?;
 
         let code = if process.is_x86()? {
             Syringe::build_call_procedure_x86(
-                code_mem.as_ptr().cast(),
                 procedure,
-                return_value_mem.as_mut_ptr().cast(),
+                result.as_mut_ptr().cast(),
             )
             .unwrap()
         } else {
             assert!(process.is_x64().unwrap_or(false));
             Syringe::build_call_procedure_x64(
-                code_mem.as_ptr().cast(),
                 procedure,
-                return_value_mem.as_mut_ptr().cast(),
+                result.as_mut_ptr().cast(),
             )
             .unwrap()
         };
-        code_mem.write(0, &code)?;
-        code_mem.flush_instruction_cache()?;
+        let mut function_stub = remote_allocator.alloc_and_copy(code.as_slice())?;
+        function_stub.memory().flush_instruction_cache()?;
 
         let exit_code = Self::run_remote_thread(
             process,
-            unsafe { mem::transmute(code_mem.as_mut_ptr()) },
-            param_mem.as_mut_ptr().cast(),
+            unsafe { mem::transmute(function_stub.as_mut_ptr()) },
+            parameter.as_mut_ptr().cast(),
         )?;
         if exit_code != 0u32 {
             return Err(InjectError::RemoteOperationFailed);
         }
 
-        Ok(unsafe { return_value_mem.read_struct::<R>(0)? })
+        Ok(result.read()?)
     }
 
     #[cfg(feature = "call_remote_procedure")]
@@ -355,11 +340,9 @@ impl Syringe {
 
     #[cfg(feature = "call_remote_procedure")]
     fn build_call_procedure_x86(
-        base_address: *const c_void,
         real_address: *const c_void,
         return_buffer_address: *mut c_void,
     ) -> Result<Vec<u8>, IcedError> {
-        assert!(!base_address.is_null());
         assert!(!real_address.is_null());
         assert!(!return_buffer_address.is_null());
 
@@ -373,16 +356,14 @@ impl Syringe {
         asm.mov(eax, 0)?; // return 0
         asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
 
-        asm.assemble(base_address as u32 as u64)
+        asm.assemble(0x1234_5678)
     }
 
     #[cfg(feature = "call_remote_procedure")]
     fn build_call_procedure_x64(
-        base_address: *const c_void,
         real_address: *const c_void,
         return_buffer_address: *mut c_void,
     ) -> Result<Vec<u8>, IcedError> {
-        assert!(!base_address.is_null());
         assert!(!real_address.is_null());
         assert!(!return_buffer_address.is_null());
 
@@ -398,16 +379,14 @@ impl Syringe {
         asm.mov(rax, 0u64)?; // return 0
         asm.ret()?; // Restore stack ptr. (Callee cleanup)
 
-        asm.assemble(base_address as u32 as u64)
+        asm.assemble(0x1234_5678)
     }
 
     #[cfg(feature = "call_remote_procedure")]
     fn build_get_proc_address_x86(
-        base_address: *const c_void,
         real_address: *const c_void,
         return_buffer_address: *mut c_void,
     ) -> Result<Vec<u8>, IcedError> {
-        assert!(!base_address.is_null());
         assert!(!real_address.is_null());
         assert!(!return_buffer_address.is_null());
 
@@ -423,21 +402,20 @@ impl Syringe {
         asm.mov(eax, esp + 4)?; // CreateRemoteThread lpParameter
         asm.push(dword_ptr(eax + 8))?; // lpProcName
         asm.push(dword_ptr(eax + 0))?; // hModule
-        asm.call(dword_ptr(real_address as u32))?;
+        asm.mov(eax, real_address as u32)?;
+        asm.call(eax)?;
         asm.mov(dword_ptr(return_buffer_address as u32), eax)?;
         asm.mov(eax, 0)?; // return 0
         asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
 
-        asm.assemble(base_address as u32 as u64)
+        asm.assemble(0x1234_5678)
     }
 
     #[cfg(feature = "call_remote_procedure")]
     fn build_get_proc_address_x64(
-        base_address: *const c_void,
         real_address: *const c_void,
         return_buffer_address: *mut c_void,
     ) -> Result<Vec<u8>, IcedError> {
-        assert!(!base_address.is_null());
         assert!(!real_address.is_null());
         assert!(!return_buffer_address.is_null());
 
@@ -455,14 +433,14 @@ impl Syringe {
         asm.sub(rsp, 40)?; // Re-align stack to 16 byte boundary +32 shadow space
         asm.mov(rdx, qword_ptr(rcx + 8))?; // lpProcName
         asm.mov(rcx, qword_ptr(rcx + 0))?; // hModule
-        asm.mov(rax, qword_ptr(real_address as u64))?;
+        asm.mov(rax, real_address as u64)?;
         asm.call(rax)?;
         asm.mov(qword_ptr(return_buffer_address as u64), rax)?;
         asm.add(rsp, 40)?; // Re-align stack to 16 byte boundary + shadow space.
         asm.mov(rax, 0u64)?; // return 0
         asm.ret()?; // Restore stack ptr. (Callee cleanup)
 
-        asm.assemble(base_address as u64)
+        asm.assemble(0x1234_5678)
     }
 
     /// Ejects a previously injected module from its target process.
@@ -476,7 +454,7 @@ impl Syringe {
             module.handle().cast(),
         )?;
 
-        let free_library_result = unsafe { mem::transmute::<u32, BOOL>(exit_code) };
+        let free_library_result = exit_code as BOOL;
         if free_library_result == 0 {
             return Err(InjectError::RemoteOperationFailed);
         }
@@ -578,6 +556,13 @@ impl Syringe {
     }
 }
 
+#[cfg(feature = "call_remote_procedure")]
+#[repr(C)]
+struct GetProcAddressParams {
+    module_handle: u64,
+    name: u64,
+}
+
 #[cfg(all(test, feature = "sync_send_syringe"))]
 mod tests {
     #[test]
@@ -591,11 +576,4 @@ mod tests {
         fn assert_sync<T: Send>() {}
         assert_sync::<super::Syringe>();
     }
-}
-
-#[cfg(feature = "call_remote_procedure")]
-#[repr(C)]
-struct GetProcAddressParams {
-    module_handle: u64,
-    name: u64,
 }
