@@ -48,8 +48,8 @@ fn get_procedure_address_test(
         dummy_process_clone.kill().unwrap();
     });
 
-    let syringe = Syringe::new();
-    let module = syringe.inject(&dummy_process, payload_path.as_ref())?;
+    let mut syringe = Syringe::for_process(&dummy_process);
+    let module = syringe.inject(payload_path)?;
 
     let dll_main = syringe.get_procedure_address(module, "DllMain")?;
     assert_ne!(dll_main, ptr::null());
@@ -60,7 +60,7 @@ fn get_procedure_address_test(
     )?;
     assert_ne!(open_process, ptr::null());
 
-    let remote_invalid = syringe.get_procedure_address(module, "Invalid")?;
+    let remote_invalid = syringe.get_procedure_address(module, "ProcedureThatDoesNotExist")?;
     assert_eq!(remote_invalid, ptr::null());
 
     Ok(())
@@ -102,15 +102,14 @@ fn call_procedure_fast_test(
         dummy_process_clone.kill().unwrap();
     });
 
-    let syringe = Syringe::new();
-    let module = syringe.inject(&dummy_process, payload_path.as_ref())?;
+    let mut syringe = Syringe::for_process(&dummy_process);
+    let module = syringe.inject(payload_path.as_ref())?;
 
     let remote_echo = syringe.get_procedure_address(module, "echo")?;
     assert_ne!(remote_echo, ptr::null());
 
     let echo_value = 0x1234_5678_9abc_def0u64 as LPVOID;
-    let echo_result =
-        unsafe { syringe.call_procedure_fast(&dummy_process, remote_echo, echo_value) }?;
+    let echo_result = unsafe { syringe.call_procedure_fast(remote_echo, echo_value) }?;
     assert_eq!(echo_value as DWORD, echo_result);
 
     Ok(())
@@ -154,23 +153,21 @@ fn call_procedure_test(
         }
     });
 
-    let syringe = Syringe::new();
-    let module = syringe.inject(&dummy_process, payload_path.as_ref())?;
+    let mut syringe = Syringe::for_process(&dummy_process);
+    let module = syringe.inject(payload_path)?;
 
     // Simple echo test
     let remote_echo2 = syringe.get_procedure_address(module, "echo2")?;
     assert_ne!(remote_echo2, ptr::null());
 
-    let echo2_result: u32 =
-        unsafe { syringe.call_procedure(&dummy_process, remote_echo2, &0x1234_5678u32) }?;
+    let echo2_result: u32 = unsafe { syringe.call_procedure(remote_echo2, &0x1234_5678u32) }?;
     assert_eq!(echo2_result, 0x1234_5678u32);
 
     // "Complex" addition test
     let remote_add = syringe.get_procedure_address(module, "add")?;
     assert_ne!(remote_add, ptr::null());
 
-    let add_result: f64 =
-        unsafe { syringe.call_procedure(&dummy_process, remote_add, &(4.2f64, 0.1f64)) }?;
+    let add_result: f64 = unsafe { syringe.call_procedure(remote_add, &(4.2f64, 0.1f64)) }?;
     assert_eq!(add_result as f64, 4.2f64 + 0.1f64);
 
     Ok(())

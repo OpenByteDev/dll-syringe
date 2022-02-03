@@ -43,8 +43,8 @@ fn inject_test(
         dummy_process_clone.kill().unwrap();
     });
 
-    let syringe = Syringe::new();
-    syringe.inject(&dummy_process, payload_path.as_ref())?;
+    let mut syringe = Syringe::for_process(&dummy_process);
+    syringe.inject(payload_path)?;
 
     Ok(())
 }

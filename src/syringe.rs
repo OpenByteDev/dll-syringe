@@ -10,6 +10,7 @@ use std::{
     convert::TryInto,
     ffi::{c_void, CString},
     fs,
+    lazy::OnceCell,
     mem::{self, MaybeUninit},
     os::windows::prelude::{AsRawHandle, FromRawHandle, OwnedHandle},
     path::{Path, PathBuf},
@@ -33,8 +34,8 @@ use winapi::{
 };
 
 use crate::{
-    error::InjectError, utils::retry_with_filter, ModuleHandle, ProcessMemoryBuffer, ProcessModule,
-    ProcessRef, RemoteBoxAllocator
+    error::InjectError, utils::retry_with_filter, ModuleHandle, ProcessModule, ProcessRef,
+    RemoteBoxAllocator,
 };
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
@@ -73,92 +74,60 @@ impl InjectHelpData {
 /// // find target process by name
 /// let target_process = Process::find_first_by_name("target_process").unwrap();
 ///
-/// // create new syringe (reuse for better performance)
-/// let syringe = Syringe::new();
+/// // create a new syringe for the target process
+/// let mut syringe = Syringe::for_process(&target_process);
 ///
 /// // inject the payload into the target process
-/// let injected_payload = syringe.inject(&target_process, "injection_payload.dll").unwrap();
+/// let injected_payload = syringe.inject("injection_payload.dll").unwrap();
 ///
 /// // do something else
 ///
 /// // eject the payload from the target (optional)
 /// syringe.eject(injected_payload).unwrap();
 /// ```
-#[derive(Default, Debug, Clone)]
-pub struct Syringe {
-    #[cfg(not(feature = "sync_send_syringe"))]
-    x86_data: std::lazy::OnceCell<InjectHelpData>,
-    #[cfg(all(not(feature = "sync_send_syringe"), target_arch = "x86_64"))]
-    x64_data: std::lazy::OnceCell<InjectHelpData>,
-
-    #[cfg(feature = "sync_send_syringe")]
-    x86_data: std::lazy::SyncOnceCell<InjectHelpData>,
-    #[cfg(all(feature = "sync_send_syringe", target_arch = "x86_64"))]
-    x64_data: std::lazy::SyncOnceCell<InjectHelpData>,
+#[derive(Debug)]
+pub struct Syringe<'a> {
+    process: ProcessRef<'a>,
+    inject_help_data: OnceCell<InjectHelpData>,
+    remote_allocator: RemoteBoxAllocator<'a>,
 }
 
-impl Syringe {
-    /// Creates a new syringe.
-    /// This operation is cheap as internal state is initialized lazily.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    fn get_inject_help_data_for_process(
-        &self,
-        process: ProcessRef,
-    ) -> Result<&InjectHelpData, InjectError> {
-        let is_target_x64 = process.is_x64()?;
-
-        #[cfg(target_arch = "x86_64")]
-        {
-            if is_target_x64 {
-                self.x64_data
-                    .get_or_try_init(Self::load_inject_help_data_for_current_target)
-            } else if cfg!(feature = "into_x86_from_x64") {
-                self.x86_data
-                    .get_or_try_init(|| Self::load_inject_help_data_for_process(process))
-            } else {
-                Err(InjectError::UnsupportedTarget)
-            }
-        }
-
-        #[cfg(target_arch = "x86")]
-        {
-            if is_target_x64 {
-                Err(InjectError::UnsupportedTarget)
-            } else {
-                self.x86_data
-                    .get_or_try_init(Self::load_inject_help_data_for_current_target)
-            }
+impl<'a> Syringe<'a> {
+    /// Creates a new syringe for the given process.
+    pub fn for_process(process: impl Into<ProcessRef<'a>>) -> Self {
+        let process = process.into();
+        Self {
+            process,
+            inject_help_data: OnceCell::new(),
+            remote_allocator: RemoteBoxAllocator::new(process),
         }
     }
 
-    /// Inject the module at the given path into the given process.
+    /// Inject the module at the given path into the target process.
     ///
     /// # Limitations
     /// - The target process and the given module need to be of the same bitness.
     /// - If the current process is `x64` the target process can be either `x64` (always available) or `x86` (with the `into_x86_from_x64` feature enabled).
     /// - If the current process is `x86` the target process can only be `x86`.
-    pub fn inject<'a>(
-        &self,
-        process: impl Into<ProcessRef<'a>>,
+    pub fn inject(
+        &mut self,
         payload_path: impl AsRef<Path>,
     ) -> Result<ProcessModule<'a>, InjectError> {
-        let process = process.into();
-        let inject_data = self.get_inject_help_data_for_process(process)?;
+        let inject_data = self
+            .inject_help_data
+            .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process))?;
         let module_path = payload_path.as_ref().absolutize()?;
 
         let wide_module_path =
             U16CString::from_os_str(module_path.as_os_str())?.into_vec_with_nul();
-        let module_path_buf =
-            ProcessMemoryBuffer::allocate_and_write(process, wide_module_path.as_slice())?;
+        let mut remote_wide_module_path = self
+            .remote_allocator
+            .alloc_and_copy(wide_module_path.as_slice())?;
 
         // creating a thread that will call LoadLibraryW with a pointer to payload_path as argument
-        let exit_code = Self::run_remote_thread(
-            process,
+        let exit_code = self.run_remote_thread(
             unsafe { mem::transmute(inject_data.get_load_library_fn_ptr()) },
-            module_path_buf.as_mut_ptr().cast(),
+            remote_wide_module_path.as_mut_ptr().cast(),
         )?;
 
         // reinterpret the possibly truncated exit code as a truncated handle to the loaded module
@@ -167,7 +136,7 @@ impl Syringe {
             return Err(InjectError::RemoteOperationFailed);
         }
 
-        let injected_module = process.find_module_by_path(module_path)?.unwrap();
+        let injected_module = self.process.find_module_by_path(module_path)?.unwrap();
         assert_eq!(
             injected_module.handle() as u32,
             truncated_injected_module_handle as u32
@@ -176,49 +145,82 @@ impl Syringe {
         Ok(injected_module)
     }
 
+    /// Ejects a previously injected module from its target process.
+    pub fn eject(&self, module: ProcessModule) -> Result<(), InjectError> {
+        if module.process() != self.process {
+            panic!("ejecting a module from a different process");
+        }
+
+        let inject_data = self
+            .inject_help_data
+            .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process))?;
+
+        let exit_code = self.run_remote_thread(
+            unsafe { mem::transmute(inject_data.get_free_library_fn_ptr()) },
+            module.handle().cast(),
+        )?;
+
+        let free_library_result = exit_code as BOOL;
+        if free_library_result == 0 {
+            return Err(InjectError::RemoteOperationFailed);
+        }
+
+        assert!(!self
+            .process
+            .module_handles()?
+            .as_ref()
+            .contains(&module.handle()));
+
+        Ok(())
+    }
+
     #[cfg(feature = "call_remote_procedure")]
     /// Load the address of the given function from the given module in the remote process.
     pub fn get_procedure_address(
-        &self,
+        &mut self,
         module: ProcessModule,
         name: impl AsRef<str>,
     ) -> Result<*const c_void, InjectError> {
-        let process = module.process();
+        if module.process() != self.process {
+            panic!("trying to load procedure from a module of a different process");
+        }
+
+        let inject_data = self
+            .inject_help_data
+            .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process))?;
+
         let name = name.as_ref();
+        let remote_get_proc_address = inject_data.get_proc_address_fn_ptr();
 
-        let remote_get_proc_address = self
-            .get_inject_help_data_for_process(process)?
-            .get_proc_address_fn_ptr();
-
-        // Allocate memory in remote process to store the parameter and the return value.
-        let mut remote_allocator = RemoteBoxAllocator::new(process);
-        let mut result = remote_allocator.alloc_uninit::<FARPROC>()?;
-        let mut name = remote_allocator.alloc_and_copy(CString::new(name).unwrap().as_bytes_with_nul())?;
-        let mut parameters = remote_allocator.alloc_and_copy(&GetProcAddressParams {
-            module_handle: module.handle() as u64,
-            name: name.as_ptr() as u64,
-        })?;
+        let mut name = self
+            .remote_allocator
+            .alloc_and_copy(CString::new(name).unwrap().as_bytes_with_nul())?;
+        let mut parameters = self
+            .remote_allocator
+            .alloc_and_copy(&GetProcAddressParams {
+                module_handle: module.handle() as u64,
+                name: name.as_ptr() as u64,
+            })?;
+        let mut result = self.remote_allocator.alloc_uninit::<FARPROC>()?;
 
         // Allocate memory in remote process and build a method stub.
-        let code = if process.is_x86()? {
+        let code = if self.process.is_x86()? {
             Syringe::build_get_proc_address_x86(
                 remote_get_proc_address as *const _,
                 result.as_mut_ptr().cast(),
             )
             .unwrap()
         } else {
-            assert!(process.is_x64().unwrap_or(false));
             Syringe::build_get_proc_address_x64(
                 remote_get_proc_address as *const _,
                 result.as_mut_ptr().cast(),
             )
             .unwrap()
         };
-        let mut function_stub = remote_allocator.alloc_and_copy(code.as_slice())?;
+        let mut function_stub = self.remote_allocator.alloc_and_copy(code.as_slice())?;
         function_stub.memory().flush_instruction_cache()?;
 
-        let exit_code = Self::run_remote_thread(
-            process,
+        let exit_code = self.run_remote_thread(
             unsafe { mem::transmute(function_stub.as_mut_ptr()) },
             parameters.as_mut_ptr().cast(),
         )?;
@@ -235,38 +237,23 @@ impl Syringe {
     ///
     /// # Safety
     /// The caller has to ensure that the given function pointer is valid and that it points to a function in the target process with the correct signature.
-    pub unsafe fn call_procedure<'a, R, P>(
-        &self,
-        process: impl Into<ProcessRef<'a>>,
+    pub unsafe fn call_procedure<R, P>(
+        &mut self,
         procedure: *const c_void,
         parameter: &P,
     ) -> Result<R, InjectError> {
-        let process = process.into();
+        let mut result = self.remote_allocator.alloc_uninit::<R>()?;
+        let mut parameter = self.remote_allocator.alloc_and_copy(parameter)?;
 
-        // Allocate memory in remote process to store the parameter, the return value and the method stub.
-        let mut remote_allocator = RemoteBoxAllocator::new(process);
-        let mut result = remote_allocator.alloc_uninit::<R>()?;
-        let mut parameter = remote_allocator.alloc_and_copy(parameter)?;
-
-        let code = if process.is_x86()? {
-            Syringe::build_call_procedure_x86(
-                procedure,
-                result.as_mut_ptr().cast(),
-            )
-            .unwrap()
+        let code = if self.process.is_x86()? {
+            Syringe::build_call_procedure_x86(procedure, result.as_mut_ptr().cast()).unwrap()
         } else {
-            assert!(process.is_x64().unwrap_or(false));
-            Syringe::build_call_procedure_x64(
-                procedure,
-                result.as_mut_ptr().cast(),
-            )
-            .unwrap()
+            Syringe::build_call_procedure_x64(procedure, result.as_mut_ptr().cast()).unwrap()
         };
-        let mut function_stub = remote_allocator.alloc_and_copy(code.as_slice())?;
+        let mut function_stub = self.remote_allocator.alloc_and_copy(code.as_slice())?;
         function_stub.memory().flush_instruction_cache()?;
 
-        let exit_code = Self::run_remote_thread(
-            process,
+        let exit_code = self.run_remote_thread(
             unsafe { mem::transmute(function_stub.as_mut_ptr()) },
             parameter.as_mut_ptr().cast(),
         )?;
@@ -286,28 +273,23 @@ impl Syringe {
     ///
     /// # Safety
     /// The caller has to ensure that the given function pointer is valid and that it points to a function in the target process with the correct signature.
-    pub unsafe fn call_procedure_fast<'a>(
+    pub unsafe fn call_procedure_fast(
         &self,
-        process: impl Into<ProcessRef<'a>>,
         procedure: *const c_void,
         parameter: *mut c_void,
     ) -> Result<u32, Win32Error> {
-        Self::run_remote_thread(
-            process.into(),
-            unsafe { mem::transmute(procedure) },
-            parameter,
-        )
+        self.run_remote_thread(unsafe { mem::transmute(procedure) }, parameter)
     }
 
     fn run_remote_thread(
-        process: ProcessRef,
+        &self,
         remote_fn: extern "system" fn(LPVOID) -> DWORD,
         parameter: LPVOID,
     ) -> Result<u32, Win32Error> {
         // create a remote thread that will call LoadLibraryW with payload_path as its argument.
         let thread_handle = unsafe {
             CreateRemoteThread(
-                process.handle(),
+                self.process.handle(),
                 ptr::null_mut(),
                 0,
                 Some(remote_fn),
@@ -402,8 +384,8 @@ impl Syringe {
         asm.mov(eax, esp + 4)?; // CreateRemoteThread lpParameter
         asm.push(dword_ptr(eax + 8))?; // lpProcName
         asm.push(dword_ptr(eax + 0))?; // hModule
-        asm.mov(eax, real_address as u32)?;
-        asm.call(eax)?;
+        asm.mov(ebx, real_address as u32)?;
+        asm.call(ebx)?;
         asm.mov(dword_ptr(return_buffer_address as u32), eax)?;
         asm.mov(eax, 0)?; // return 0
         asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
@@ -443,28 +425,18 @@ impl Syringe {
         asm.assemble(0x1234_5678)
     }
 
-    /// Ejects a previously injected module from its target process.
-    pub fn eject(&self, module: ProcessModule) -> Result<(), InjectError> {
-        let process = module.process();
-        let inject_data = self.get_inject_help_data_for_process(module.process())?;
+    fn load_inject_help_data_for_process(
+        process: ProcessRef,
+    ) -> Result<InjectHelpData, InjectError> {
+        let is_target_x64 = process.is_x64()?;
+        let is_self_x64 = cfg!(target_arch = "x86_64");
 
-        let exit_code = Self::run_remote_thread(
-            process,
-            unsafe { mem::transmute(inject_data.get_free_library_fn_ptr()) },
-            module.handle().cast(),
-        )?;
-
-        let free_library_result = exit_code as BOOL;
-        if free_library_result == 0 {
-            return Err(InjectError::RemoteOperationFailed);
+        match (is_target_x64, is_self_x64) {
+            (true, true) | (false, false) => Self::load_inject_help_data_for_current_target(),
+            #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
+            (false, true) => Self::_load_inject_help_data_for_process(process),
+            _ => Err(InjectError::UnsupportedTarget),
         }
-
-        assert!(!process
-            .module_handles()?
-            .as_ref()
-            .contains(&module.handle()));
-
-        Ok(())
     }
 
     fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, InjectError> {
@@ -491,7 +463,7 @@ impl Syringe {
 
     #[cfg(target_arch = "x86_64")]
     #[cfg(feature = "into_x86_from_x64")]
-    fn load_inject_help_data_for_process(
+    fn _load_inject_help_data_for_process(
         process: ProcessRef,
     ) -> Result<InjectHelpData, InjectError> {
         // get kernel32 handle of target process (may fail if target process is currently starting and has not loaded kernel32 yet)

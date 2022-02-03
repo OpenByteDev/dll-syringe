@@ -263,7 +263,7 @@ impl<'a> ProcessMemorySlice<'a> {
     ///
     /// # Panics
     /// This function will panic if the given offset plus the size of the value exceeds this buffer's length.
-    /// 
+    ///
     /// # Safety
     /// The caller must ensure that the designated region of memory contains a valid instance of type `T` at the given offset.
     pub unsafe fn read_struct<T>(&self, offset: usize) -> Result<T, Win32Error> {

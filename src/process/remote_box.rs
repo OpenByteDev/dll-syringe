@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, mem, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, marker::PhantomData, mem, rc::Rc};
 
 use rust_win32error::Win32Error;
 
@@ -11,7 +11,9 @@ pub struct RemoteBoxAllocator<'a>(Rc<RefCell<DynamicMultiBufferAllocator<'a>>>);
 
 impl<'a> RemoteBoxAllocator<'a> {
     pub fn new(process: ProcessRef<'a>) -> Self {
-        Self(Rc::new(RefCell::new(DynamicMultiBufferAllocator::new(process))))
+        Self(Rc::new(RefCell::new(DynamicMultiBufferAllocator::new(
+            process,
+        ))))
     }
 
     fn process(&self) -> ProcessRef<'a> {
@@ -39,15 +41,18 @@ impl<'a> RemoteBoxAllocator<'a> {
 pub struct RemoteBox<'a, T: ?Sized> {
     allocation: Allocation,
     allocator: Rc<RefCell<DynamicMultiBufferAllocator<'a>>>,
-    phantom: PhantomData<&'a T>
+    phantom: PhantomData<T>,
 }
 
 impl<'a, T: ?Sized> RemoteBox<'a, T> {
-    fn new(allocator: Rc<RefCell<DynamicMultiBufferAllocator<'a>>>, allocation: Allocation) -> Self {
+    fn new(
+        allocator: Rc<RefCell<DynamicMultiBufferAllocator<'a>>>,
+        allocation: Allocation,
+    ) -> Self {
         Self {
             allocation,
             allocator,
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 
@@ -94,8 +99,7 @@ impl<'a, T> RemoteBox<'a, [T]> {
     }
 }
 
-
-impl <T: ?Sized> Drop for RemoteBox<'_, T> {
+impl<T: ?Sized> Drop for RemoteBox<'_, T> {
     fn drop(&mut self) {
         self.allocator.borrow_mut().free(&self.allocation);
     }
