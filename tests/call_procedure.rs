@@ -1,11 +1,16 @@
-#![feature(try_blocks)]
+use dll_syringe::{Process, Syringe};
+use std::{
+    error::Error,
+    path::Path,
+    process::{Command, Stdio},
+};
 
 #[allow(unused)]
 mod common;
 
 #[test]
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[cfg(feature = "call_remote_procedure")]
+#[cfg(any(target_arch = "x86", all(target_arch = "x86_64", feature = "into_x86_from_x64")))]
+#[cfg(feature = "remote_procedure")]
 fn get_procedure_address_32() -> Result<(), Box<dyn Error>> {
     get_procedure_address_test(
         common::build_test_payload_x86()?,
@@ -15,7 +20,7 @@ fn get_procedure_address_32() -> Result<(), Box<dyn Error>> {
 
 #[test]
 #[cfg(target_arch = "x86_64")]
-#[cfg(feature = "call_remote_procedure")]
+#[cfg(feature = "remote_procedure")]
 fn get_procedure_address_64() -> Result<(), Box<dyn Error>> {
     get_procedure_address_test(
         common::build_test_payload_x64()?,
@@ -23,7 +28,7 @@ fn get_procedure_address_64() -> Result<(), Box<dyn Error>> {
     )
 }
 
-#[cfg(feature = "call_remote_procedure")]
+#[cfg(feature = "remote_procedure")]
 fn get_procedure_address_test(
     payload_path: impl AsRef<Path>,
     target_path: impl AsRef<Path>,
@@ -61,7 +66,7 @@ fn get_procedure_address_test(
 
 #[test]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[cfg(feature = "call_remote_procedure")]
+#[cfg(feature = "remote_procedure")]
 fn call_procedure_32() -> Result<(), Box<dyn Error>> {
     call_procedure_test(
         common::build_test_payload_x86()?,
@@ -71,7 +76,7 @@ fn call_procedure_32() -> Result<(), Box<dyn Error>> {
 
 #[test]
 #[cfg(target_arch = "x86_64")]
-#[cfg(feature = "call_remote_procedure")]
+#[cfg(feature = "remote_procedure")]
 fn call_procedure_64() -> Result<(), Box<dyn Error>> {
     call_procedure_test(
         common::build_test_payload_x64()?,
@@ -79,7 +84,7 @@ fn call_procedure_64() -> Result<(), Box<dyn Error>> {
     )
 }
 
-#[cfg(feature = "call_remote_procedure")]
+#[cfg(feature = "remote_procedure")]
 fn call_procedure_test(
     payload_path: impl AsRef<Path>,
     target_path: impl AsRef<Path>,

@@ -1,5 +1,3 @@
-#![feature(try_blocks)]
-
 use dll_syringe::{Process, Syringe};
 use std::{
     error::Error,
@@ -11,7 +9,7 @@ use std::{
 mod common;
 
 #[test]
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(any(target_arch = "x86", all(target_arch = "x86_64", feature = "into_x86_from_x64")))]
 fn eject_32() -> Result<(), Box<dyn Error>> {
     eject_test(
         common::build_test_payload_x86()?,
