@@ -13,11 +13,11 @@ pub enum Win32OrNulError {
     Win32(#[from] rust_win32error::Win32Error),
 }
 
-/// Error enum for errors during a call to [`ProcessModule::get_procedure`].
+/// Error enum for errors during a call to [`ProcessModule::get_local_procedure`].
 ///
-/// [`ProcessModule::get_procedure`]: crate::ProcessModule::get_procedure
+/// [`ProcessModule::get_local_procedure`]: crate::ProcessModule::get_local_procedure
 #[derive(Debug, Error)]
-pub enum ProcedureLoadError {
+pub enum GetLocalProcedureError {
     /// Variant representing an illegal interior nul value.
     #[error("interior nul found")]
     Nul(#[from] std::ffi::NulError),

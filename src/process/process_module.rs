@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    error::{FindModuleByPathError, ProcedureLoadError, Win32OrNulError},
+    error::{FindModuleByPathError, GetLocalProcedureError, Win32OrNulError},
     utils::WinPathBuf,
     ProcessRef,
 };
@@ -272,16 +272,16 @@ impl<'a> ProcessModule<'a> {
     pub fn get_local_procedure(
         &self,
         proc_name: impl AsRef<str>,
-    ) -> Result<*const __some_function, ProcedureLoadError> {
+    ) -> Result<*const __some_function, GetLocalProcedureError> {
         self.__get_local_procedure(&CString::new(proc_name.as_ref())?)
     }
 
     pub(crate) fn __get_local_procedure(
         &self,
         proc_name: &CStr,
-    ) -> Result<*const __some_function, ProcedureLoadError> {
+    ) -> Result<*const __some_function, GetLocalProcedureError> {
         if self.is_remote() {
-            return Err(ProcedureLoadError::UnsupportedTarget);
+            return Err(GetLocalProcedureError::UnsupportedTarget);
         }
 
         let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ptr()) };
