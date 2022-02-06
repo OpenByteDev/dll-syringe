@@ -12,13 +12,13 @@
     missing_docs,
     missing_debug_implementations,
     missing_copy_implementations,
-    clippy::missing_const_for_fn,
     rust_2018_idioms,
     clippy::todo,
     clippy::manual_assert,
     clippy::must_use_candidate,
     clippy::inconsistent_struct_constructor,
     clippy::wrong_self_convention,
+    clippy::missing_const_for_fn,
     rustdoc::broken_intra_doc_links,
     rustdoc::private_intra_doc_links
 )]
@@ -28,8 +28,8 @@
     clippy::missing_errors_doc,
     clippy::borrow_as_ptr
 )]
-#![cfg_attr(feature = "remote_procedure", doc = include_str!("../crate-doc.md"))]
-#![cfg_attr(not(feature = "remote_procedure"), allow(missing_docs))]
+#![cfg_attr(feature = "doc_cfg", doc = include_str!("../crate-doc.md"))]
+#![cfg_attr(not(feature = "doc_cfg"), allow(missing_docs))]
 #![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
 
 mod syringe;
@@ -55,6 +55,7 @@ pub use remote_procedure::*;
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "process_memory")))]
 /// Module containing utilities for dealing with memory of another process.
 pub mod process_memory;
+#[cfg_attr(not(feature = "process_memory"), allow(dead_code))]
 #[cfg(not(any(feature = "process_memory", feature = "doc_cfg")))]
 /// Module containing utilities for dealing with memory of another process.
 pub(crate) mod process_memory;

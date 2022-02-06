@@ -41,7 +41,7 @@ impl<'a> ProcessModule<'a> {
     ///
     /// # Safety
     /// The caller must guarantee that the given handle is valid and that the module is loaded into the given process. (and stays that way while interacting).
-    pub unsafe fn new(handle: ModuleHandle, process: ProcessRef<'a>) -> Self {
+    pub const unsafe fn new(handle: ModuleHandle, process: ProcessRef<'a>) -> Self {
         Self { handle, process }
     }
     /// Contructs a new instance from the given module handle loaded in the current process.
@@ -161,12 +161,12 @@ impl<'a> ProcessModule<'a> {
 
     /// Gets the underlying handle to the module.
     #[must_use]
-    pub fn handle(&self) -> ModuleHandle {
+    pub const fn handle(&self) -> ModuleHandle {
         self.handle
     }
     /// Gets the process this module belongs to.
     #[must_use]
-    pub fn process(&self) -> ProcessRef<'_> {
+    pub const fn process(&self) -> ProcessRef<'_> {
         self.process
     }
 

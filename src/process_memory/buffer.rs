@@ -22,8 +22,8 @@ use winapi::{
 use crate::ProcessRef;
 
 /// A owned memory buffer in the memory space of a (remote) process.
-#[derive(Debug)]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "process_memory")))]
+#[derive(Debug)]
 pub struct ProcessMemoryBuffer<'a>(ProcessMemorySlice<'a>);
 
 impl<'a> Deref for ProcessMemoryBuffer<'a> {
@@ -130,7 +130,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
     /// - can be read using [`ReadProcessMemory`]
     /// - can be written to using [`WriteProcessMemory`]
     /// - will not be deallocated by other code
-    pub unsafe fn from_raw_parts(ptr: *mut u8, len: usize, process: ProcessRef<'a>) -> Self {
+    pub const unsafe fn from_raw_parts(ptr: *mut u8, len: usize, process: ProcessRef<'a>) -> Self {
         Self(unsafe { ProcessMemorySlice::from_raw_parts(ptr, len, process) })
     }
 
@@ -209,7 +209,7 @@ impl<'a> ProcessMemorySlice<'a> {
     /// - can be read using [`ReadProcessMemory`]
     /// - can be written to using [`WriteProcessMemory`]
     /// - will live as long as the slice is used
-    pub unsafe fn from_raw_parts(ptr: *mut u8, len: usize, process: ProcessRef<'a>) -> Self {
+    pub const unsafe fn from_raw_parts(ptr: *mut u8, len: usize, process: ProcessRef<'a>) -> Self {
         Self {
             ptr,
             len,
@@ -230,17 +230,17 @@ impl<'a> ProcessMemorySlice<'a> {
     }
     /// Returns the process the buffer is allocated in.
     #[must_use]
-    pub fn process(&self) -> ProcessRef<'a> {
+    pub const fn process(&self) -> ProcessRef<'a> {
         self.process
     }
     /// Returns the length of the buffer.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.len
     }
     /// Returns whether the buffer is empty.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
@@ -338,7 +338,7 @@ impl<'a> ProcessMemorySlice<'a> {
     /// # Note
     /// The returned pointer is only valid in the target process.
     #[must_use]
-    pub fn as_ptr(&self) -> *const u8 {
+    pub const fn as_ptr(&self) -> *const u8 {
         self.ptr
     }
     /// Returns a mutable pointer to the start of the buffer.
@@ -346,7 +346,7 @@ impl<'a> ProcessMemorySlice<'a> {
     /// # Note
     /// The returned pointer is only valid in the target process.
     #[must_use]
-    pub fn as_mut_ptr(&self) -> *mut u8 {
+    pub const fn as_mut_ptr(&self) -> *mut u8 {
         self.ptr
     }
 

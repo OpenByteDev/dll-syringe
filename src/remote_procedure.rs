@@ -247,7 +247,7 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
     }
 
     /// Returns the underlying pointer to the remote procedure.
-    pub fn as_ptr(&self) -> *const c_void {
+    pub const fn as_ptr(&self) -> *const c_void {
         self.ptr.as_ptr()
     }
 

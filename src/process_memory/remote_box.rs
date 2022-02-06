@@ -3,8 +3,10 @@ use std::{cell::RefCell, marker::PhantomData, mem, rc::Rc};
 use rust_win32error::Win32Error;
 
 use crate::{
-    process_memory::{Allocation, DynamicMultiBufferAllocator, ProcessMemorySlice, RawAllocator},
     ProcessRef,
+    process_memory::{
+        Allocation, DynamicMultiBufferAllocator, ProcessMemorySlice, RawAllocator,
+    }
 };
 
 #[derive(Debug, Clone)]

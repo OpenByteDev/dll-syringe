@@ -19,14 +19,14 @@ pub struct DynamicMultiBufferAllocator<'a> {
 }
 
 impl<'a> DynamicMultiBufferAllocator<'a> {
-    pub fn new(process: ProcessRef<'a>) -> Self {
+    pub const fn new(process: ProcessRef<'a>) -> Self {
         Self {
             process,
             pages: Vec::new(),
         }
     }
 
-    pub fn process(&self) -> ProcessRef<'a> {
+    pub const fn process(&self) -> ProcessRef<'a> {
         self.process
     }
 
@@ -99,7 +99,7 @@ impl<'a> FixedBufferAllocator<'a> {
     }
 
     #[allow(dead_code)]
-    pub fn memory(&self) -> &ProcessMemoryBuffer<'a> {
+    pub const fn memory(&self) -> &ProcessMemoryBuffer<'a> {
         &self.mem
     }
 
@@ -212,11 +212,11 @@ pub struct Allocation {
 }
 
 impl Allocation {
-    pub fn as_ptr(&self) -> *const u8 {
+    pub const fn as_ptr(&self) -> *const u8 {
         self.base as *const u8
     }
 
-    pub fn as_mut_ptr(&self) -> *mut u8 {
+    pub const fn as_mut_ptr(&self) -> *mut u8 {
         self.base as *mut u8
     }
 }

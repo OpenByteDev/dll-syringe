@@ -108,7 +108,7 @@ impl<'a> ProcessRef<'a> {
     /// # Safety
     /// The handle needs to fulfill the priviliges listed in the [struct documentation](ProcessRef).
     #[must_use]
-    pub unsafe fn borrow_from_handle(handle: BorrowedHandle<'a>) -> Self {
+    pub const unsafe fn borrow_from_handle(handle: BorrowedHandle<'a>) -> Self {
         Self(handle)
     }
 
