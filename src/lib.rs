@@ -24,7 +24,8 @@
     clippy::missing_errors_doc,
     clippy::borrow_as_ptr
 )]
-#![doc = include_str!("../crate-doc.md")]
+#![cfg_attr(feature = "remote_procedure", doc = include_str!("../crate-doc.md"))]
+#![cfg_attr(not(feature = "remote_procedure"), allow(missing_docs))]
 
 mod syringe;
 pub use syringe::*;
