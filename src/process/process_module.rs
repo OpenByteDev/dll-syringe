@@ -266,15 +266,17 @@ impl<'a> ProcessModule<'a> {
     }
 
     /// Gets a pointer to the procedure with the given name from the module.
+    /// 
+    /// Note:
     /// This function is only supported for modules in the current process.
-    pub fn get_procedure(
+    pub fn get_local_procedure(
         &self,
         proc_name: impl AsRef<str>,
     ) -> Result<*const __some_function, ProcedureLoadError> {
-        self.__get_procedure(&CString::new(proc_name.as_ref())?)
+        self.__get_local_procedure(&CString::new(proc_name.as_ref())?)
     }
 
-    pub(crate) fn __get_procedure(
+    pub(crate) fn __get_local_procedure(
         &self,
         proc_name: &CStr,
     ) -> Result<*const __some_function, ProcedureLoadError> {

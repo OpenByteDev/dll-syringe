@@ -187,14 +187,14 @@ impl<'a> Syringe<'a> {
             ProcessModule::__find_local_by_name_or_abs_path(u16cstr!("kernel32.dll"))?.unwrap();
 
         let load_library_fn_ptr = kernel32_module
-            .__get_procedure(cstr!("LoadLibraryW"))
+            .__get_local_procedure(cstr!("LoadLibraryW"))
             .unwrap();
         let free_library_fn_ptr = kernel32_module
-            .__get_procedure(cstr!("FreeLibrary"))
+            .__get_local_procedure(cstr!("FreeLibrary"))
             .unwrap();
         #[cfg(feature = "remote_procedure")]
         let get_proc_address_fn_ptr = kernel32_module
-            .__get_procedure(cstr!("GetProcAddress"))
+            .__get_local_procedure(cstr!("GetProcAddress"))
             .unwrap();
 
         Ok(InjectHelpData {
