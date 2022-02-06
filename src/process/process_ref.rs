@@ -92,7 +92,7 @@ impl Eq for ProcessRef<'_> {}
 
 impl Hash for ProcessRef<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.handle().hash(state)
+        self.handle().hash(state);
     }
 }
 
@@ -107,6 +107,7 @@ impl<'a> ProcessRef<'a> {
     ///
     /// # Safety
     /// The handle needs to fulfill the priviliges listed in the [struct documentation](ProcessRef).
+    #[must_use]
     pub unsafe fn borrow_from_handle(handle: BorrowedHandle<'a>) -> Self {
         Self(handle)
     }
@@ -140,6 +141,7 @@ impl<'a> ProcessRef<'a> {
     ///
     /// # Note
     /// If the operation to determine the status fails, this function assumes that the process has exited.
+    #[must_use]
     pub fn is_alive(&self) -> bool {
         let mut exit_code = MaybeUninit::uninit();
         let result = unsafe { GetExitCodeProcess(self.handle(), exit_code.as_mut_ptr()) };
@@ -440,7 +442,10 @@ impl<'a> ProcessRef<'a> {
         if result == 0 {
             return Err(Win32Error::new());
         }
-        assert_ne!(result, STILL_ACTIVE.try_into().unwrap());
+        assert_ne!(
+            result as u32, STILL_ACTIVE,
+            "GetExitCodeThread returned STILL_ACTIVE after WaitForSingleObject"
+        );
 
         Ok(unsafe { exit_code.assume_init() })
     }

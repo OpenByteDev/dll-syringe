@@ -7,15 +7,22 @@
     io_safety,
     linked_list_cursors
 )]
-#![allow(clippy::module_inception)]
-#![warn(unsafe_op_in_unsafe_fn, missing_docs)]
-#![cfg_attr(
-    any(
-        not(target_arch = "x86_64"),
-        not(feature = "into_x86_from_x64"),
-        not(feature = "remote_procedure")
-    ),
-    allow(unused_imports)
+#![warn(
+    unsafe_op_in_unsafe_fn,
+    missing_docs,
+    missing_debug_implementations,
+    rust_2018_idioms,
+    clippy::todo,
+    clippy::manual_assert,
+    clippy::must_use_candidate,
+    clippy::inconsistent_struct_constructor,
+    clippy::wrong_self_convention
+)]
+#![allow(
+    clippy::module_inception,
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc,
+    clippy::borrow_as_ptr
 )]
 #![doc = include_str!("../crate-doc.md")]
 

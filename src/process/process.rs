@@ -87,7 +87,7 @@ impl Eq for Process {}
 
 impl Hash for Process {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.get_ref().hash(state)
+        self.get_ref().hash(state);
     }
 }
 
@@ -145,6 +145,7 @@ impl Process {
     }
 
     /// Returns a list of all currently running processes.
+    #[must_use]
     pub fn all() -> Vec<Self> {
         // TODO: avoid using sysinfo for this
         // TODO: deduplicate code
@@ -159,6 +160,7 @@ impl Process {
     }
 
     /// Finds all processes whose name contains the given string.
+    #[must_use]
     pub fn find_all_by_name(name: impl AsRef<str>) -> Vec<Self> {
         // TODO: avoid using sysinfo for this
         // TODO: deduplicate code
@@ -174,6 +176,7 @@ impl Process {
     }
 
     /// Finds the first process whose name contains the given string.
+    #[must_use]
     pub fn find_first_by_name(name: impl AsRef<str>) -> Option<Self> {
         // TODO: avoid using sysinfo for this
         // TODO: deduplicate code
@@ -194,6 +197,7 @@ impl Process {
     }
 
     /// Creates a new non-owning [`ProcessRef`] instance for this process.
+    #[must_use]
     pub fn get_ref(&'_ self) -> ProcessRef<'_> {
         unsafe { ProcessRef::borrow_from_handle(self.as_handle()) }
     }
@@ -204,6 +208,7 @@ impl Process {
     }
 
     /// Leak the underlying handle and return it as a non-owning [`ProcessRef`] instance.
+    #[allow(clippy::must_use_candidate)]
     pub fn leak(self) -> ProcessRef<'static> {
         unsafe {
             ProcessRef::borrow_from_handle(BorrowedHandle::borrow_raw_handle(

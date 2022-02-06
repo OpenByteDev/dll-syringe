@@ -1,35 +1,31 @@
 use cstr::cstr;
-#[cfg(target_arch = "x86_64")]
-#[cfg(feature = "into_x86_from_x64")]
-use goblin::pe::PE;
 use path_absolutize::Absolutize;
-use rust_win32error::Win32Error;
-use std::{
-    convert::TryInto,
-    fs,
-    lazy::OnceCell,
-    mem::{self, MaybeUninit},
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use std::{lazy::OnceCell, mem, path::Path};
 use u16cstr::u16cstr;
-use widestring::{U16CString, U16Str};
-use winapi::{
-    shared::{
-        minwindef::{BOOL, FARPROC, HMODULE, MAX_PATH},
-        ntdef::{LPCSTR, LPCWSTR},
-    },
-    um::{
-        wow64apiset::GetSystemWow64DirectoryW,
-    },
+use widestring::U16CString;
+use winapi::shared::{
+    minwindef::{BOOL, HMODULE},
+    ntdef::LPCWSTR,
 };
 
-use crate::{
-    error::InjectError, utils::retry_with_filter, ModuleHandle, ProcessModule, ProcessRef, RemoteBoxAllocator,
+use crate::{error::InjectError, ModuleHandle, ProcessModule, ProcessRef, RemoteBoxAllocator};
+
+#[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
+use {
+    crate::utils::retry_with_filter,
+    goblin::pe::PE,
+    rust_win32error::Win32Error,
+    std::{convert::TryInto, fs, mem::MaybeUninit, path::PathBuf, time::Duration},
+    widestring::U16Str,
+    winapi::{shared::minwindef::MAX_PATH, um::wow64apiset::GetSystemWow64DirectoryW},
 };
+
+#[cfg(feature = "remote_procedure")]
+use winapi::shared::{minwindef::FARPROC, ntdef::LPCSTR};
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
+#[cfg(feature = "remote_procedure")]
 type GetProcAddressFn = unsafe extern "system" fn(HMODULE, LPCSTR) -> FARPROC;
 
 #[derive(Debug, Clone)]
@@ -37,6 +33,7 @@ pub(crate) struct InjectHelpData {
     kernel32_module: ModuleHandle,
     load_library_offset: usize,
     free_library_offset: usize,
+    #[cfg(feature = "remote_procedure")]
     get_proc_address_offset: usize,
 }
 
@@ -49,6 +46,7 @@ impl InjectHelpData {
     pub fn get_free_library_fn_ptr(&self) -> FreeLibraryFn {
         unsafe { mem::transmute(self.kernel32_module as usize + self.free_library_offset) }
     }
+    #[cfg(feature = "remote_procedure")]
     pub fn get_proc_address_fn_ptr(&self) -> GetProcAddressFn {
         unsafe { mem::transmute(self.kernel32_module as usize + self.get_proc_address_offset) }
     }
@@ -142,9 +140,10 @@ impl<'a> Syringe<'a> {
 
     /// Ejects a previously injected module from its target process.
     pub fn eject(&self, module: ProcessModule<'_>) -> Result<(), InjectError> {
-        if module.process() != self.process {
-            panic!("ejecting a module from a different process");
-        }
+        assert!(
+            module.process() != self.process,
+            "ejecting a module from a different process"
+        );
 
         let inject_data = self
             .inject_help_data
@@ -186,12 +185,14 @@ impl<'a> Syringe<'a> {
     fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, InjectError> {
         let kernel32_module =
             ProcessModule::__find_local_by_name_or_abs_path(u16cstr!("kernel32.dll"))?.unwrap();
+
         let load_library_fn_ptr = kernel32_module
             .__get_procedure(cstr!("LoadLibraryW"))
             .unwrap();
         let free_library_fn_ptr = kernel32_module
             .__get_procedure(cstr!("FreeLibrary"))
             .unwrap();
+        #[cfg(feature = "remote_procedure")]
         let get_proc_address_fn_ptr = kernel32_module
             .__get_procedure(cstr!("GetProcAddress"))
             .unwrap();
@@ -200,6 +201,7 @@ impl<'a> Syringe<'a> {
             kernel32_module: kernel32_module.handle(),
             load_library_offset: load_library_fn_ptr as usize - kernel32_module.handle() as usize,
             free_library_offset: free_library_fn_ptr as usize - kernel32_module.handle() as usize,
+            #[cfg(feature = "remote_procedure")]
             get_proc_address_offset: get_proc_address_fn_ptr as usize
                 - kernel32_module.handle() as usize,
         })
@@ -243,6 +245,7 @@ impl<'a> Syringe<'a> {
             .find(|export| matches!(export.name, Some("FreeLibrary")))
             .unwrap();
 
+        #[cfg(feature = "remote_procedure")]
         let get_proc_address_export = pe
             .exports
             .iter()
@@ -253,6 +256,7 @@ impl<'a> Syringe<'a> {
             kernel32_module: kernel32_module.handle(),
             load_library_offset: load_library_export.rva,
             free_library_offset: free_library_export.rva,
+            #[cfg(feature = "remote_procedure")]
             get_proc_address_offset: get_proc_address_export.rva,
         })
     }

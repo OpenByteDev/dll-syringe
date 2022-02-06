@@ -1,6 +1,4 @@
-
 use iced_x86::{code_asm::*, IcedError};
-
 
 use std::{
     ffi::{c_void, CString},
@@ -10,16 +8,10 @@ use std::{
     ptr::{self, NonNull},
 };
 
-
-use winapi::{
-    shared::{
-        minwindef::{FARPROC},
-    },
-};
+use winapi::shared::minwindef::FARPROC;
 
 use crate::{
-    error::InjectError, ProcessModule, ProcessRef,
-    RemoteBox, RemoteBoxAllocator, Syringe,
+    error::InjectError, ProcessModule, ProcessRef, RemoteBox, RemoteBoxAllocator, Syringe,
 };
 
 type RemoteProcedurePtr = NonNull<c_void>;
@@ -43,14 +35,18 @@ impl<'a> Syringe<'a> {
     }
 
     /// Load the address of the given function from the given module in the remote process.
+    ///
+    /// # Panics
+    /// This method panics if the given module is not loaded in the target process.
     pub fn get_procedure_address(
         &mut self,
         module: ProcessModule<'_>,
         name: impl AsRef<str>,
     ) -> Result<Option<RemoteProcedurePtr>, InjectError> {
-        if module.process() != self.process {
-            panic!("trying to load procedure from a module of a different process");
-        }
+        assert!(
+            module.process() != self.process,
+            "trying to load procedure from a module of a different process"
+        );
 
         self.build_get_proc_address_stub()?;
         let stub = self.get_proc_address_stub.get_mut().unwrap();
@@ -256,6 +252,7 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
         self.stub
             .get_or_try_init(|| Self::build_stub(self.ptr.as_ptr(), &mut self.remote_allocator))?;
         let stub = self.stub.get_mut().unwrap();
+
         stub.parameter.write(arg)?;
         let exit_code = self.remote_allocator.process().run_remote_thread(
             unsafe { mem::transmute(stub.code.as_ptr()) },
@@ -264,6 +261,7 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
         if exit_code != 0 {
             return Err(InjectError::RemoteOperationFailed);
         }
+
         Ok(stub.result.read()?)
     }
 
@@ -283,9 +281,9 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
         code.memory().flush_instruction_cache()?;
 
         Ok(RemoteProcedureStub {
-            result,
-            parameter,
             code,
+            parameter,
+            result,
         })
     }
 }

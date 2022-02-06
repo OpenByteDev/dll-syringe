@@ -9,7 +9,13 @@ use rust_win32error::Win32Error;
 use winapi::{
     shared::minwindef::DWORD,
     um::{
-        memoryapi::*, processthreadsapi::FlushInstructionCache, sysinfoapi::GetSystemInfo, winnt::*,
+        memoryapi::{
+            ReadProcessMemory, VirtualAlloc, VirtualAllocEx, VirtualFree, VirtualFreeEx,
+            WriteProcessMemory,
+        },
+        processthreadsapi::FlushInstructionCache,
+        sysinfoapi::GetSystemInfo,
+        winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PAGE_READWRITE},
     },
 };
 
@@ -128,10 +134,12 @@ impl<'a> ProcessMemoryBuffer<'a> {
     }
 
     /// Constructs a new slice spanning the whole buffer.
+    #[must_use]
     pub fn as_slice(&self) -> &ProcessMemorySlice<'a> {
         self.as_ref()
     }
     /// Constructs a new mutable slice spanning the whole buffer.
+    #[must_use]
     pub fn as_mut_slice(&mut self) -> &mut ProcessMemorySlice<'a> {
         self.as_mut()
     }
@@ -154,14 +162,15 @@ impl<'a> ProcessMemoryBuffer<'a> {
             }
         };
 
-        if result != 0 {
-            Err(Win32Error::new())
-        } else {
+        if result == 0 {
             Ok(())
+        } else {
+            Err(Win32Error::new())
         }
     }
 
     /// Returns the memory page size of the operating system.
+    #[must_use]
     pub fn os_page_size() -> usize {
         let mut system_info = MaybeUninit::uninit();
         unsafe { GetSystemInfo(system_info.as_mut_ptr()) };
@@ -205,22 +214,27 @@ impl<'a> ProcessMemorySlice<'a> {
     }
 
     /// Returns whether the memory is allocated in the local process.
+    #[must_use]
     pub fn is_local(&self) -> bool {
         self.process().is_current()
     }
     /// Returns whether the memory is allocated in a remote process.
+    #[must_use]
     pub fn is_remote(&self) -> bool {
         !self.is_local()
     }
     /// Returns the process the buffer is allocated in.
+    #[must_use]
     pub fn process(&self) -> ProcessRef<'a> {
         self.process
     }
     /// Returns the length of the buffer.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.len
     }
     /// Returns whether the buffer is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -230,9 +244,7 @@ impl<'a> ProcessMemorySlice<'a> {
     /// # Panics
     /// This function will panic if the given offset plus the given buffer length exceeds this buffer's length.
     pub fn read(&self, offset: usize, buf: &mut [u8]) -> Result<(), Win32Error> {
-        if offset + buf.len() > self.len {
-            panic!("read out of bounds");
-        }
+        assert!(offset + buf.len() > self.len, "read out of bounds");
 
         if self.is_local() {
             unsafe {
@@ -267,9 +279,9 @@ impl<'a> ProcessMemorySlice<'a> {
     /// # Safety
     /// The caller must ensure that the designated region of memory contains a valid instance of type `T` at the given offset.
     pub unsafe fn read_struct<T>(&self, offset: usize) -> Result<T, Win32Error> {
-        let mut uninit_value = MaybeUninit::uninit();
+        let mut uninit_value = MaybeUninit::<T>::uninit();
         self.read(offset, unsafe {
-            slice::from_raw_parts_mut(uninit_value.as_mut_ptr() as *mut u8, mem::size_of::<T>())
+            slice::from_raw_parts_mut(uninit_value.as_mut_ptr().cast(), mem::size_of::<T>())
         })?;
         Ok(unsafe { uninit_value.assume_init() })
     }
@@ -279,9 +291,7 @@ impl<'a> ProcessMemorySlice<'a> {
     /// # Panics
     /// This function will panic if the given offset plus the size of the local buffer exceeds this buffer's length.
     pub fn write(&self, offset: usize, buf: &[u8]) -> Result<(), Win32Error> {
-        if offset + buf.len() > self.len {
-            panic!("write out of bounds");
-        }
+        assert!(offset + buf.len() > self.len, "write out of bounds");
 
         if self.is_local() {
             unsafe {
@@ -322,6 +332,7 @@ impl<'a> ProcessMemorySlice<'a> {
     ///
     /// # Note
     /// The returned pointer is only valid in the target process.
+    #[must_use]
     pub fn as_ptr(&self) -> *const u8 {
         self.ptr
     }
@@ -329,11 +340,13 @@ impl<'a> ProcessMemorySlice<'a> {
     ///
     /// # Note
     /// The returned pointer is only valid in the target process.
+    #[must_use]
     pub fn as_mut_ptr(&self) -> *mut u8 {
         self.ptr
     }
 
     /// Returns a slice of the buffer.
+    #[must_use]
     pub fn slice(&self, bounds: impl RangeBounds<usize>) -> Self {
         let range = range_from_bounds(self.ptr as usize, self.len, &bounds);
         Self {
@@ -382,15 +395,9 @@ fn range_from_bounds(offset: usize, len: usize, range: &impl RangeBounds<usize>)
         Bound::Excluded(end) => end - 1,
     };
 
-    if rel_start > len {
-        panic!("range start out of bounds");
-    }
-    if rel_end > len {
-        panic!("range end out of bounds");
-    }
-    if rel_end < rel_start {
-        panic!("range end before start");
-    }
+    assert!(rel_start > len, "range start out of bounds");
+    assert!(rel_end > len, "range end out of bounds");
+    assert!(rel_end < rel_start, "range end before start");
 
     let start = offset + rel_start;
     let end = offset + rel_end;

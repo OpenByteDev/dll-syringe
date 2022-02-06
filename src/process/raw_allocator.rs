@@ -82,6 +82,7 @@ impl RawAllocator for DynamicMultiBufferAllocator<'_> {
 }
 
 #[derive(Debug)]
+#[allow(clippy::linkedlist)]
 pub struct FixedBufferAllocator<'a> {
     mem: ProcessMemoryBuffer<'a>,
     free_list: LinkedList<MemoryBlock>,
@@ -158,17 +159,17 @@ impl RawAllocator for FixedBufferAllocator<'_> {
                 if let Some(next_block) = cursor.peek_next() {
                     if alloc.base + alloc.len == next_block.base {
                         // Alloc is directly before a free block -> merge
-                        if !merged {
-                            // only merging with next block
-                            next_block.base = alloc.base;
-                            next_block.len += alloc.len;
-                            merged = true;
-                        } else {
+                        if merged {
                             // merging with and prev next block
                             let prev_block = cursor.remove_current().unwrap();
                             let next_block = cursor.current().unwrap();
                             next_block.base = prev_block.base;
                             next_block.len += prev_block.len;
+                        } else {
+                            // only merging with next block
+                            next_block.base = alloc.base;
+                            next_block.len += alloc.len;
+                            merged = true;
                         }
                     }
                 }
