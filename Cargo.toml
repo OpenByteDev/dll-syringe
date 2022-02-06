@@ -37,6 +37,7 @@ dispose = { version = "0.4", default-features = false }
 default = ["into_x86_from_x64", "remote_procedure"]
 into_x86_from_x64 = ["goblin"]
 remote_procedure = ["iced-x86"]
+process_memory = []
 
 [package.metadata.docs.rs]
 targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
