@@ -46,13 +46,13 @@ The code of the injector/caller will look like this.
 use dll_syringe::{Syringe, Process};
 
 // find target process by name
-let target_process = Process::find_first_by_name("Name of target process").unwrap();
+let target_process = Process::find_first_by_name("ExampleProcess").unwrap();
 
 // create a new syringe for the target process
 let mut syringe = Syringe::for_process(&target_process);
 
 // inject the payload into the target process
-let injected_payload = syringe.inject("Path to injection payload").unwrap();
+let injected_payload = syringe.inject("injection_payload.dll").unwrap();
 
 let result: f64 = syringe.get_procedure(injected_payload, "add").unwrap().unwrap().call(&(2f64, 4f64)).unwrap();
 println!("{}", result); // prints 6
