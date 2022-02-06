@@ -30,7 +30,7 @@ let injected_payload = syringe.inject("injection_payload.dll").unwrap();
 syringe.eject(injected_payload).unwrap();
 ```
 
-## Call Remote Procedures
+## Calling Remote Procedures
 The example below will perform the same injection as above, but will call the `add` function defined exported from the injected module.
 
 The definition of the exported `add` function looks like this.
