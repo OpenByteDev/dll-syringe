@@ -2,7 +2,7 @@ use std::{collections::LinkedList, mem};
 
 use rust_win32error::Win32Error;
 
-use crate::{ProcessMemoryBuffer, ProcessRef};
+use crate::{process_memory::ProcessMemoryBuffer, ProcessRef};
 
 pub trait RawAllocator {
     type Error;
@@ -39,6 +39,7 @@ impl<'a> DynamicMultiBufferAllocator<'a> {
         Ok(self.pages.last_mut().unwrap())
     }
 
+    #[allow(dead_code)]
     pub fn count_allocated_bytes(&self) -> usize {
         self.pages
             .iter()
@@ -97,10 +98,12 @@ impl<'a> FixedBufferAllocator<'a> {
         Self { mem, free_list }
     }
 
+    #[allow(dead_code)]
     pub fn memory(&self) -> &ProcessMemoryBuffer<'a> {
         &self.mem
     }
 
+    #[allow(dead_code)]
     pub fn process(&self) -> ProcessRef<'a> {
         self.memory().process()
     }
@@ -230,7 +233,7 @@ pub enum AllocError {
 mod tests {
     use std::mem;
 
-    use crate::ProcessMemorySlice;
+    use crate::process_memory::ProcessMemorySlice;
 
     use super::*;
 
@@ -370,8 +373,8 @@ mod tests {
 
 #[cfg(test)]
 struct AlignTestStruct {
-    a: u8,
-    b: u16,
-    c: u32,
-    d: u64,
+    _a: u8,
+    _b: u16,
+    _c: u32,
+    _d: u64,
 }

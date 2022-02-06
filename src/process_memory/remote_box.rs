@@ -3,7 +3,8 @@ use std::{cell::RefCell, marker::PhantomData, mem, rc::Rc};
 use rust_win32error::Win32Error;
 
 use crate::{
-    Allocation, DynamicMultiBufferAllocator, ProcessMemorySlice, ProcessRef, RawAllocator,
+    process_memory::{Allocation, DynamicMultiBufferAllocator, ProcessMemorySlice, RawAllocator},
+    ProcessRef,
 };
 
 #[derive(Debug, Clone)]
@@ -33,6 +34,7 @@ impl<'a> RemoteBoxAllocator<'a> {
         Ok(b)
     }
 
+    #[allow(dead_code)]
     fn free(&mut self, allocation: &Allocation) {
         self.0.borrow_mut().free(allocation);
     }
@@ -81,6 +83,7 @@ impl<'a, T: Sized> RemoteBox<'a, T> {
         unsafe { self.memory().read_struct::<T>(0) }
     }
 
+    #[allow(dead_code)]
     pub fn as_ptr(&mut self) -> *const T {
         self.allocation.as_ptr().cast()
     }

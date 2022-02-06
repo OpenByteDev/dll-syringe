@@ -11,11 +11,14 @@ use std::{
 use winapi::shared::minwindef::FARPROC;
 
 use crate::{
-    error::SyringeError, ProcessModule, ProcessRef, RemoteBox, RemoteBoxAllocator, Syringe,
+    error::SyringeError,
+    process_memory::{RemoteBox, RemoteBoxAllocator},
+    ProcessModule, ProcessRef, Syringe,
 };
 
 type RemoteProcedurePtr = NonNull<c_void>;
 
+#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "remote_procedure")))]
 impl<'a> Syringe<'a> {
     /// Loads an exported function from the given module from the target process.
     /// The function does not have to be from an injected module.
@@ -219,6 +222,7 @@ impl<'a> Syringe<'a> {
 
 /// A remote procedure from a module of a foreign process.
 /// The procedure abides by the `extern "system" fn(*const T, *mut R)` signature.
+#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "remote_procedure")))]
 #[derive(Debug)]
 pub struct RemoteProcedure<'a, T, R> {
     ptr: RemoteProcedurePtr,

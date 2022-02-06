@@ -24,7 +24,9 @@ use winapi::{
 };
 
 /// A handle to a process module.
-/// Note that this is not a `HANDLE` in windows terms but the base address of a loaded module (`HMODULE`).
+///
+/// # Note
+/// This is not a `HANDLE` but a [`HMODULE`](https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types#HMODULE) which is the base address of a loaded module.
 pub type ModuleHandle = HMODULE;
 
 /// A loaded module of a running process.
@@ -266,8 +268,8 @@ impl<'a> ProcessModule<'a> {
     }
 
     /// Gets a pointer to the procedure with the given name from the module.
-    /// 
-    /// Note:
+    ///
+    /// # Note
     /// This function is only supported for modules in the current process.
     pub fn get_local_procedure(
         &self,
@@ -277,7 +279,8 @@ impl<'a> ProcessModule<'a> {
             return Err(GetLocalProcedureError::UnsupportedRemoteTarget);
         }
 
-        self.__get_local_procedure(&CString::new(proc_name.as_ref())?).map_err(|e| e.into())
+        self.__get_local_procedure(&CString::new(proc_name.as_ref())?)
+            .map_err(|e| e.into())
     }
 
     pub(crate) fn __get_local_procedure(

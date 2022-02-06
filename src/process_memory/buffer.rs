@@ -23,6 +23,7 @@ use crate::ProcessRef;
 
 /// A owned memory buffer in the memory space of a (remote) process.
 #[derive(Debug)]
+#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "process_memory")))]
 pub struct ProcessMemoryBuffer<'a>(ProcessMemorySlice<'a>);
 
 impl<'a> Deref for ProcessMemoryBuffer<'a> {
@@ -181,7 +182,11 @@ impl<'a> ProcessMemoryBuffer<'a> {
 impl Drop for ProcessMemoryBuffer<'_> {
     fn drop(&mut self) {
         let result = unsafe { self._free() };
-        debug_assert!(result.is_ok(), "Failed to free process memory buffer: {:?}", result);
+        debug_assert!(
+            result.is_ok(),
+            "Failed to free process memory buffer: {:?}",
+            result
+        );
     }
 }
 

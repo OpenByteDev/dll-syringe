@@ -8,7 +8,10 @@ use winapi::shared::{
     ntdef::LPCWSTR,
 };
 
-use crate::{error::SyringeError, ModuleHandle, ProcessModule, ProcessRef, RemoteBoxAllocator};
+use crate::{
+    error::SyringeError, process_memory::RemoteBoxAllocator, ModuleHandle, ProcessModule,
+    ProcessRef,
+};
 
 #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
 use {
@@ -159,11 +162,14 @@ impl<'a> Syringe<'a> {
             return Err(SyringeError::RemoteOperationFailed);
         }
 
-        assert!(!self
-            .process
-            .module_handles()?
-            .as_ref()
-            .contains(&module.handle()), "ejected module survived");
+        assert!(
+            !self
+                .process
+                .module_handles()?
+                .as_ref()
+                .contains(&module.handle()),
+            "ejected module survived"
+        );
 
         Ok(())
     }
@@ -186,13 +192,11 @@ impl<'a> Syringe<'a> {
         let kernel32_module =
             ProcessModule::__find_local_by_name_or_abs_path(u16cstr!("kernel32.dll"))?.unwrap();
 
-        let load_library_fn_ptr = kernel32_module
-            .__get_local_procedure(cstr!("LoadLibraryW"))?;
-        let free_library_fn_ptr = kernel32_module
-            .__get_local_procedure(cstr!("FreeLibrary"))?;
+        let load_library_fn_ptr = kernel32_module.__get_local_procedure(cstr!("LoadLibraryW"))?;
+        let free_library_fn_ptr = kernel32_module.__get_local_procedure(cstr!("FreeLibrary"))?;
         #[cfg(feature = "remote_procedure")]
-        let get_proc_address_fn_ptr = kernel32_module
-            .__get_local_procedure(cstr!("GetProcAddress"))?;
+        let get_proc_address_fn_ptr =
+            kernel32_module.__get_local_procedure(cstr!("GetProcAddress"))?;
 
         Ok(InjectHelpData {
             kernel32_module: kernel32_module.handle(),

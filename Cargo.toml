@@ -39,6 +39,7 @@ into_x86_from_x64 = ["goblin"]
 remote_procedure = ["iced-x86"]
 process_memory = []
 all = ["into_x86_from_x64", "remote_procedure", "process_memory"]
+doc_cfg = ["all"]
 
 [package.metadata.docs.rs]
 targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]

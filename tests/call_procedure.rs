@@ -11,7 +11,10 @@ use std::{
 mod common;
 
 #[test]
-#[cfg(any(target_arch = "x86", all(target_arch = "x86_64", feature = "into_x86_from_x64")))]
+#[cfg(any(
+    target_arch = "x86",
+    all(target_arch = "x86_64", feature = "into_x86_from_x64")
+))]
 fn get_procedure_address_32() -> Result<(), Box<dyn Error>> {
     get_procedure_address_test(
         common::build_test_payload_x86()?,
@@ -64,7 +67,10 @@ fn get_procedure_address_test(
 }
 
 #[test]
-#[cfg(any(target_arch = "x86", all(target_arch = "x86_64", feature = "into_x86_from_x64")))]
+#[cfg(any(
+    target_arch = "x86",
+    all(target_arch = "x86_64", feature = "into_x86_from_x64")
+))]
 fn call_procedure_32() -> Result<(), Box<dyn Error>> {
     call_procedure_test(
         common::build_test_payload_x86()?,

@@ -26,6 +26,10 @@ use winapi::{
 
 use crate::ProcessRef;
 
+/// A handle to a process.
+/// Equivalent to [`HANDLE`](std::os::windows::raw::HANDLE).
+pub type ProcessHandle = std::os::windows::raw::HANDLE;
+
 /// The [privileges](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights) required for a process handle to be usable for dll injection.
 pub const PROCESS_INJECTION_ACCESS: DWORD = PROCESS_CREATE_THREAD
     | PROCESS_QUERY_INFORMATION
