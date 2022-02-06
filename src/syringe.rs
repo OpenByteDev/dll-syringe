@@ -141,8 +141,8 @@ impl<'a> Syringe<'a> {
     /// Ejects a previously injected module from its target process.
     pub fn eject(&self, module: ProcessModule<'_>) -> Result<(), InjectError> {
         assert!(
-            module.process() != self.process,
-            "ejecting a module from a different process"
+            module.process() == self.process,
+            "trying to eject a module from a different process"
         );
 
         let inject_data = self
@@ -163,7 +163,7 @@ impl<'a> Syringe<'a> {
             .process
             .module_handles()?
             .as_ref()
-            .contains(&module.handle()));
+            .contains(&module.handle()), "ejected module survived");
 
         Ok(())
     }

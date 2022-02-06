@@ -44,8 +44,8 @@ impl<'a> Syringe<'a> {
         name: impl AsRef<str>,
     ) -> Result<Option<RemoteProcedurePtr>, InjectError> {
         assert!(
-            module.process() != self.process,
-            "trying to load procedure from a module of a different process"
+            module.process() == self.process,
+            "trying to load a procedure from a module of a different process"
         );
 
         self.build_get_proc_address_stub()?;

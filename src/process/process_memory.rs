@@ -181,7 +181,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
 impl Drop for ProcessMemoryBuffer<'_> {
     fn drop(&mut self) {
         let result = unsafe { self._free() };
-        debug_assert!(result.is_ok());
+        debug_assert!(result.is_ok(), "Failed to free process memory buffer: {:?}", result);
     }
 }
 
@@ -244,7 +244,7 @@ impl<'a> ProcessMemorySlice<'a> {
     /// # Panics
     /// This function will panic if the given offset plus the given buffer length exceeds this buffer's length.
     pub fn read(&self, offset: usize, buf: &mut [u8]) -> Result<(), Win32Error> {
-        assert!(offset + buf.len() > self.len, "read out of bounds");
+        assert!(offset + buf.len() <= self.len, "read out of bounds");
 
         if self.is_local() {
             unsafe {
@@ -291,7 +291,7 @@ impl<'a> ProcessMemorySlice<'a> {
     /// # Panics
     /// This function will panic if the given offset plus the size of the local buffer exceeds this buffer's length.
     pub fn write(&self, offset: usize, buf: &[u8]) -> Result<(), Win32Error> {
-        assert!(offset + buf.len() > self.len, "write out of bounds");
+        assert!(offset + buf.len() <= self.len, "write out of bounds");
 
         if self.is_local() {
             unsafe {
@@ -395,9 +395,9 @@ fn range_from_bounds(offset: usize, len: usize, range: &impl RangeBounds<usize>)
         Bound::Excluded(end) => end - 1,
     };
 
-    assert!(rel_start > len, "range start out of bounds");
-    assert!(rel_end > len, "range end out of bounds");
-    assert!(rel_end < rel_start, "range end before start");
+    assert!(rel_start <= len, "range start out of bounds");
+    assert!(rel_end <= len, "range end out of bounds");
+    assert!(rel_end >= rel_start, "range end before start");
 
     let start = offset + rel_start;
     let end = offset + rel_end;
