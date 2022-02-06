@@ -248,6 +248,7 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
     }
 
     /// Calls the remote procedure with the given argument.
+    /// As the argument is copied to the memory of the remote process, changes made in the called function will not be reflected in the local copy.
     pub fn call(&mut self, arg: &T) -> Result<R, InjectError> {
         self.stub
             .get_or_try_init(|| Self::build_stub(self.ptr.as_ptr(), &mut self.remote_allocator))?;
