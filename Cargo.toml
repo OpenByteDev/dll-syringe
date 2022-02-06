@@ -34,10 +34,9 @@ platforms = { version = "2.0", default-features = false }
 dispose = { version = "0.4", default-features = false }
 
 [features]
-default = ["into_x86_from_x64", "call_remote_procedure"]
-sync_send_syringe = []
+default = ["into_x86_from_x64", "remote_procedure"]
 into_x86_from_x64 = ["goblin"]
-call_remote_procedure = ["iced-x86"]
+remote_procedure = ["iced-x86"]
 
 [package.metadata.docs.rs]
 targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]

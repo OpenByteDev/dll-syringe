@@ -2,11 +2,12 @@ use std::{
     borrow::Cow,
     cmp,
     convert::TryInto,
+    ffi::c_void,
     hash::{Hash, Hasher},
     mem::{self, MaybeUninit},
     num::NonZeroU32,
     os::windows::{
-        prelude::{AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle},
+        prelude::{AsHandle, AsRawHandle, BorrowedHandle, FromRawHandle, OwnedHandle},
         raw::HANDLE,
     },
     path::{Path, PathBuf},
@@ -22,10 +23,14 @@ use winapi::{
     um::{
         handleapi::DuplicateHandle,
         libloaderapi::GetModuleFileNameW,
+        minwinbase::STILL_ACTIVE,
         processthreadsapi::{
-            GetCurrentProcess, GetExitCodeProcess, GetProcessId, TerminateProcess,
+            CreateRemoteThread, GetCurrentProcess, GetExitCodeProcess, GetExitCodeThread,
+            GetProcessId, TerminateProcess,
         },
         psapi::{EnumProcessModulesEx, GetModuleFileNameExW, LIST_MODULES_ALL},
+        synchapi::WaitForSingleObject,
+        winbase::{INFINITE, WAIT_FAILED},
         winnt::DUPLICATE_SAME_ACCESS,
         wow64apiset::{GetSystemWow64DirectoryA, IsWow64Process},
     },
@@ -353,7 +358,6 @@ impl<'a> ProcessRef<'a> {
     }
 
     /// Gets the executable path of this process.
-    // TODO: deduplicate with ProcessModule::get_path
     pub fn path(&self) -> Result<PathBuf, Win32Error> {
         if self.is_current() {
             self._get_path_of_current()
@@ -415,6 +419,56 @@ impl<'a> ProcessRef<'a> {
             return Err(Win32Error::new());
         }
         Ok(())
+    }
+
+    /// Starts a new thread in this process with the given entry point and arguments and waits for it to finish, returning its exit code.
+    pub fn run_remote_thread(
+        &self,
+        remote_fn: extern "system" fn(*mut c_void) -> u32,
+        parameter: *mut c_void,
+    ) -> Result<u32, Win32Error> {
+        let thread_handle = self.start_remote_thread(remote_fn, parameter)?;
+
+        let reason = unsafe { WaitForSingleObject(thread_handle.as_raw_handle(), INFINITE) };
+        if reason == WAIT_FAILED {
+            return Err(Win32Error::new());
+        }
+
+        let mut exit_code = MaybeUninit::uninit();
+        let result =
+            unsafe { GetExitCodeThread(thread_handle.as_raw_handle(), exit_code.as_mut_ptr()) };
+        if result == 0 {
+            return Err(Win32Error::new());
+        }
+        assert_ne!(result, STILL_ACTIVE.try_into().unwrap());
+
+        Ok(unsafe { exit_code.assume_init() })
+    }
+
+    /// Starts a new thread in this process with the given entry point and arguments and returns its thread handle.
+    #[allow(clippy::not_unsafe_ptr_arg_deref)] // not relevant as ptr is dereffed in the target process and any invalid deref will only result in an error.
+    pub fn start_remote_thread(
+        &self,
+        remote_fn: extern "system" fn(*mut c_void) -> u32,
+        parameter: *mut c_void,
+    ) -> Result<OwnedHandle, Win32Error> {
+        // create a remote thread that will call LoadLibraryW with payload_path as its argument.
+        let thread_handle = unsafe {
+            CreateRemoteThread(
+                self.handle(),
+                ptr::null_mut(),
+                0,
+                Some(remote_fn),
+                parameter,
+                0, // RUN_IMMEDIATELY
+                ptr::null_mut(),
+            )
+        };
+        if thread_handle.is_null() {
+            return Err(Win32Error::new());
+        }
+
+        Ok(unsafe { OwnedHandle::from_raw_handle(thread_handle) })
     }
 }
 

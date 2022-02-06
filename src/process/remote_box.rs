@@ -16,7 +16,7 @@ impl<'a> RemoteBoxAllocator<'a> {
         ))))
     }
 
-    fn process(&self) -> ProcessRef<'a> {
+    pub fn process(&self) -> ProcessRef<'a> {
         self.0.borrow().process()
     }
 
@@ -34,10 +34,11 @@ impl<'a> RemoteBoxAllocator<'a> {
     }
 
     fn free(&mut self, allocation: &Allocation) {
-        self.0.borrow_mut().free(allocation)
+        self.0.borrow_mut().free(allocation);
     }
 }
 
+#[derive(Debug)]
 pub struct RemoteBox<'a, T: ?Sized> {
     allocation: Allocation,
     allocator: Rc<RefCell<DynamicMultiBufferAllocator<'a>>>,
@@ -81,21 +82,21 @@ impl<'a, T: Sized> RemoteBox<'a, T> {
     }
 
     pub fn as_ptr(&mut self) -> *const T {
-        self.allocation.as_ptr() as *const T
+        self.allocation.as_ptr().cast()
     }
 
     pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.allocation.as_mut_ptr() as *mut T
+        self.allocation.as_mut_ptr().cast()
     }
 }
 
 impl<'a, T> RemoteBox<'a, [T]> {
     pub fn as_ptr(&mut self) -> *const T {
-        self.allocation.as_ptr() as *const T
+        self.allocation.as_ptr().cast()
     }
 
     pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.allocation.as_mut_ptr() as *mut T
+        self.allocation.as_mut_ptr().cast()
     }
 }
 

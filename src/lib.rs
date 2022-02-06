@@ -13,7 +13,7 @@
     any(
         not(target_arch = "x86_64"),
         not(feature = "into_x86_from_x64"),
-        not(feature = "call_remote_procedure")
+        not(feature = "remote_procedure")
     ),
     allow(unused_imports)
 )]
@@ -21,6 +21,11 @@
 
 mod syringe;
 pub use syringe::*;
+
+#[cfg(feature = "remote_procedure")]
+mod remote_procedure;
+#[cfg(feature = "remote_procedure")]
+pub use remote_procedure::*;
 
 mod process;
 pub use process::*;

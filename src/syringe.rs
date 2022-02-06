@@ -2,40 +2,30 @@ use cstr::cstr;
 #[cfg(target_arch = "x86_64")]
 #[cfg(feature = "into_x86_from_x64")]
 use goblin::pe::PE;
-#[cfg(feature = "call_remote_procedure")]
-use iced_x86::{code_asm::*, IcedError};
 use path_absolutize::Absolutize;
 use rust_win32error::Win32Error;
 use std::{
     convert::TryInto,
-    ffi::{c_void, CString},
     fs,
     lazy::OnceCell,
     mem::{self, MaybeUninit},
-    os::windows::prelude::{AsRawHandle, FromRawHandle, OwnedHandle},
     path::{Path, PathBuf},
-    ptr,
     time::Duration,
 };
 use u16cstr::u16cstr;
 use widestring::{U16CString, U16Str};
 use winapi::{
     shared::{
-        minwindef::{BOOL, DWORD, FARPROC, HMODULE, LPVOID, MAX_PATH},
+        minwindef::{BOOL, FARPROC, HMODULE, MAX_PATH},
         ntdef::{LPCSTR, LPCWSTR},
     },
     um::{
-        minwinbase::STILL_ACTIVE,
-        processthreadsapi::{CreateRemoteThread, GetExitCodeThread},
-        synchapi::WaitForSingleObject,
-        winbase::{INFINITE, WAIT_FAILED},
         wow64apiset::GetSystemWow64DirectoryW,
     },
 };
 
 use crate::{
-    error::InjectError, utils::retry_with_filter, ModuleHandle, ProcessModule, ProcessRef,
-    RemoteBoxAllocator,
+    error::InjectError, utils::retry_with_filter, ModuleHandle, ProcessModule, ProcessRef, RemoteBoxAllocator,
 };
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
@@ -43,7 +33,7 @@ type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
 type GetProcAddressFn = unsafe extern "system" fn(HMODULE, LPCSTR) -> FARPROC;
 
 #[derive(Debug, Clone)]
-struct InjectHelpData {
+pub(crate) struct InjectHelpData {
     kernel32_module: ModuleHandle,
     load_library_offset: usize,
     free_library_offset: usize,
@@ -87,9 +77,12 @@ impl InjectHelpData {
 /// ```
 #[derive(Debug)]
 pub struct Syringe<'a> {
-    process: ProcessRef<'a>,
-    inject_help_data: OnceCell<InjectHelpData>,
-    remote_allocator: RemoteBoxAllocator<'a>,
+    pub(crate) process: ProcessRef<'a>,
+    pub(crate) inject_help_data: OnceCell<InjectHelpData>,
+    pub(crate) remote_allocator: RemoteBoxAllocator<'a>,
+    #[cfg(feature = "remote_procedure")]
+    pub(crate) get_proc_address_stub:
+        OnceCell<crate::RemoteProcedureStub<'a, crate::GetProcAddressParams, FARPROC>>,
 }
 
 impl<'a> Syringe<'a> {
@@ -100,6 +93,8 @@ impl<'a> Syringe<'a> {
             process,
             inject_help_data: OnceCell::new(),
             remote_allocator: RemoteBoxAllocator::new(process),
+            #[cfg(feature = "remote_procedure")]
+            get_proc_address_stub: OnceCell::new(),
         }
     }
 
@@ -125,7 +120,7 @@ impl<'a> Syringe<'a> {
             .alloc_and_copy(wide_module_path.as_slice())?;
 
         // creating a thread that will call LoadLibraryW with a pointer to payload_path as argument
-        let exit_code = self.run_remote_thread(
+        let exit_code = self.process.run_remote_thread(
             unsafe { mem::transmute(inject_data.get_load_library_fn_ptr()) },
             remote_wide_module_path.as_mut_ptr().cast(),
         )?;
@@ -146,7 +141,7 @@ impl<'a> Syringe<'a> {
     }
 
     /// Ejects a previously injected module from its target process.
-    pub fn eject(&self, module: ProcessModule) -> Result<(), InjectError> {
+    pub fn eject(&self, module: ProcessModule<'_>) -> Result<(), InjectError> {
         if module.process() != self.process {
             panic!("ejecting a module from a different process");
         }
@@ -155,7 +150,7 @@ impl<'a> Syringe<'a> {
             .inject_help_data
             .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process))?;
 
-        let exit_code = self.run_remote_thread(
+        let exit_code = self.process.run_remote_thread(
             unsafe { mem::transmute(inject_data.get_free_library_fn_ptr()) },
             module.handle().cast(),
         )?;
@@ -174,259 +169,8 @@ impl<'a> Syringe<'a> {
         Ok(())
     }
 
-    #[cfg(feature = "call_remote_procedure")]
-    /// Load the address of the given function from the given module in the remote process.
-    pub fn get_procedure_address(
-        &mut self,
-        module: ProcessModule,
-        name: impl AsRef<str>,
-    ) -> Result<*const c_void, InjectError> {
-        if module.process() != self.process {
-            panic!("trying to load procedure from a module of a different process");
-        }
-
-        let inject_data = self
-            .inject_help_data
-            .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process))?;
-
-        let name = name.as_ref();
-        let remote_get_proc_address = inject_data.get_proc_address_fn_ptr();
-
-        let mut name = self
-            .remote_allocator
-            .alloc_and_copy(CString::new(name).unwrap().as_bytes_with_nul())?;
-        let mut parameters = self
-            .remote_allocator
-            .alloc_and_copy(&GetProcAddressParams {
-                module_handle: module.handle() as u64,
-                name: name.as_ptr() as u64,
-            })?;
-        let mut result = self.remote_allocator.alloc_uninit::<FARPROC>()?;
-
-        // Allocate memory in remote process and build a method stub.
-        let code = if self.process.is_x86()? {
-            Syringe::build_get_proc_address_x86(
-                remote_get_proc_address as *const _,
-                result.as_mut_ptr().cast(),
-            )
-            .unwrap()
-        } else {
-            Syringe::build_get_proc_address_x64(
-                remote_get_proc_address as *const _,
-                result.as_mut_ptr().cast(),
-            )
-            .unwrap()
-        };
-        let mut function_stub = self.remote_allocator.alloc_and_copy(code.as_slice())?;
-        function_stub.memory().flush_instruction_cache()?;
-
-        let exit_code = self.run_remote_thread(
-            unsafe { mem::transmute(function_stub.as_mut_ptr()) },
-            parameters.as_mut_ptr().cast(),
-        )?;
-        if exit_code != 0u32 {
-            return Err(InjectError::RemoteOperationFailed);
-        }
-
-        Ok(result.read()?.cast())
-    }
-
-    #[cfg(feature = "call_remote_procedure")]
-    /// Calls the function pointer retrieved using [Syringe::get_procedure_address] in the remote process.
-    /// The target function has to have the following signature: `extern "system" fn(parameter: *const P, result: *mut R)`.
-    ///
-    /// # Safety
-    /// The caller has to ensure that the given function pointer is valid and that it points to a function in the target process with the correct signature.
-    pub unsafe fn call_procedure<R, P>(
-        &mut self,
-        procedure: *const c_void,
-        parameter: &P,
-    ) -> Result<R, InjectError> {
-        let mut result = self.remote_allocator.alloc_uninit::<R>()?;
-        let mut parameter = self.remote_allocator.alloc_and_copy(parameter)?;
-
-        let code = if self.process.is_x86()? {
-            Syringe::build_call_procedure_x86(procedure, result.as_mut_ptr().cast()).unwrap()
-        } else {
-            Syringe::build_call_procedure_x64(procedure, result.as_mut_ptr().cast()).unwrap()
-        };
-        let mut function_stub = self.remote_allocator.alloc_and_copy(code.as_slice())?;
-        function_stub.memory().flush_instruction_cache()?;
-
-        let exit_code = self.run_remote_thread(
-            unsafe { mem::transmute(function_stub.as_mut_ptr()) },
-            parameter.as_mut_ptr().cast(),
-        )?;
-        if exit_code != 0u32 {
-            return Err(InjectError::RemoteOperationFailed);
-        }
-
-        Ok(result.read()?)
-    }
-
-    #[cfg(feature = "call_remote_procedure")]
-    /// Calls the function specified by `procedure` retrieved using [Syringe::get_procedure_address] in the remote process.
-    /// The target function has to have the following signature: `extern "system" fn(*mut c_void) -> u32`.
-    ///
-    /// # Note
-    /// Pointers to memory in the current process will not be accessible from the remote process.
-    ///
-    /// # Safety
-    /// The caller has to ensure that the given function pointer is valid and that it points to a function in the target process with the correct signature.
-    pub unsafe fn call_procedure_fast(
-        &self,
-        procedure: *const c_void,
-        parameter: *mut c_void,
-    ) -> Result<u32, Win32Error> {
-        self.run_remote_thread(unsafe { mem::transmute(procedure) }, parameter)
-    }
-
-    fn run_remote_thread(
-        &self,
-        remote_fn: extern "system" fn(LPVOID) -> DWORD,
-        parameter: LPVOID,
-    ) -> Result<u32, Win32Error> {
-        // create a remote thread that will call LoadLibraryW with payload_path as its argument.
-        let thread_handle = unsafe {
-            CreateRemoteThread(
-                self.process.handle(),
-                ptr::null_mut(),
-                0,
-                Some(remote_fn),
-                parameter,
-                0, // RUN_IMMEDIATELY
-                ptr::null_mut(),
-            )
-        };
-        if thread_handle.is_null() {
-            return Err(Win32Error::new());
-        }
-        // ensure the handle is closed once we exit this function
-        let thread_handle = unsafe { OwnedHandle::from_raw_handle(thread_handle) };
-
-        let reason = unsafe { WaitForSingleObject(thread_handle.as_raw_handle(), INFINITE) };
-        if reason == WAIT_FAILED {
-            return Err(Win32Error::new());
-        }
-
-        let mut exit_code = MaybeUninit::uninit();
-        let result =
-            unsafe { GetExitCodeThread(thread_handle.as_raw_handle(), exit_code.as_mut_ptr()) };
-        if result == 0 {
-            return Err(Win32Error::new());
-        }
-        assert_ne!(result, STILL_ACTIVE.try_into().unwrap());
-
-        Ok(unsafe { exit_code.assume_init() })
-    }
-
-    #[cfg(feature = "call_remote_procedure")]
-    fn build_call_procedure_x86(
-        real_address: *const c_void,
-        return_buffer_address: *mut c_void,
-    ) -> Result<Vec<u8>, IcedError> {
-        assert!(!real_address.is_null());
-        assert!(!return_buffer_address.is_null());
-
-        let mut asm = CodeAssembler::new(32)?;
-
-        asm.mov(eax, esp + 4)?; // load arg ptr (lpParameter) from stack
-        asm.push(return_buffer_address as u32)?; // push result ptr onto stack
-        asm.push(eax)?; // push arg ptr onto stack
-        asm.mov(eax, real_address as u32)?; // load address of target function
-        asm.call(eax)?; // call real_address
-        asm.mov(eax, 0)?; // return 0
-        asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
-
-        asm.assemble(0x1234_5678)
-    }
-
-    #[cfg(feature = "call_remote_procedure")]
-    fn build_call_procedure_x64(
-        real_address: *const c_void,
-        return_buffer_address: *mut c_void,
-    ) -> Result<Vec<u8>, IcedError> {
-        assert!(!real_address.is_null());
-        assert!(!return_buffer_address.is_null());
-
-        let mut asm = CodeAssembler::new(64)?;
-
-        asm.sub(rsp, 40)?; // Re-align stack to 16 byte boundary +32 shadow space
-        asm.mov(rdx, return_buffer_address as u64)?; // result ptr
-        asm.mov(rcx, rcx)?; // arg ptr
-        asm.mov(rax, real_address as u64)?;
-        asm.call(rax)?;
-        asm.mov(rax, 0u64)?; // return 0
-        asm.add(rsp, 40)?; // Re-align stack to 16 byte boundary + shadow space.
-        asm.mov(rax, 0u64)?; // return 0
-        asm.ret()?; // Restore stack ptr. (Callee cleanup)
-
-        asm.assemble(0x1234_5678)
-    }
-
-    #[cfg(feature = "call_remote_procedure")]
-    fn build_get_proc_address_x86(
-        real_address: *const c_void,
-        return_buffer_address: *mut c_void,
-    ) -> Result<Vec<u8>, IcedError> {
-        assert!(!real_address.is_null());
-        assert!(!return_buffer_address.is_null());
-
-        // assembly code from https://github.com/Reloaded-Project/Reloaded.Injector/blob/77a9a87392cc75fa087d7004e8cdef054e880428/Source/Reloaded.Injector/Shellcode.cs#L159
-        // mov eax, dword [esp + 4]         // CreateRemoteThread lpParameter
-        // push dword [eax + 8]             // lpProcName
-        // push dword [eax + 0]             // hModule
-        // call dword [dword GetProcAddress]
-        // mov dword [dword ReturnAddress], eax
-        // ret 4                           // Restore stack ptr. (Callee cleanup)
-        let mut asm = CodeAssembler::new(32)?;
-
-        asm.mov(eax, esp + 4)?; // CreateRemoteThread lpParameter
-        asm.push(dword_ptr(eax + 8))?; // lpProcName
-        asm.push(dword_ptr(eax + 0))?; // hModule
-        asm.mov(ebx, real_address as u32)?;
-        asm.call(ebx)?;
-        asm.mov(dword_ptr(return_buffer_address as u32), eax)?;
-        asm.mov(eax, 0)?; // return 0
-        asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
-
-        asm.assemble(0x1234_5678)
-    }
-
-    #[cfg(feature = "call_remote_procedure")]
-    fn build_get_proc_address_x64(
-        real_address: *const c_void,
-        return_buffer_address: *mut c_void,
-    ) -> Result<Vec<u8>, IcedError> {
-        assert!(!real_address.is_null());
-        assert!(!return_buffer_address.is_null());
-
-        // assembly code from https://github.com/Reloaded-Project/Reloaded.Injector/blob/77a9a87392cc75fa087d7004e8cdef054e880428/Source/Reloaded.Injector/Shellcode.cs#L188
-        //                                      // CreateRemoteThread lpParameter @ ECX
-        // sub rsp, 40                          // Re-align stack to 16 byte boundary +32 shadow space
-        // mov rdx, qword [qword rcx + 8]       // lpProcName
-        // mov rcx, qword [qword rcx + 0]       // hModule
-        // call qword [qword GetProcAddress]    // [replaced with indirect call]
-        // mov qword [qword ReturnAddress], rax
-        // add rsp, 40                          // Re-align stack to 16 byte boundary + shadow space.
-        // ret
-        let mut asm = CodeAssembler::new(64).unwrap();
-
-        asm.sub(rsp, 40)?; // Re-align stack to 16 byte boundary +32 shadow space
-        asm.mov(rdx, qword_ptr(rcx + 8))?; // lpProcName
-        asm.mov(rcx, qword_ptr(rcx + 0))?; // hModule
-        asm.mov(rax, real_address as u64)?;
-        asm.call(rax)?;
-        asm.mov(qword_ptr(return_buffer_address as u64), rax)?;
-        asm.add(rsp, 40)?; // Re-align stack to 16 byte boundary + shadow space.
-        asm.mov(rax, 0u64)?; // return 0
-        asm.ret()?; // Restore stack ptr. (Callee cleanup)
-
-        asm.assemble(0x1234_5678)
-    }
-
-    fn load_inject_help_data_for_process(
-        process: ProcessRef,
+    pub(crate) fn load_inject_help_data_for_process(
+        process: ProcessRef<'_>,
     ) -> Result<InjectHelpData, InjectError> {
         let is_target_x64 = process.is_x64()?;
         let is_self_x64 = cfg!(target_arch = "x86_64");
@@ -464,7 +208,7 @@ impl<'a> Syringe<'a> {
     #[cfg(target_arch = "x86_64")]
     #[cfg(feature = "into_x86_from_x64")]
     fn _load_inject_help_data_for_process(
-        process: ProcessRef,
+        process: ProcessRef<'_>,
     ) -> Result<InjectHelpData, InjectError> {
         // get kernel32 handle of target process (may fail if target process is currently starting and has not loaded kernel32 yet)
         let kernel32_module = retry_with_filter(
@@ -525,27 +269,5 @@ impl<'a> Syringe<'a> {
         let path_len = result as usize;
         let path = unsafe { MaybeUninit::slice_assume_init_ref(&path_buf[..path_len]) };
         Ok(PathBuf::from(U16Str::from_slice(path).to_os_string()))
-    }
-}
-
-#[cfg(feature = "call_remote_procedure")]
-#[repr(C)]
-struct GetProcAddressParams {
-    module_handle: u64,
-    name: u64,
-}
-
-#[cfg(all(test, feature = "sync_send_syringe"))]
-mod tests {
-    #[test]
-    fn syringe_is_send() {
-        fn assert_send<T: Send>() {}
-        assert_send::<super::Syringe>();
-    }
-
-    #[test]
-    fn syringe_is_sync() {
-        fn assert_sync<T: Send>() {}
-        assert_sync::<super::Syringe>();
     }
 }

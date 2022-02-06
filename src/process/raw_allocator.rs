@@ -1,4 +1,4 @@
-use std::collections::LinkedList;
+use std::{collections::LinkedList, mem};
 
 use rust_win32error::Win32Error;
 
@@ -30,8 +30,10 @@ impl<'a> DynamicMultiBufferAllocator<'a> {
         self.process
     }
 
-    fn alloc_page(&mut self) -> Result<&mut FixedBufferAllocator<'a>, Win32Error> {
-        let mem = ProcessMemoryBuffer::allocate_page(self.process)?;
+    fn alloc_page(&mut self, min_size: usize) -> Result<&mut FixedBufferAllocator<'a>, Win32Error> {
+        let os_page_size = ProcessMemoryBuffer::os_page_size();
+        let page_size = (min_size / os_page_size + 1) * os_page_size;
+        let mem = ProcessMemoryBuffer::allocate(self.process, page_size)?;
         let page = FixedBufferAllocator::new(mem);
         self.pages.push(page);
         Ok(self.pages.last_mut().unwrap())
@@ -58,11 +60,11 @@ impl RawAllocator for DynamicMultiBufferAllocator<'_> {
             }
         }
 
-        let page = self.alloc_page()?;
+        let page = self.alloc_page(size)?;
         match page.alloc(size) {
             Ok(allocation) => Ok(allocation),
             Err(AllocError::Win32(e)) => Err(e),
-            Err(AllocError::OutOfMemory) => todo!("handle large allocations (> page size)"), // TODO:
+            Err(AllocError::OutOfMemory) => unreachable!(),
         }
     }
 
@@ -115,7 +117,10 @@ impl RawAllocator for FixedBufferAllocator<'_> {
     type Error = AllocError;
     type Alloc = Allocation;
 
-    fn alloc(&mut self, size: usize) -> Result<Allocation, AllocError> {
+    fn alloc(&mut self, mut size: usize) -> Result<Allocation, AllocError> {
+        // TODO: smarter alignment calculation
+        size = (size + mem::size_of::<u64>() - 1) & !(mem::size_of::<u64>() - 1);
+
         let mut cursor = self.free_list.cursor_front_mut();
         while let Some(block) = cursor.current() {
             if block.len >= size {
@@ -222,6 +227,8 @@ pub enum AllocError {
 
 #[cfg(test)]
 mod tests {
+    use std::mem;
+
     use crate::ProcessMemorySlice;
 
     use super::*;
@@ -233,12 +240,13 @@ mod tests {
 
         let data = [42u8; 100];
         let alloc = allocator.alloc(data.len()).unwrap();
-        assert_eq!(alloc.len, data.len());
+        assert!(alloc.len >= data.len());
         let alloc_mem =
             unsafe { ProcessMemorySlice::from_raw_parts(alloc.as_mut_ptr(), alloc.len, process) };
         alloc_mem.write(0, &data).unwrap();
 
-        assert_eq!(allocator.count_allocated_bytes(), data.len());
+        assert_eq!(allocator.count_allocated_bytes(), alloc.len);
+        assert!(allocator.count_allocated_bytes() >= data.len());
     }
 
     #[test]
@@ -248,33 +256,36 @@ mod tests {
 
         let data = &[42u8; 100];
         let mut allocated_bytes = 0;
+        let mut actual_allocated_bytes = 0;
         for i in 1..data.len() {
             let alloc = allocator.alloc(i).unwrap();
-            assert_eq!(alloc.len, i);
+            assert!(alloc.len >= i);
             let alloc_mem = unsafe {
                 ProcessMemorySlice::from_raw_parts(alloc.as_mut_ptr(), alloc.len, process)
             };
             alloc_mem.write(0, &data[0..i]).unwrap();
 
             allocated_bytes += i;
-            assert_eq!(allocator.count_allocated_bytes(), allocated_bytes);
+            actual_allocated_bytes += alloc.len;
+            assert!(allocator.count_allocated_bytes() >= allocated_bytes);
+            assert_eq!(allocator.count_allocated_bytes(), actual_allocated_bytes);
         }
     }
 
     #[test]
     fn free() {
         let process = ProcessRef::current();
-        let memory = ProcessMemoryBuffer::allocate(process, 400).unwrap();
+        let memory = ProcessMemoryBuffer::allocate(process, 512).unwrap();
         let mut allocator = FixedBufferAllocator::new(memory);
 
         assert_eq!(allocator.count_allocated_bytes(), 0);
 
-        let a1 = _free_helper_alloc(&mut allocator, 42);
-        let a2 = _free_helper_alloc(&mut allocator, 132);
-        let a3 = _free_helper_alloc(&mut allocator, 226);
+        let a1 = _free_helper_alloc(&mut allocator, 32);
+        let a2 = _free_helper_alloc(&mut allocator, 128);
+        let a3 = _free_helper_alloc(&mut allocator, 256);
         _free_helper_free(&mut allocator, a2);
-        let a4 = _free_helper_alloc(&mut allocator, 43);
-        let a5 = _free_helper_alloc(&mut allocator, 42);
+        let a4 = _free_helper_alloc(&mut allocator, 64);
+        let a5 = _free_helper_alloc(&mut allocator, 32);
         _free_helper_free(&mut allocator, a3);
         _free_helper_free(&mut allocator, a1);
         _free_helper_free(&mut allocator, a5);
@@ -284,26 +295,25 @@ mod tests {
     }
 
     fn _free_helper_alloc(
-        allocator: &mut FixedBufferAllocator,
+        allocator: &mut FixedBufferAllocator<'_>,
         allocation_size: usize,
     ) -> Allocation {
         let free_bytes = allocator.count_free_bytes();
         let allocated_bytes = allocator.count_allocated_bytes();
 
         let alloc = allocator.alloc(allocation_size).unwrap();
-        assert_eq!(alloc.len, allocation_size);
+        assert!(alloc.len >= allocation_size);
 
         assert_eq!(
             allocator.count_allocated_bytes(),
-            allocated_bytes + allocation_size
+            allocated_bytes + alloc.len
         );
-        assert_eq!(allocator.count_free_bytes(), free_bytes - allocation_size);
+        assert_eq!(allocator.count_free_bytes(), free_bytes - alloc.len);
 
         alloc
     }
 
-    fn _free_helper_free(allocator: &mut FixedBufferAllocator, allocation: Allocation) {
-        let allocation_size = allocation.len;
+    fn _free_helper_free(allocator: &mut FixedBufferAllocator<'_>, allocation: Allocation) {
         let free_bytes = allocator.count_free_bytes();
         let allocated_bytes = allocator.count_allocated_bytes();
 
@@ -311,9 +321,9 @@ mod tests {
 
         assert_eq!(
             allocator.count_allocated_bytes(),
-            allocated_bytes - allocation_size
+            allocated_bytes - allocation.len
         );
-        assert_eq!(allocator.count_free_bytes(), free_bytes + allocation_size);
+        assert_eq!(allocator.count_free_bytes(), free_bytes + allocation.len);
     }
 
     #[test]
@@ -323,18 +333,44 @@ mod tests {
 
         let page_size = ProcessMemoryBuffer::os_page_size();
         let alloc = allocator.alloc(page_size - 1).unwrap();
-        assert_eq!(alloc.len, page_size - 1);
+        assert!(alloc.len >= page_size - 1);
         let alloc = allocator.alloc(page_size - 1).unwrap();
-        assert_eq!(alloc.len, page_size - 1);
+        assert!(alloc.len >= page_size - 1);
     }
 
-    // TODO: #[test]
+    #[test]
+    fn correct_align() {
+        let process = ProcessRef::current();
+        let memory = ProcessMemoryBuffer::allocate_page(process).unwrap();
+        let mut allocator = FixedBufferAllocator::new(memory);
+
+        let a = allocator.alloc(mem::size_of::<u8>()).unwrap();
+        assert_eq!(a.as_ptr() as usize % mem::align_of::<u8>(), 0);
+        let b = allocator.alloc(mem::size_of::<u16>()).unwrap();
+        assert_eq!(b.as_ptr() as usize % mem::align_of::<u16>(), 0);
+        let c = allocator.alloc(mem::size_of::<u32>()).unwrap();
+        assert_eq!(c.as_ptr() as usize % mem::align_of::<u32>(), 0);
+        let d = allocator.alloc(mem::size_of::<u64>()).unwrap();
+        assert_eq!(d.as_ptr() as usize % mem::align_of::<u64>(), 0);
+        let e = allocator.alloc(mem::size_of::<AlignTestStruct>()).unwrap();
+        assert_eq!(e.as_ptr() as usize % mem::align_of::<AlignTestStruct>(), 0);
+    }
+
+    #[test]
     fn large_alloc() {
         let process = ProcessRef::current();
         let mut allocator = DynamicMultiBufferAllocator::new(process);
 
         let page_size = ProcessMemoryBuffer::os_page_size();
         let alloc = allocator.alloc(page_size + 1).unwrap();
-        assert_eq!(alloc.len, page_size + 1);
+        assert!(alloc.len > page_size);
     }
+}
+
+#[cfg(test)]
+struct AlignTestStruct {
+    a: u8,
+    b: u16,
+    c: u32,
+    d: u64,
 }

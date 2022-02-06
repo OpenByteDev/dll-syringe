@@ -164,7 +164,7 @@ impl<'a> ProcessModule<'a> {
     }
     /// Gets the process this module belongs to.
     #[must_use]
-    pub fn process(&self) -> ProcessRef {
+    pub fn process(&self) -> ProcessRef<'_> {
         self.process
     }
 
