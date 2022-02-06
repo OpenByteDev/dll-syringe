@@ -8,7 +8,7 @@ use winapi::shared::{
     ntdef::LPCWSTR,
 };
 
-use crate::{error::InjectError, ModuleHandle, ProcessModule, ProcessRef, RemoteBoxAllocator};
+use crate::{error::SyringeError, ModuleHandle, ProcessModule, ProcessRef, RemoteBoxAllocator};
 
 #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
 use {
@@ -105,7 +105,7 @@ impl<'a> Syringe<'a> {
     pub fn inject(
         &mut self,
         payload_path: impl AsRef<Path>,
-    ) -> Result<ProcessModule<'a>, InjectError> {
+    ) -> Result<ProcessModule<'a>, SyringeError> {
         let inject_data = self
             .inject_help_data
             .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process))?;
@@ -126,7 +126,7 @@ impl<'a> Syringe<'a> {
         // reinterpret the possibly truncated exit code as a truncated handle to the loaded module
         let truncated_injected_module_handle = exit_code as ModuleHandle;
         if truncated_injected_module_handle.is_null() {
-            return Err(InjectError::RemoteOperationFailed);
+            return Err(SyringeError::RemoteOperationFailed);
         }
 
         let injected_module = self.process.find_module_by_path(module_path)?.unwrap();
@@ -139,7 +139,7 @@ impl<'a> Syringe<'a> {
     }
 
     /// Ejects a previously injected module from its target process.
-    pub fn eject(&self, module: ProcessModule<'_>) -> Result<(), InjectError> {
+    pub fn eject(&self, module: ProcessModule<'_>) -> Result<(), SyringeError> {
         assert!(
             module.process() == self.process,
             "trying to eject a module from a different process"
@@ -156,7 +156,7 @@ impl<'a> Syringe<'a> {
 
         let free_library_result = exit_code as BOOL;
         if free_library_result == 0 {
-            return Err(InjectError::RemoteOperationFailed);
+            return Err(SyringeError::RemoteOperationFailed);
         }
 
         assert!(!self
@@ -170,7 +170,7 @@ impl<'a> Syringe<'a> {
 
     pub(crate) fn load_inject_help_data_for_process(
         process: ProcessRef<'_>,
-    ) -> Result<InjectHelpData, InjectError> {
+    ) -> Result<InjectHelpData, SyringeError> {
         let is_target_x64 = process.is_x64()?;
         let is_self_x64 = cfg!(target_arch = "x86_64");
 
@@ -178,24 +178,21 @@ impl<'a> Syringe<'a> {
             (true, true) | (false, false) => Self::load_inject_help_data_for_current_target(),
             #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
             (false, true) => Self::_load_inject_help_data_for_process(process),
-            _ => Err(InjectError::UnsupportedTarget),
+            _ => Err(SyringeError::UnsupportedTarget),
         }
     }
 
-    fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, InjectError> {
+    fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, SyringeError> {
         let kernel32_module =
             ProcessModule::__find_local_by_name_or_abs_path(u16cstr!("kernel32.dll"))?.unwrap();
 
         let load_library_fn_ptr = kernel32_module
-            .__get_local_procedure(cstr!("LoadLibraryW"))
-            .unwrap();
+            .__get_local_procedure(cstr!("LoadLibraryW"))?;
         let free_library_fn_ptr = kernel32_module
-            .__get_local_procedure(cstr!("FreeLibrary"))
-            .unwrap();
+            .__get_local_procedure(cstr!("FreeLibrary"))?;
         #[cfg(feature = "remote_procedure")]
         let get_proc_address_fn_ptr = kernel32_module
-            .__get_local_procedure(cstr!("GetProcAddress"))
-            .unwrap();
+            .__get_local_procedure(cstr!("GetProcAddress"))?;
 
         Ok(InjectHelpData {
             kernel32_module: kernel32_module.handle(),
@@ -211,7 +208,7 @@ impl<'a> Syringe<'a> {
     #[cfg(feature = "into_x86_from_x64")]
     fn _load_inject_help_data_for_process(
         process: ProcessRef<'_>,
-    ) -> Result<InjectHelpData, InjectError> {
+    ) -> Result<InjectHelpData, SyringeError> {
         // get kernel32 handle of target process (may fail if target process is currently starting and has not loaded kernel32 yet)
         let kernel32_module = retry_with_filter(
             || process.find_module_by_name("kernel32.dll"),

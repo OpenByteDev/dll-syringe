@@ -273,20 +273,22 @@ impl<'a> ProcessModule<'a> {
         &self,
         proc_name: impl AsRef<str>,
     ) -> Result<*const __some_function, GetLocalProcedureError> {
-        self.__get_local_procedure(&CString::new(proc_name.as_ref())?)
+        if self.is_remote() {
+            return Err(GetLocalProcedureError::UnsupportedRemoteTarget);
+        }
+
+        self.__get_local_procedure(&CString::new(proc_name.as_ref())?).map_err(|e| e.into())
     }
 
     pub(crate) fn __get_local_procedure(
         &self,
         proc_name: &CStr,
-    ) -> Result<*const __some_function, GetLocalProcedureError> {
-        if self.is_remote() {
-            return Err(GetLocalProcedureError::UnsupportedTarget);
-        }
+    ) -> Result<*const __some_function, Win32Error> {
+        assert!(self.is_local());
 
         let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ptr()) };
         if fn_ptr.is_null() {
-            return Err(Win32Error::new().into());
+            return Err(Win32Error::new());
         }
         Ok(fn_ptr)
     }

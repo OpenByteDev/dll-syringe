@@ -11,7 +11,7 @@ use std::{
 use winapi::shared::minwindef::FARPROC;
 
 use crate::{
-    error::InjectError, ProcessModule, ProcessRef, RemoteBox, RemoteBoxAllocator, Syringe,
+    error::SyringeError, ProcessModule, ProcessRef, RemoteBox, RemoteBoxAllocator, Syringe,
 };
 
 type RemoteProcedurePtr = NonNull<c_void>;
@@ -23,7 +23,7 @@ impl<'a> Syringe<'a> {
         &mut self,
         module: ProcessModule<'_>,
         name: impl AsRef<str>,
-    ) -> Result<Option<RemoteProcedure<'a, T, R>>, InjectError> {
+    ) -> Result<Option<RemoteProcedure<'a, T, R>>, SyringeError> {
         match self.get_procedure_address(module, name) {
             Ok(Some(procedure)) => Ok(Some(RemoteProcedure::new(
                 procedure,
@@ -42,7 +42,7 @@ impl<'a> Syringe<'a> {
         &mut self,
         module: ProcessModule<'_>,
         name: impl AsRef<str>,
-    ) -> Result<Option<RemoteProcedurePtr>, InjectError> {
+    ) -> Result<Option<RemoteProcedurePtr>, SyringeError> {
         assert!(
             module.process() == self.process,
             "trying to load a procedure from a module of a different process"
@@ -68,15 +68,15 @@ impl<'a> Syringe<'a> {
             stub.parameter.as_mut_ptr().cast(),
         )?;
         if exit_code != 0u32 {
-            return Err(InjectError::RemoteOperationFailed);
+            return Err(SyringeError::RemoteOperationFailed);
         }
 
         Ok(RemoteProcedurePtr::new(stub.result.read()?.cast()))
     }
 
-    fn build_get_proc_address_stub(&mut self) -> Result<(), InjectError> {
+    fn build_get_proc_address_stub(&mut self) -> Result<(), SyringeError> {
         self.get_proc_address_stub
-            .get_or_try_init::<_, InjectError>(|| {
+            .get_or_try_init::<_, SyringeError>(|| {
                 let inject_data = self
                     .inject_help_data
                     .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process))?;
@@ -249,7 +249,7 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
 
     /// Calls the remote procedure with the given argument.
     /// As the argument is copied to the memory of the remote process, changes made in the called function will not be reflected in the local copy.
-    pub fn call(&mut self, arg: &T) -> Result<R, InjectError> {
+    pub fn call(&mut self, arg: &T) -> Result<R, SyringeError> {
         self.stub
             .get_or_try_init(|| Self::build_stub(self.ptr.as_ptr(), &mut self.remote_allocator))?;
         let stub = self.stub.get_mut().unwrap();
@@ -260,7 +260,7 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
             stub.parameter.as_mut_ptr().cast(),
         )?;
         if exit_code != 0 {
-            return Err(InjectError::RemoteOperationFailed);
+            return Err(SyringeError::RemoteOperationFailed);
         }
 
         Ok(stub.result.read()?)
@@ -269,7 +269,7 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
     fn build_stub(
         procedure: *const c_void,
         remote_allocator: &mut RemoteBoxAllocator<'a>,
-    ) -> Result<RemoteProcedureStub<'a, T, R>, InjectError> {
+    ) -> Result<RemoteProcedureStub<'a, T, R>, SyringeError> {
         let parameter = remote_allocator.alloc_uninit::<T>()?;
         let mut result = remote_allocator.alloc_uninit::<R>()?;
 

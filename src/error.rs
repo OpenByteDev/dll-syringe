@@ -25,8 +25,8 @@ pub enum GetLocalProcedureError {
     #[error("windows api error: {}", _0)]
     Win32(#[from] rust_win32error::Win32Error),
     /// Variant representing an unsupported target process.
-    #[error("unsupported target process")]
-    UnsupportedTarget,
+    #[error("unsupported remote target process")]
+    UnsupportedRemoteTarget,
 }
 
 /// Error enum for errors during a call to [`ProcessModule::find_by_path`] and related methods.
@@ -54,9 +54,10 @@ impl From<Win32OrNulError> for FindModuleByPathError {
     }
 }
 
-/// Error enum for errors during injection and ejection.
+// TODO: add more specialized error variants
+/// Error enum for errors during syringe operations like injection, ejection or remote procedure calling.
 #[derive(Debug, Error)]
-pub enum InjectError {
+pub enum SyringeError {
     /// Variant representing an illegal interior nul value.
     #[error("interior nul found")]
     Nul(#[from] widestring::NulError<u16>),
@@ -79,7 +80,7 @@ pub enum InjectError {
     Goblin(#[from] goblin::error::Error),
 }
 
-impl From<Win32OrNulError> for InjectError {
+impl From<Win32OrNulError> for SyringeError {
     fn from(err: Win32OrNulError) -> Self {
         match err {
             Win32OrNulError::Nul(e) => Self::Nul(e),
@@ -88,7 +89,7 @@ impl From<Win32OrNulError> for InjectError {
     }
 }
 
-impl From<FindModuleByPathError> for InjectError {
+impl From<FindModuleByPathError> for SyringeError {
     fn from(err: FindModuleByPathError) -> Self {
         match err {
             FindModuleByPathError::Nul(e) => Self::Nul(e),
