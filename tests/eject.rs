@@ -41,7 +41,9 @@ fn eject_test(
         .into();
     let dummy_process_clone = dummy_process.try_clone().unwrap();
     let _guard = dispose::defer(|| {
-        dummy_process_clone.kill().unwrap();
+        if dummy_process.is_alive() {
+            dummy_process_clone.kill().unwrap();
+        }
     });
 
     let mut syringe = Syringe::for_process(&dummy_process);
