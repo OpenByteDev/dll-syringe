@@ -177,6 +177,7 @@ impl ExceptionCode {
         Self::try_from_primitive(code)
     }
     /// Returns the underlying windows exception code.
+    #[must_use]
     pub fn code(self) -> u32 {
         self.into()
     }
