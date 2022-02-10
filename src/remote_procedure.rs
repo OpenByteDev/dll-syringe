@@ -22,10 +22,10 @@ type RemoteProcedurePtr = NonNull<c_void>;
 impl<'a> Syringe<'a> {
     /// Loads an exported function from the given module from the target process.
     /// The function does not have to be from an injected module.
-    pub fn get_procedure<T, R>(
+    pub fn get_procedure<T, R, N: AsRef<str>>(
         &mut self,
         module: ProcessModule<'_>,
-        name: impl AsRef<str>,
+        name: N,
     ) -> Result<Option<RemoteProcedure<'a, T, R>>, SyringeError> {
         match self.get_procedure_address(module, name) {
             Ok(Some(procedure)) => Ok(Some(RemoteProcedure::new(
