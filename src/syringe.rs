@@ -332,16 +332,16 @@ impl<'a> LoadLibraryWStub<'a> {
 
         let code = if remote_allocator.process().is_x86()? {
             Self::build_code_x86(
-                unsafe { mem::transmute(inject_data.get_load_library_fn_ptr()) },
+                inject_data.get_load_library_fn_ptr() as *const _,
                 result.as_mut_ptr().cast(),
-                unsafe { mem::transmute(inject_data.get_get_last_error()) },
+                inject_data.get_get_last_error() as *const _,
             )
             .unwrap()
         } else {
             Self::build_code_x64(
-                unsafe { mem::transmute(inject_data.get_load_library_fn_ptr()) },
+                inject_data.get_load_library_fn_ptr() as *const _,
                 result.as_mut_ptr().cast(),
-                unsafe { mem::transmute(inject_data.get_get_last_error()) },
+                inject_data.get_get_last_error() as *const _,
             )
             .unwrap()
         };

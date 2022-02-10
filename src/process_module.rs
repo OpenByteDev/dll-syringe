@@ -63,7 +63,7 @@ impl<'a> ProcessModule<'a> {
         if module_name_or_path.has_root() {
             Self::find_by_path(module_name_or_path, process)
         } else {
-            Self::find_by_name(module_name_or_path, process).map_err(|e| e.into())
+            Self::find_by_name(module_name_or_path, process)
         }
     }
     /// Searches for a module with the given name in the given process (the current one if [`None`] was specified).
@@ -111,7 +111,7 @@ impl<'a> ProcessModule<'a> {
         module_path: impl AsRef<Path>,
     ) -> Result<Option<Self>, IoOrNulError> {
         let absolute_path = module_path.as_ref().absolutize()?;
-        Self::_find_local_by_name_or_abs_path(absolute_path).map_err(|e| e.into())
+        Self::_find_local_by_name_or_abs_path(absolute_path)
     }
     pub(crate) fn _find_local_by_name_or_abs_path(
         module: impl AsRef<Path>,
