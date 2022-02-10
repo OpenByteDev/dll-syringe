@@ -11,8 +11,8 @@ use std::{
     process::Child,
 };
 
-use rust_win32error::Win32Error;
 use sysinfo::{PidExt, ProcessExt, SystemExt};
+use get_last_error::Win32Error;
 use winapi::{
     shared::minwindef::{DWORD, FALSE},
     um::{
@@ -142,7 +142,7 @@ impl Process {
         };
 
         if handle.is_null() {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
 
         Ok(unsafe { Self::from_raw_handle(handle) })
@@ -230,7 +230,7 @@ impl Process {
     pub fn kill_with_exit_code(self, exit_code: u32) -> Result<(), Win32Error> {
         let result = unsafe { TerminateProcess(self.handle(), exit_code) };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
         Ok(())
     }

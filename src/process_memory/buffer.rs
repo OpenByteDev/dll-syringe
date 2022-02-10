@@ -5,7 +5,7 @@ use std::{
     ptr, slice,
 };
 
-use rust_win32error::Win32Error;
+use get_last_error::Win32Error;
 use winapi::{
     shared::minwindef::DWORD,
     um::{
@@ -100,7 +100,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
         };
 
         return if ptr.is_null() {
-            Err(Win32Error::new())
+            Err(Win32Error::get_last_error())
         } else {
             Ok(unsafe { Self::from_raw_parts(ptr.cast(), len, process) })
         };
@@ -166,7 +166,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
         if result == 0 {
             Ok(())
         } else {
-            Err(Win32Error::new())
+            Err(Win32Error::get_last_error())
         }
     }
 
@@ -269,7 +269,7 @@ impl<'a> ProcessMemorySlice<'a> {
             )
         };
         if res == 0 {
-            Err(Win32Error::new())
+            Err(Win32Error::get_last_error())
         } else {
             assert_eq!(bytes_read, buf.len());
             Ok(())
@@ -316,7 +316,7 @@ impl<'a> ProcessMemorySlice<'a> {
             )
         };
         if res == 0 {
-            Err(Win32Error::new())
+            Err(Win32Error::get_last_error())
         } else {
             assert_eq!(bytes_written, buf.len());
             Ok(())
@@ -381,7 +381,7 @@ impl<'a> ProcessMemorySlice<'a> {
         let res =
             unsafe { FlushInstructionCache(self.process.handle(), base_ptr.cast(), range_len) };
         if res == 0 {
-            Err(Win32Error::new())
+            Err(Win32Error::get_last_error())
         } else {
             Ok(())
         }

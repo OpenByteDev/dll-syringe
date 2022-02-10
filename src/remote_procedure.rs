@@ -70,9 +70,7 @@ impl<'a> Syringe<'a> {
             unsafe { mem::transmute(stub.code.as_mut_ptr()) },
             stub.parameter.as_mut_ptr().cast(),
         )?;
-        if exit_code != 0u32 {
-            return Err(SyringeError::RemoteOperationFailed);
-        }
+        Syringe::remote_exit_code_to_exception(exit_code)?;
 
         Ok(RemoteProcedurePtr::new(stub.result.read()?.cast()))
     }
@@ -258,16 +256,7 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
             .get_or_try_init(|| Self::build_stub(self.ptr.as_ptr(), &mut self.remote_allocator))?;
         let stub = self.stub.get_mut().unwrap();
 
-        stub.parameter.write(arg)?;
-        let exit_code = self.remote_allocator.process().run_remote_thread(
-            unsafe { mem::transmute(stub.code.as_ptr()) },
-            stub.parameter.as_mut_ptr().cast(),
-        )?;
-        if exit_code != 0 {
-            return Err(SyringeError::RemoteOperationFailed);
-        }
-
-        Ok(stub.result.read()?)
+        stub.call(arg)
     }
 
     fn build_stub(
@@ -294,15 +283,28 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
 }
 
 #[derive(Debug)]
+#[repr(C)]
+pub(crate) struct GetProcAddressParams {
+    module_handle: u64,
+    name: u64,
+}
+
+#[derive(Debug)]
 pub(crate) struct RemoteProcedureStub<'a, T, R> {
     pub code: RemoteBox<'a, [u8]>,
     pub parameter: RemoteBox<'a, T>,
     pub result: RemoteBox<'a, R>,
 }
 
-#[derive(Debug)]
-#[repr(C)]
-pub(crate) struct GetProcAddressParams {
-    module_handle: u64,
-    name: u64,
+impl<'a, T, R> RemoteProcedureStub<'a, T, R> {
+    pub fn call(&mut self, arg: &T) -> Result<R, SyringeError> {
+        self.parameter.write(arg)?;
+        let exit_code = self.code.memory().process().run_remote_thread(
+            unsafe { mem::transmute(self.code.as_ptr()) },
+            self.parameter.as_mut_ptr().cast(),
+        )?;
+        Syringe::remote_exit_code_to_exception(exit_code)?;
+
+        Ok(self.result.read()?)
+    }
 }

@@ -1,6 +1,6 @@
 use std::{collections::LinkedList, mem};
 
-use rust_win32error::Win32Error;
+use get_last_error::Win32Error;
 
 use crate::{process_memory::ProcessMemoryBuffer, ProcessRef};
 

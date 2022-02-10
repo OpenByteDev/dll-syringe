@@ -14,7 +14,7 @@ use std::{
     ptr,
 };
 
-use rust_win32error::Win32Error;
+use get_last_error::Win32Error;
 use winapi::{
     shared::{
         minwindef::{FALSE, HMODULE},
@@ -171,7 +171,7 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
         Ok(unsafe { Process::from_raw_handle(new_handle.assume_init()) })
     }
@@ -179,7 +179,7 @@ impl<'a> ProcessRef<'a> {
     /// Returns the id of this process.
     pub fn pid(&self) -> Result<NonZeroU32, Win32Error> {
         let result = unsafe { GetProcessId(self.handle()) };
-        NonZeroU32::new(result).ok_or_else(Win32Error::new)
+        NonZeroU32::new(result).ok_or_else(Win32Error::get_last_error)
     }
 
     /// Returns the handles of all the modules currently loaded in this process.
@@ -201,7 +201,7 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
 
         let mut bytes_needed = unsafe { bytes_needed_target.assume_init() } as usize;
@@ -235,7 +235,7 @@ impl<'a> ProcessRef<'a> {
                     )
                 };
                 if result == 0 {
-                    return Err(Win32Error::new());
+                    return Err(Win32Error::get_last_error());
                 }
                 bytes_needed = unsafe { bytes_needed_target.assume_init() } as usize;
 
@@ -331,7 +331,7 @@ impl<'a> ProcessRef<'a> {
         let mut is_wow64 = MaybeUninit::uninit();
         let result = unsafe { IsWow64Process(self.handle(), is_wow64.as_mut_ptr()) };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
         Ok(unsafe { is_wow64.assume_init() } != FALSE)
     }
@@ -351,9 +351,9 @@ impl<'a> ProcessRef<'a> {
         // TODO: use GetNativeSystemInfo() instead?
         let result = unsafe { GetSystemWow64DirectoryA(ptr::null_mut(), 0) };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
-        Ok(Win32Error::new().get_error_code() == ERROR_CALL_NOT_IMPLEMENTED)
+        Ok(Win32Error::get_last_error().code() == ERROR_CALL_NOT_IMPLEMENTED)
     }
     fn is_x64_windows() -> Result<bool, Win32Error> {
         Self::is_x32_windows().map(|r| !r)
@@ -380,7 +380,7 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
 
         let module_path_len = result as usize;
@@ -401,7 +401,7 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
 
         let module_path_len = result as usize;
@@ -418,7 +418,7 @@ impl<'a> ProcessRef<'a> {
     pub fn kill_with_exit_code(self, exit_code: u32) -> Result<(), Win32Error> {
         let result = unsafe { TerminateProcess(self.handle(), exit_code) };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
         Ok(())
     }
@@ -433,14 +433,14 @@ impl<'a> ProcessRef<'a> {
 
         let reason = unsafe { WaitForSingleObject(thread_handle.as_raw_handle(), INFINITE) };
         if reason == WAIT_FAILED {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
 
         let mut exit_code = MaybeUninit::uninit();
         let result =
             unsafe { GetExitCodeThread(thread_handle.as_raw_handle(), exit_code.as_mut_ptr()) };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
         assert_ne!(
             result as u32, STILL_ACTIVE,
@@ -470,7 +470,7 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if thread_handle.is_null() {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
 
         Ok(unsafe { OwnedHandle::from_raw_handle(thread_handle) })

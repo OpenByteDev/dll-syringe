@@ -5,13 +5,13 @@ use std::{
 };
 
 use crate::{
-    error::{FindModuleByPathError, GetLocalProcedureError, Win32OrNulError},
+    error::{GetLocalProcedureError, IoOrNulError},
     utils::WinPathBuf,
     ProcessRef,
 };
 use path_absolutize::Absolutize;
-use rust_win32error::Win32Error;
 use widestring::{U16CStr, U16CString};
+use get_last_error::Win32Error;
 use winapi::{
     shared::{
         minwindef::{__some_function, HMODULE},
@@ -57,7 +57,7 @@ impl<'a> ProcessModule<'a> {
     pub fn find(
         module_name_or_path: impl AsRef<Path>,
         process: ProcessRef<'a>,
-    ) -> Result<Option<Self>, FindModuleByPathError> {
+    ) -> Result<Option<Self>, IoOrNulError> {
         let module_name_or_path = module_name_or_path.as_ref();
         if module_name_or_path.has_root() {
             Self::find_by_path(module_name_or_path, process)
@@ -70,7 +70,7 @@ impl<'a> ProcessModule<'a> {
     pub fn find_by_name(
         module_name: impl AsRef<Path>,
         process: ProcessRef<'a>,
-    ) -> Result<Option<Self>, Win32OrNulError> {
+    ) -> Result<Option<Self>, IoOrNulError> {
         if process.is_current() {
             Self::find_local_by_name(module_name)
         } else {
@@ -82,7 +82,7 @@ impl<'a> ProcessModule<'a> {
     pub fn find_by_path(
         module_path: impl AsRef<Path>,
         process: ProcessRef<'a>,
-    ) -> Result<Option<Self>, FindModuleByPathError> {
+    ) -> Result<Option<Self>, IoOrNulError> {
         if process.is_current() {
             Self::find_local_by_path(module_path)
         } else {
@@ -94,37 +94,37 @@ impl<'a> ProcessModule<'a> {
     /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn find_local(
         module_name_or_path: impl AsRef<Path>,
-    ) -> Result<Option<Self>, FindModuleByPathError> {
+    ) -> Result<Option<Self>, IoOrNulError> {
         Self::find(module_name_or_path, ProcessRef::current())
     }
     /// Searches for a module with the given name in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn find_local_by_name(
         module_name: impl AsRef<Path>,
-    ) -> Result<Option<Self>, Win32OrNulError> {
+    ) -> Result<Option<Self>, IoOrNulError> {
         Self::_find_local_by_name_or_abs_path(module_name)
     }
     /// Searches for a module with the given path in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn find_local_by_path(
         module_path: impl AsRef<Path>,
-    ) -> Result<Option<Self>, FindModuleByPathError> {
+    ) -> Result<Option<Self>, IoOrNulError> {
         let absolute_path = module_path.as_ref().absolutize()?;
         Self::_find_local_by_name_or_abs_path(absolute_path).map_err(|e| e.into())
     }
     pub(crate) fn _find_local_by_name_or_abs_path(
         module: impl AsRef<Path>,
-    ) -> Result<Option<Self>, Win32OrNulError> {
+    ) -> Result<Option<Self>, IoOrNulError> {
         let wide_string = U16CString::from_os_str(module.as_ref().as_os_str())?;
         Self::__find_local_by_name_or_abs_path(&wide_string)
     }
     pub(crate) fn __find_local_by_name_or_abs_path(
         module: &U16CStr,
-    ) -> Result<Option<Self>, Win32OrNulError> {
+    ) -> Result<Option<Self>, IoOrNulError> {
         let handle = unsafe { GetModuleHandleW(module.as_ptr()) };
         if handle.is_null() {
-            let err = Win32Error::new();
-            if err.get_error_code() == ERROR_MOD_NOT_FOUND {
+            let err = Win32Error::get_last_error();
+            if err.code() == ERROR_MOD_NOT_FOUND {
                 return Ok(None);
             }
 
@@ -139,7 +139,7 @@ impl<'a> ProcessModule<'a> {
     fn _find_remote_by_name(
         module_name: impl AsRef<Path>,
         process: ProcessRef<'a>,
-    ) -> Result<Option<ProcessModule<'a>>, Win32OrNulError> {
+    ) -> Result<Option<ProcessModule<'a>>, IoOrNulError> {
         assert!(!process.is_current());
 
         process
@@ -151,7 +151,7 @@ impl<'a> ProcessModule<'a> {
     fn _find_remote_by_path(
         module_path: impl AsRef<Path>,
         process: ProcessRef<'a>,
-    ) -> Result<Option<Self>, FindModuleByPathError> {
+    ) -> Result<Option<Self>, IoOrNulError> {
         assert!(!process.is_current());
 
         process
@@ -202,7 +202,7 @@ impl<'a> ProcessModule<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
 
         let module_path_len = result as usize;
@@ -223,7 +223,7 @@ impl<'a> ProcessModule<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
 
         let module_path_len = result as usize;
@@ -259,7 +259,7 @@ impl<'a> ProcessModule<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
 
         let module_name_len = result as usize;
@@ -291,7 +291,7 @@ impl<'a> ProcessModule<'a> {
 
         let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ptr()) };
         if fn_ptr.is_null() {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
         Ok(fn_ptr)
     }

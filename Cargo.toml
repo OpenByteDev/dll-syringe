@@ -17,12 +17,13 @@ winapi = { version = "0.3", features = ["processthreadsapi", "libloaderapi", "me
 cstr = { version = "0.2", default-features = false }
 sysinfo = { version = "0.23", default-features = false }
 widestring = { version = "0.5", default-features = false }
-rust_win32error = { version = "0.8", default-features = false }
+get-last-error = { version = "0.1", features = ["std"], default-features = false }
 path-absolutize = { version = "3.0", default-features = false }
 stopwatch = { version = "0.0", default-features = false }
 thiserror = { version = "1.0", default-features = false }
 u16cstr = { version = "0.3", default-features = false }
 iced-x86 = { version = "1.15", features = ["std", "code_asm"], default-features = false, optional = true }
+num_enum = { version = "0.5", default-features = false }
 
 [target.'cfg(target_arch = "x86")'.dependencies]
 

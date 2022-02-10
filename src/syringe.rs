@@ -1,23 +1,26 @@
 use cstr::cstr;
+use get_last_error::Win32Error;
+use iced_x86::{code_asm::*, IcedError};
+use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
-use std::{lazy::OnceCell, mem, path::Path};
+use std::{io, ffi::c_void, lazy::OnceCell, mem, path::Path};
 use u16cstr::u16cstr;
 use widestring::U16CString;
 use winapi::shared::{
-    minwindef::{BOOL, HMODULE},
+    minwindef::{BOOL, DWORD, HMODULE, FALSE},
     ntdef::LPCWSTR,
 };
 
 use crate::{
-    error::SyringeError, process_memory::RemoteBoxAllocator, ModuleHandle, ProcessModule,
-    ProcessRef,
+    error::{ExceptionCode, SyringeError},
+    process_memory::{RemoteBox, RemoteBoxAllocator},
+    ModuleHandle, ProcessModule, ProcessRef,
 };
 
 #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
 use {
     crate::utils::retry_with_filter,
     goblin::pe::PE,
-    rust_win32error::Win32Error,
     std::{convert::TryInto, fs, mem::MaybeUninit, path::PathBuf, time::Duration},
     widestring::U16Str,
     winapi::{shared::minwindef::MAX_PATH, um::wow64apiset::GetSystemWow64DirectoryW},
@@ -28,6 +31,7 @@ use winapi::shared::{minwindef::FARPROC, ntdef::LPCSTR};
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
+type GetLastErrorFn = unsafe extern "system" fn() -> DWORD;
 #[cfg(feature = "remote_procedure")]
 type GetProcAddressFn = unsafe extern "system" fn(HMODULE, LPCSTR) -> FARPROC;
 
@@ -36,6 +40,7 @@ pub(crate) struct InjectHelpData {
     kernel32_module: ModuleHandle,
     load_library_offset: usize,
     free_library_offset: usize,
+    get_last_error_offset: usize,
     #[cfg(feature = "remote_procedure")]
     get_proc_address_offset: usize,
 }
@@ -48,6 +53,9 @@ impl InjectHelpData {
     }
     pub fn get_free_library_fn_ptr(&self) -> FreeLibraryFn {
         unsafe { mem::transmute(self.kernel32_module as usize + self.free_library_offset) }
+    }
+    pub fn get_get_last_error(&self) -> GetLastErrorFn {
+        unsafe { mem::transmute(self.kernel32_module as usize + self.get_last_error_offset) }
     }
     #[cfg(feature = "remote_procedure")]
     pub fn get_proc_address_fn_ptr(&self) -> GetProcAddressFn {
@@ -81,6 +89,7 @@ pub struct Syringe<'a> {
     pub(crate) process: ProcessRef<'a>,
     pub(crate) inject_help_data: OnceCell<InjectHelpData>,
     pub(crate) remote_allocator: RemoteBoxAllocator<'a>,
+    load_library_w_stub: OnceCell<LoadLibraryWStub<'a>>,
     #[cfg(feature = "remote_procedure")]
     pub(crate) get_proc_address_stub:
         OnceCell<crate::RemoteProcedureStub<'a, crate::GetProcAddressParams, FARPROC>>,
@@ -94,6 +103,7 @@ impl<'a> Syringe<'a> {
             process,
             inject_help_data: OnceCell::new(),
             remote_allocator: RemoteBoxAllocator::new(process),
+            load_library_w_stub: OnceCell::new(),
             #[cfg(feature = "remote_procedure")]
             get_proc_address_stub: OnceCell::new(),
         }
@@ -109,33 +119,27 @@ impl<'a> Syringe<'a> {
         &mut self,
         payload_path: impl AsRef<Path>,
     ) -> Result<ProcessModule<'a>, SyringeError> {
-        let inject_data = self
-            .inject_help_data
-            .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process))?;
-        let module_path = payload_path.as_ref().absolutize()?;
+        self.load_library_w_stub.get_or_try_init(|| {
+            let inject_data = self
+                .inject_help_data
+                .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process))?;
+            LoadLibraryWStub::build(inject_data, &mut self.remote_allocator)
+        })?;
+        let load_library_w = self.load_library_w_stub.get_mut().unwrap();
 
+        let module_path = payload_path.as_ref().absolutize()?;
         let wide_module_path =
             U16CString::from_os_str(module_path.as_os_str())?.into_vec_with_nul();
         let mut remote_wide_module_path = self
             .remote_allocator
             .alloc_and_copy(wide_module_path.as_slice())?;
 
-        // creating a thread that will call LoadLibraryW with a pointer to payload_path as argument
-        let exit_code = self.process.run_remote_thread(
-            unsafe { mem::transmute(inject_data.get_load_library_fn_ptr()) },
-            remote_wide_module_path.as_mut_ptr().cast(),
-        )?;
+        let injected_module_handle = load_library_w.call(remote_wide_module_path.as_mut_ptr())?;
+        let injected_module = unsafe { ProcessModule::new(injected_module_handle, self.process) };
 
-        // reinterpret the possibly truncated exit code as a truncated handle to the loaded module
-        let truncated_injected_module_handle = exit_code as ModuleHandle;
-        if truncated_injected_module_handle.is_null() {
-            return Err(SyringeError::RemoteOperationFailed);
-        }
-
-        let injected_module = self.process.find_module_by_path(module_path)?.unwrap();
-        assert_eq!(
-            injected_module.handle() as u32,
-            truncated_injected_module_handle as u32
+        debug_assert_eq!(
+            injected_module,
+            self.process.find_module_by_path(module_path)?.unwrap()
         );
 
         Ok(injected_module)
@@ -158,11 +162,15 @@ impl<'a> Syringe<'a> {
         )?;
 
         let free_library_result = exit_code as BOOL;
-        if free_library_result == 0 {
-            return Err(SyringeError::RemoteOperationFailed);
-        }
 
-        assert!(
+        if free_library_result == FALSE {
+            return Err(SyringeError::RemoteIo(io::Error::new(io::ErrorKind::Other, "failed to eject module from process")));
+        }
+        if let Ok(exception) = ExceptionCode::try_from_primitive(exit_code) {
+            return Err(SyringeError::RemoteException(exception));
+        }
+        
+        debug_assert!(
             !self
                 .process
                 .module_handles()?
@@ -188,12 +196,35 @@ impl<'a> Syringe<'a> {
         }
     }
 
+    pub(crate) fn remote_exit_code_to_exception(exit_code: u32) -> Result<(), SyringeError> {
+        if exit_code == 0 {
+            return Ok(())
+        }
+
+        match ExceptionCode::try_from_primitive(exit_code) {
+            Ok(exception) => Err(SyringeError::RemoteException(exception)),
+            Err(_) => Err(SyringeError::RemoteIo(io::Error::new(io::ErrorKind::Other, "unknown remote process error"))),
+        }
+    }
+
+    pub(crate) fn remote_exit_code_to_error_or_exception(exit_code: u32) -> Result<(), SyringeError> {
+        if exit_code == 0 {
+            return Ok(())
+        }
+
+        match ExceptionCode::try_from_primitive(exit_code) {
+            Ok(exception) => Err(SyringeError::RemoteException(exception)),
+            Err(_) => Err(SyringeError::RemoteIo(Win32Error::new(exit_code).into())),
+        }
+    }
+
     fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, SyringeError> {
         let kernel32_module =
             ProcessModule::__find_local_by_name_or_abs_path(u16cstr!("kernel32.dll"))?.unwrap();
 
         let load_library_fn_ptr = kernel32_module.__get_local_procedure(cstr!("LoadLibraryW"))?;
         let free_library_fn_ptr = kernel32_module.__get_local_procedure(cstr!("FreeLibrary"))?;
+        let get_last_error_fn_ptr = kernel32_module.__get_local_procedure(cstr!("GetLastError"))?;
         #[cfg(feature = "remote_procedure")]
         let get_proc_address_fn_ptr =
             kernel32_module.__get_local_procedure(cstr!("GetProcAddress"))?;
@@ -202,6 +233,8 @@ impl<'a> Syringe<'a> {
             kernel32_module: kernel32_module.handle(),
             load_library_offset: load_library_fn_ptr as usize - kernel32_module.handle() as usize,
             free_library_offset: free_library_fn_ptr as usize - kernel32_module.handle() as usize,
+            get_last_error_offset: get_last_error_fn_ptr as usize
+                - kernel32_module.handle() as usize,
             #[cfg(feature = "remote_procedure")]
             get_proc_address_offset: get_proc_address_fn_ptr as usize
                 - kernel32_module.handle() as usize,
@@ -246,6 +279,12 @@ impl<'a> Syringe<'a> {
             .find(|export| matches!(export.name, Some("FreeLibrary")))
             .unwrap();
 
+        let get_last_error_export = pe
+            .exports
+            .iter()
+            .find(|export| matches!(export.name, Some("GetLastError")))
+            .unwrap();
+
         #[cfg(feature = "remote_procedure")]
         let get_proc_address_export = pe
             .exports
@@ -257,6 +296,7 @@ impl<'a> Syringe<'a> {
             kernel32_module: kernel32_module.handle(),
             load_library_offset: load_library_export.rva,
             free_library_offset: free_library_export.rva,
+            get_last_error_offset: get_last_error_export.rva,
             #[cfg(feature = "remote_procedure")]
             get_proc_address_offset: get_proc_address_export.rva,
         })
@@ -268,11 +308,123 @@ impl<'a> Syringe<'a> {
         let path_buf_len: u32 = path_buf.len().try_into().unwrap();
         let result = unsafe { GetSystemWow64DirectoryW(path_buf[0].as_mut_ptr(), path_buf_len) };
         if result == 0 {
-            return Err(Win32Error::new());
+            return Err(Win32Error::get_last_error());
         }
 
         let path_len = result as usize;
         let path = unsafe { MaybeUninit::slice_assume_init_ref(&path_buf[..path_len]) };
         Ok(PathBuf::from(U16Str::from_slice(path).to_os_string()))
+    }
+}
+
+#[derive(Debug)]
+struct LoadLibraryWStub<'a> {
+    code: RemoteBox<'a, [u8]>,
+    result: RemoteBox<'a, ModuleHandle>,
+}
+
+impl<'a> LoadLibraryWStub<'a> {
+    fn build(
+        inject_data: &InjectHelpData,
+        remote_allocator: &mut RemoteBoxAllocator<'a>,
+    ) -> Result<Self, SyringeError> {
+        let mut result = remote_allocator.alloc_uninit::<ModuleHandle>()?;
+
+        let code = if remote_allocator.process().is_x86()? {
+            Self::build_code_x86(
+                unsafe { mem::transmute(inject_data.get_load_library_fn_ptr()) },
+                result.as_mut_ptr().cast(),
+                unsafe { mem::transmute(inject_data.get_get_last_error()) },
+            )
+            .unwrap()
+        } else {
+            Self::build_code_x64(
+                unsafe { mem::transmute(inject_data.get_load_library_fn_ptr()) },
+                result.as_mut_ptr().cast(),
+                unsafe { mem::transmute(inject_data.get_get_last_error()) },
+            )
+            .unwrap()
+        };
+        let code = remote_allocator.alloc_and_copy(code.as_slice())?;
+
+        Ok(Self { code, result })
+    }
+
+    fn call(&mut self, remote_wide_module_path: *mut u16) -> Result<ModuleHandle, SyringeError> {
+        // creating a thread that will call LoadLibraryW with a pointer to payload_path as argument
+        let exit_code = self.process().run_remote_thread(
+            unsafe { mem::transmute(self.code.as_ptr()) },
+            remote_wide_module_path.cast(),
+        )?;
+
+        Syringe::remote_exit_code_to_error_or_exception(exit_code)?;
+
+        let injected_module_handle = self.result.read()?;
+        assert!(!injected_module_handle.is_null());
+
+        Ok(injected_module_handle)
+    }
+
+    fn process(&self) -> ProcessRef<'a> {
+        self.code.process()
+    }
+
+    fn build_code_x86(
+        load_library_w: *const c_void,
+        return_buffer: *mut c_void,
+        get_last_error: *mut c_void,
+    ) -> Result<Vec<u8>, IcedError> {
+        let mut asm = CodeAssembler::new(32)?;
+
+        asm.mov(eax, esp + 4)?; // CreateRemoteThread lpParameter
+        asm.push(eax)?; // lpLibFileName
+        asm.mov(eax, load_library_w as u32)?;
+        asm.call(eax)?;
+        asm.mov(dword_ptr(return_buffer as u32), eax)?;
+        // asm.mov(eax, 0)?;
+        let mut label = asm.create_label();
+        asm.test(eax, eax)?;
+        asm.mov(eax, 0)?;
+        asm.jnz(label)?;
+        asm.mov(eax, get_last_error as u32)?;
+        asm.call(eax)?; // return 0
+        asm.set_label(&mut label)?;
+        asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
+
+        let code = asm.assemble(0x1234_5678)?;
+        debug_assert_eq!(code, asm.assemble(0x1111_2222)?);
+
+        Ok(code)
+    }
+
+    fn build_code_x64(
+        load_library_w: *const c_void,
+        return_buffer: *mut c_void,
+        get_last_error: *mut c_void,
+    ) -> Result<Vec<u8>, IcedError> {
+        let mut asm = CodeAssembler::new(64)?;
+
+        asm.sub(rsp, 40)?; // Re-align stack to 16 byte boundary +32 shadow space
+
+        // arg already in rcx
+        asm.mov(rax, load_library_w as u64)?;
+        asm.call(rax)?;
+        asm.mov(dword_ptr(return_buffer as u64), rax)?; // move result to buffer
+
+        let mut label = asm.create_label();
+        asm.test(rax, rax)?;
+        asm.mov(rax, 0u64)?;
+        asm.jnz(label)?;
+        asm.mov(rax, get_last_error as u64)?;
+        asm.call(rax)?; // return 0
+        asm.set_label(&mut label)?;
+
+        asm.add(rsp, 40)?; // Re-align stack to 16 byte boundary + shadow space.
+        asm.ret()?; // Restore stack ptr. (Callee cleanup)
+
+        let code = asm.assemble(0x1234_5678)?;
+        debug_assert_eq!(code, asm.assemble(0x1111_2222)?);
+
+        Ok(code)
     }
 }
