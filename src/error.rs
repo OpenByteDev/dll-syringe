@@ -3,7 +3,7 @@ use std::{
     io,
 };
 
-use num_enum::{IntoPrimitive, TryFromPrimitive};
+use num_enum::{IntoPrimitive, TryFromPrimitive, TryFromPrimitiveError};
 use thiserror::Error;
 use winapi::{um::{
     minwinbase::{
@@ -169,6 +169,17 @@ pub enum ExceptionCode {
     StackOverflow = EXCEPTION_STACK_OVERFLOW,
     /// A frame consolidation has been executed.
     UnwindConsolidate = STATUS_UNWIND_CONSOLIDATE,
+}
+
+impl ExceptionCode {
+    /// Try to interpret the given code as a windows exception code.
+    pub fn try_from_code(code: u32) -> Result<Self, TryFromPrimitiveError<Self>> {
+        Self::try_from_primitive(code)
+    }
+    /// Returns the underlying windows exception code.
+    pub fn code(self) -> u32 {
+        self.into()
+    }
 }
 
 impl Display for ExceptionCode {
