@@ -1,7 +1,7 @@
 use std::{
     convert::TryInto,
     ffi::{CStr, CString, OsString},
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, ptr::NonNull,
 };
 
 use crate::{
@@ -14,7 +14,7 @@ use widestring::{U16CStr, U16CString};
 use get_last_error::Win32Error;
 use winapi::{
     shared::{
-        minwindef::{__some_function, HMODULE},
+        minwindef::{__some_function, HMODULE, HINSTANCE__},
         winerror::ERROR_MOD_NOT_FOUND,
     },
     um::{
@@ -32,7 +32,7 @@ pub type ModuleHandle = HMODULE;
 /// A loaded module of a running process.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ProcessModule<'a> {
-    handle: ModuleHandle,
+    handle: NonNull<HINSTANCE__>,
     process: ProcessRef<'a>,
 }
 
@@ -162,7 +162,7 @@ impl<'a> ProcessModule<'a> {
     /// Gets the underlying handle to the module.
     #[must_use]
     pub const fn handle(&self) -> ModuleHandle {
-        self.handle
+        self.handle.as_ptr()
     }
     /// Gets the process this module belongs to.
     #[must_use]
