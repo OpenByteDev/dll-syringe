@@ -41,15 +41,16 @@ impl<'a> ProcessModule<'a> {
     ///
     /// # Safety
     /// The caller must guarantee that the given handle is valid and that the module is loaded into the given process. (and stays that way while interacting).
-    pub const unsafe fn new(handle: ModuleHandle, process: ProcessRef<'a>) -> Self {
+    pub const unsafe fn new_unchecked(handle: ModuleHandle, process: ProcessRef<'a>) -> Self {
+        let handle = unsafe { NonNull::new_unchecked(handle) };
         Self { handle, process }
     }
     /// Contructs a new instance from the given module handle loaded in the current process.
     ///
     /// # Safety
     /// The caller must guarantee that the given handle is valid and that it is loaded into the current process. (and stays that way while interacting).
-    pub unsafe fn new_local(handle: ModuleHandle) -> Self {
-        unsafe { Self::new(handle, ProcessRef::current()) }
+    pub unsafe fn new_local_unchecked(handle: ModuleHandle) -> Self {
+        unsafe { Self::new_unchecked(handle, ProcessRef::current()) }
     }
 
     /// Searches for a module with the given name or path in the given process (the current one if [`None`] was specified).
@@ -131,7 +132,7 @@ impl<'a> ProcessModule<'a> {
             return Err(err.into());
         }
 
-        Ok(Some(unsafe { Self::new_local(handle) }))
+        Ok(Some(unsafe { Self::new_local_unchecked(handle) }))
     }
 
     /// Searches for a module with the given name in the given process.

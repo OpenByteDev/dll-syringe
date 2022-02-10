@@ -277,7 +277,7 @@ impl<'a> ProcessRef<'a> {
         let modules = self.module_handles()?;
 
         for &module_handle in modules.as_ref() {
-            let module = unsafe { ProcessModule::new(module_handle, *self) };
+            let module = unsafe { ProcessModule::new_unchecked(module_handle, *self) };
             let module_name = module.base_name()?;
 
             if module_name.eq_ignore_ascii_case(&target_module_name) {
@@ -311,7 +311,7 @@ impl<'a> ProcessRef<'a> {
         let modules = self.module_handles()?;
 
         for &module_handle in modules.as_ref() {
-            let module = unsafe { ProcessModule::new(module_handle, *self) };
+            let module = unsafe { ProcessModule::new_unchecked(module_handle, *self) };
             let module_path = module.path()?.into_os_string();
 
             if module_path.eq_ignore_ascii_case(&target_module_path) {

@@ -135,7 +135,7 @@ impl<'a> Syringe<'a> {
             .alloc_and_copy(wide_module_path.as_slice())?;
 
         let injected_module_handle = load_library_w.call(remote_wide_module_path.as_mut_ptr())?;
-        let injected_module = unsafe { ProcessModule::new(injected_module_handle, self.process) };
+        let injected_module = unsafe { ProcessModule::new_unchecked(injected_module_handle, self.process) };
 
         debug_assert_eq!(
             injected_module,
