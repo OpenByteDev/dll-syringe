@@ -113,32 +113,61 @@ impl From<IoOrNulError> for SyringeError {
     }
 }
 
-// from https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode
 #[derive(Debug, TryFromPrimitive, IntoPrimitive, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 #[repr(u32)]
+/// Codes for unhandled windows exceptions from [msdn](https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode).
 pub enum ExceptionCode {
+    /// The thread attempts to read from or write to a virtual address for which it does not have access.
     AccessViolation = EXCEPTION_ACCESS_VIOLATION,
+    /// The thread attempts to access an array element that is out of bounds, and the underlying hardware supports bounds checking.
     ArrayBoundsExceeded = EXCEPTION_ARRAY_BOUNDS_EXCEEDED,
+    /// A breakpoint is encountered.
     Breakpoint = EXCEPTION_BREAKPOINT,
+    /// The thread attempts to read or write data that is misaligned on hardware that does not provide alignment.
+    /// For example, 16-bit values must be aligned on 2-byte boundaries, 32-bit values on 4-byte boundaries, and so on.
     DatatypeMisalignment = EXCEPTION_DATATYPE_MISALIGNMENT,
+    /// One of the operands in a floating point operation is denormal.
+    /// A denormal value is one that is too small to represent as a standard floating point value.
     FltDenormalOperand = EXCEPTION_FLT_DENORMAL_OPERAND,
+    /// The thread attempts to divide a floating point value by a floating point divisor of 0 (zero).
     FltDivideByZero = EXCEPTION_FLT_DIVIDE_BY_ZERO,
+    /// The result of a floating point operation cannot be represented exactly as a decimal fraction.
     FltInexactResult = EXCEPTION_FLT_INEXACT_RESULT,
+    /// A floating point exception that is not included in this list.
     FltInvalidOperation = EXCEPTION_FLT_INVALID_OPERATION,
+    /// The exponent of a floating point operation is greater than the magnitude allowed by the corresponding type.
     FltOverflow = EXCEPTION_FLT_OVERFLOW,
+    /// The stack has overflowed or underflowed, because of a floating point operation.
     FltStackCheck = EXCEPTION_FLT_STACK_CHECK,
+    /// The exponent of a floating point operation is less than the magnitude allowed by the corresponding type.
     FltUnderflow = EXCEPTION_FLT_UNDERFLOW,
+    /// The thread accessed memory allocated with the PAGE_GUARD modifier.
     GuardPage = EXCEPTION_GUARD_PAGE,
+    /// The thread tries to execute an invalid instruction.
     IllegalInstruction = EXCEPTION_ILLEGAL_INSTRUCTION,
+    /// The thread tries to access a page that is not present, and the system is unable to load the page.
+    /// For example, this exception might occur if a network connection is lost while running a program over a network.
     InPageError = EXCEPTION_IN_PAGE_ERROR,
+    /// The thread attempts to divide an integer value by an integer divisor of 0 (zero).
     IntegerDivideByZero = EXCEPTION_INT_DIVIDE_BY_ZERO,
+    /// The result of an integer operation creates a value that is too large to be held by the destination register.
+    /// In some cases, this will result in a carry out of the most significant bit of the result.
+    /// Some operations do not set the carry flag.
     IntegerOverflow = EXCEPTION_INT_OVERFLOW,
+    /// An exception handler returns an invalid disposition to the exception dispatcher.
+    /// Programmers using a high-level language such as C should never encounter this exception.
     InvalidDisposition = EXCEPTION_INVALID_DISPOSITION,
+    /// The thread used a handle to a kernel object that was invalid (probably because it had been closed.)
     InvalidHandle = EXCEPTION_INVALID_HANDLE,
+    /// The thread attempts to continue execution after a non-continuable exception occurs.
     NoncontinuableException = EXCEPTION_NONCONTINUABLE_EXCEPTION,
+    /// The thread attempts to execute an instruction with an operation that is not allowed in the current computer mode.
     PrivilegedInstruction = EXCEPTION_PRIV_INSTRUCTION,
+    /// A trace trap or other single instruction mechanism signals that one instruction is executed.
     SingleStep = EXCEPTION_SINGLE_STEP,
+    /// The thread uses up its stack.
     StackOverflow = EXCEPTION_STACK_OVERFLOW,
+    /// A frame consolidation has been executed.
     UnwindConsolidate = STATUS_UNWIND_CONSOLIDATE,
 }
 
