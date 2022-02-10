@@ -117,53 +117,63 @@ impl<'a> Syringe<'a> {
     }
 
     fn build_call_procedure_x86(
-        real_address: *const c_void,
-        return_buffer_address: *mut c_void,
+        procedure: *const c_void,
+        return_buffer: *mut c_void,
     ) -> Result<Vec<u8>, IcedError> {
-        assert!(!real_address.is_null());
-        assert!(!return_buffer_address.is_null());
+        assert!(!procedure.is_null());
+        assert!(!return_buffer.is_null());
+        assert_eq!(procedure as u32 as usize, procedure as usize);
+        assert_eq!(return_buffer as u32 as usize,return_buffer as usize);
 
         let mut asm = CodeAssembler::new(32)?;
 
         asm.mov(eax, esp + 4)?; // load arg ptr (lpParameter) from stack
-        asm.push(return_buffer_address as u32)?; // push result ptr onto stack
+        asm.push(return_buffer as u32)?; // push result ptr onto stack
         asm.push(eax)?; // push arg ptr onto stack
-        asm.mov(eax, real_address as u32)?; // load address of target function
+        asm.mov(eax, procedure as u32)?; // load address of target function
         asm.call(eax)?; // call real_address
         asm.mov(eax, 0)?; // return 0
         asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
 
-        asm.assemble(0x1234_5678)
+        let code = asm.assemble(0x1234_5678)?;
+        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "CallProcedure x86 stub is not location independent");
+
+        Ok(code)
     }
 
     fn build_call_procedure_x64(
-        real_address: *const c_void,
-        return_buffer_address: *mut c_void,
+        procedure: *const c_void,
+        return_buffer: *mut c_void,
     ) -> Result<Vec<u8>, IcedError> {
-        assert!(!real_address.is_null());
-        assert!(!return_buffer_address.is_null());
+        assert!(!procedure.is_null());
+        assert!(!return_buffer.is_null());
 
         let mut asm = CodeAssembler::new(64)?;
 
         asm.sub(rsp, 40)?; // Re-align stack to 16 byte boundary +32 shadow space
-        asm.mov(rdx, return_buffer_address as u64)?; // result ptr
+        asm.mov(rdx, return_buffer as u64)?; // result ptr
         asm.mov(rcx, rcx)?; // arg ptr
-        asm.mov(rax, real_address as u64)?;
+        asm.mov(rax, procedure as u64)?;
         asm.call(rax)?;
         asm.mov(rax, 0u64)?; // return 0
         asm.add(rsp, 40)?; // Re-align stack to 16 byte boundary + shadow space.
         asm.mov(rax, 0u64)?; // return 0
         asm.ret()?; // Restore stack ptr. (Callee cleanup)
 
-        asm.assemble(0x1234_5678)
+        let code = asm.assemble(0x1234_5678)?;
+        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "CallProcedure x64 stub is not location independent");
+
+        Ok(code)
     }
 
     fn build_get_proc_address_x86(
-        real_address: *const c_void,
-        return_buffer_address: *mut c_void,
+        get_proc_address: *const c_void,
+        return_buffer: *mut c_void,
     ) -> Result<Vec<u8>, IcedError> {
-        assert!(!real_address.is_null());
-        assert!(!return_buffer_address.is_null());
+        assert!(!get_proc_address.is_null());
+        assert!(!return_buffer.is_null());
+        assert_eq!(get_proc_address as u32 as usize, get_proc_address as usize);
+        assert_eq!(return_buffer as u32 as usize,return_buffer as usize);
 
         // assembly code from https://github.com/Reloaded-Project/Reloaded.Injector/blob/77a9a87392cc75fa087d7004e8cdef054e880428/Source/Reloaded.Injector/Shellcode.cs#L159
         // mov eax, dword [esp + 4]         // CreateRemoteThread lpParameter
@@ -177,21 +187,24 @@ impl<'a> Syringe<'a> {
         asm.mov(eax, esp + 4)?; // CreateRemoteThread lpParameter
         asm.push(dword_ptr(eax + 8))?; // lpProcName
         asm.push(dword_ptr(eax + 0))?; // hModule
-        asm.mov(eax, real_address as u32)?;
+        asm.mov(eax, get_proc_address as u32)?;
         asm.call(eax)?;
-        asm.mov(dword_ptr(return_buffer_address as u32), eax)?;
+        asm.mov(dword_ptr(return_buffer as u32), eax)?;
         asm.mov(eax, 0)?; // return 0
         asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
 
-        asm.assemble(0x1234_5678)
+        let code = asm.assemble(0x1234_5678)?;
+        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "GetProcAddress x86 stub is not location independent");
+
+        Ok(code)
     }
 
     fn build_get_proc_address_x64(
-        real_address: *const c_void,
-        return_buffer_address: *mut c_void,
+        get_proc_address: *const c_void,
+        return_buffer: *mut c_void,
     ) -> Result<Vec<u8>, IcedError> {
-        assert!(!real_address.is_null());
-        assert!(!return_buffer_address.is_null());
+        assert!(!get_proc_address.is_null());
+        assert!(!return_buffer.is_null());
 
         // assembly code from https://github.com/Reloaded-Project/Reloaded.Injector/blob/77a9a87392cc75fa087d7004e8cdef054e880428/Source/Reloaded.Injector/Shellcode.cs#L188
         //                                      // CreateRemoteThread lpParameter @ ECX
@@ -207,14 +220,17 @@ impl<'a> Syringe<'a> {
         asm.sub(rsp, 40)?; // Re-align stack to 16 byte boundary +32 shadow space
         asm.mov(rdx, qword_ptr(rcx + 8))?; // lpProcName
         asm.mov(rcx, qword_ptr(rcx + 0))?; // hModule
-        asm.mov(rax, real_address as u64)?;
+        asm.mov(rax, get_proc_address as u64)?;
         asm.call(rax)?;
-        asm.mov(qword_ptr(return_buffer_address as u64), rax)?;
+        asm.mov(qword_ptr(return_buffer as u64), rax)?;
         asm.mov(rax, 0u64)?; // return 0
         asm.add(rsp, 40)?; // Re-align stack to 16 byte boundary + shadow space.
         asm.ret()?; // Restore stack ptr. (Callee cleanup)
 
-        asm.assemble(0x1234_5678)
+        let code = asm.assemble(0x1234_5678)?;
+        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "GetProcAddress x64 stub is not location independent");
+
+        Ok(code)
     }
 }
 

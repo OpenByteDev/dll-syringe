@@ -169,7 +169,7 @@ impl<'a> Syringe<'a> {
         if let Ok(exception) = ExceptionCode::try_from_primitive(exit_code) {
             return Err(SyringeError::RemoteException(exception));
         }
-        
+
         debug_assert!(
             !self
                 .process
@@ -372,8 +372,15 @@ impl<'a> LoadLibraryWStub<'a> {
     fn build_code_x86(
         load_library_w: *const c_void,
         return_buffer: *mut c_void,
-        get_last_error: *mut c_void,
+        get_last_error: *const c_void,
     ) -> Result<Vec<u8>, IcedError> {
+        assert!(!load_library_w.is_null());
+        assert!(!return_buffer.is_null());
+        assert!(!get_last_error.is_null());
+        assert_eq!(load_library_w as u32 as usize, load_library_w as usize);
+        assert_eq!(return_buffer as u32 as usize, return_buffer as usize);
+        assert_eq!(get_last_error as u32 as usize, get_last_error as usize);
+
         let mut asm = CodeAssembler::new(32)?;
 
         asm.mov(eax, esp + 4)?; // CreateRemoteThread lpParameter
@@ -392,7 +399,7 @@ impl<'a> LoadLibraryWStub<'a> {
         asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
 
         let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(code, asm.assemble(0x1111_2222)?);
+        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "LoadLibraryW x86 stub is not location independent");
 
         Ok(code)
     }
@@ -400,8 +407,12 @@ impl<'a> LoadLibraryWStub<'a> {
     fn build_code_x64(
         load_library_w: *const c_void,
         return_buffer: *mut c_void,
-        get_last_error: *mut c_void,
+        get_last_error: *const c_void,
     ) -> Result<Vec<u8>, IcedError> {
+        assert!(!load_library_w.is_null());
+        assert!(!return_buffer.is_null());
+        assert!(!get_last_error.is_null());
+
         let mut asm = CodeAssembler::new(64)?;
 
         asm.sub(rsp, 40)?; // Re-align stack to 16 byte boundary +32 shadow space
@@ -423,7 +434,7 @@ impl<'a> LoadLibraryWStub<'a> {
         asm.ret()?; // Restore stack ptr. (Callee cleanup)
 
         let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(code, asm.assemble(0x1111_2222)?);
+        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "LoadLibraryW x64 stub is not location independent");
 
         Ok(code)
     }
