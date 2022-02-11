@@ -19,7 +19,6 @@ use crate::{
 
 #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
 use {
-    crate::utils::retry_with_filter,
     goblin::pe::PE,
     std::{convert::TryInto, fs, mem::MaybeUninit, path::PathBuf, time::Duration},
     widestring::U16Str,
@@ -257,12 +256,9 @@ impl<'a> Syringe<'a> {
         process: ProcessRef<'_>,
     ) -> Result<InjectHelpData, SyringeError> {
         // get kernel32 handle of target process (may fail if target process is currently starting and has not loaded kernel32 yet)
-        let kernel32_module = retry_with_filter(
-            || process.find_module_by_name("kernel32.dll"),
-            Option::is_some,
-            Duration::from_secs(1),
-        )?
-        .unwrap();
+        let kernel32_module = process
+            .wait_for_module_by_name("kernel32.dll", Duration::from_secs(1))?
+            .unwrap();
 
         // get path of kernel32 used in target process
         let kernel32_path = if process.is_x86()? {

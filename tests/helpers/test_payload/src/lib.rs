@@ -35,3 +35,15 @@ dll_syringe_payload_utils::remote_procedure! {
         count
     }
 }
+
+dll_syringe_payload_utils::remote_procedure! {
+    pub fn count_zeros_unsized(buf: &[u8]) -> u32 {
+        let mut count = 0;
+        for i in 0..buf.len() {
+            if buf[i] == 0 {
+                count += 1;
+            }
+        }
+        count
+    }
+}

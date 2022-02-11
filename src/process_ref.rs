@@ -12,6 +12,7 @@ use std::{
     },
     path::{Path, PathBuf},
     ptr,
+    time::Duration,
 };
 
 use get_last_error::Win32Error;
@@ -37,7 +38,7 @@ use winapi::{
 };
 
 use crate::{
-    utils::{ArrayOrVecSlice, UninitArrayBuf, WinPathBuf},
+    utils::{retry_with_filter, ArrayOrVecSlice, UninitArrayBuf, WinPathBuf},
     ModuleHandle, Process, ProcessHandle, ProcessModule,
 };
 
@@ -320,6 +321,36 @@ impl<'a> ProcessRef<'a> {
         }
 
         Ok(None)
+    }
+
+    /// Searches the modules in this process for one with the given name repeatedly until a matching module is found or the given timeout elapses.
+    /// The comparison of names is case-insensitive.
+    /// If the extension is omitted, the default library extension `.dll` is appended.
+    pub fn wait_for_module_by_name(
+        &self,
+        module_name: impl AsRef<Path>,
+        timeout: Duration,
+    ) -> Result<Option<ProcessModule<'a>>, Win32Error> {
+        retry_with_filter(
+            || self.find_module_by_name(module_name.as_ref()),
+            Option::is_some,
+            timeout,
+        )
+    }
+
+    /// Searches the modules in this process for one with the given path repeatedly until a matching module is found or the given timeout elapses.
+    /// The comparison of paths is case-insensitive.
+    /// If the extension is omitted, the default library extension `.dll` is appended.
+    pub fn wait_for_module_by_path(
+        &self,
+        module_path: impl AsRef<Path>,
+        timeout: Duration,
+    ) -> Result<Option<ProcessModule<'a>>, Win32Error> {
+        retry_with_filter(
+            || self.find_module_by_path(module_path.as_ref()),
+            Option::is_some,
+            timeout,
+        )
     }
 
     /// Returns whether this process is running under [WOW64](https://docs.microsoft.com/en-us/windows/win32/winprog64/running-32-bit-applications).
