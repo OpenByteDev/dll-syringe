@@ -19,7 +19,19 @@ pub extern "system" fn add(numbers: *const (f64, f64), result: *mut f64) {
 }
 
 dll_syringe_payload_utils::remote_procedure! {
-    pub fn add2(a: f64, b: f64) -> f64 {
+    fn add2(a: f64, b: f64) -> f64 {
         a + b
+    }
+}
+
+dll_syringe_payload_utils::remote_procedure! {
+    pub fn count_zeros(buf: [u8; 100]) -> u32 {
+        let mut count = 0;
+        for i in 0..buf.len() {
+            if buf[i] == 0 {
+                count += 1;
+            }
+        }
+        count
     }
 }

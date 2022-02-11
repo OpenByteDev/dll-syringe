@@ -124,5 +124,14 @@ fn call_procedure_test(
     let add2_result: f64 = remote_add2.call(&(4.2f64, 0.1f64))?;
     assert_eq!(add2_result as f64, 4.2f64 + 0.1f64);
 
+    // Complex addition test larger argument
+    let mut remote_count_zeros = syringe.get_procedure::<[u8; 100], u32, _>(module, "count_zeros")?.unwrap();
+    let mut buffer = [0u8; 100];
+    for i in 0..buffer.len() {
+        buffer[i] = if i % 2 == 0 { 0u8 } else { 1u8 };
+    }
+    let count_zeros_result = remote_count_zeros.call(&buffer)?;
+    assert_eq!(count_zeros_result, buffer.len() as u32 / 2);
+
     Ok(())
 }
