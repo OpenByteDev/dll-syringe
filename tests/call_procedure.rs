@@ -108,17 +108,21 @@ fn call_procedure_test(
     let module = syringe.inject(payload_path)?;
 
     // Simple echo test
-    let remote_echo2 = syringe.get_procedure(module, "echo2")?;
-    assert!(remote_echo2.is_some());
-    let mut remote_echo2 = remote_echo2.unwrap();
-    let echo2_result: u32 = remote_echo2.call(&0x1234_5678u32)?;
-    assert_eq!(echo2_result, 0x1234_5678u32);
+    let remote_echo = syringe.get_procedure(module, "echo")?;
+    assert!(remote_echo.is_some());
+    let mut remote_echo = remote_echo.unwrap();
+    let echo_result: u32 = remote_echo.call(&0x1234_5678u32)?;
+    assert_eq!(echo_result, 0x1234_5678u32);
 
     // "Complex" addition test
     let mut remote_add = syringe.get_procedure(module, "add")?.unwrap();
-
     let add_result: f64 = remote_add.call(&(4.2f64, 0.1f64))?;
     assert_eq!(add_result as f64, 4.2f64 + 0.1f64);
+
+    // "Complex" addition test with dll-syringe-payload-utils
+    let mut remote_add2 = syringe.get_procedure(module, "add2")?.unwrap();
+    let add2_result: f64 = remote_add2.call(&(4.2f64, 0.1f64))?;
+    assert_eq!(add2_result as f64, 4.2f64 + 0.1f64);
 
     Ok(())
 }
