@@ -22,10 +22,10 @@ type RemoteProcedurePtr = NonNull<c_void>;
 impl<'a> Syringe<'a> {
     /// Loads an exported function from the given module from the target process.
     /// The function does not have to be from an injected module.
-    pub fn get_procedure<T, R, N: AsRef<str>>(
+    pub fn get_procedure<T: ?Sized, R>(
         &mut self,
         module: ProcessModule<'_>,
-        name: N,
+        name: &str,
     ) -> Result<Option<RemoteProcedure<'a, T, R>>, SyringeError> {
         match self.get_procedure_address(module, name) {
             Ok(Some(procedure)) => Ok(Some(RemoteProcedure::new(
@@ -123,7 +123,7 @@ impl<'a> Syringe<'a> {
         assert!(!procedure.is_null());
         assert!(!return_buffer.is_null());
         assert_eq!(procedure as u32 as usize, procedure as usize);
-        assert_eq!(return_buffer as u32 as usize,return_buffer as usize);
+        assert_eq!(return_buffer as u32 as usize, return_buffer as usize);
 
         let mut asm = CodeAssembler::new(32)?;
 
@@ -136,7 +136,11 @@ impl<'a> Syringe<'a> {
         asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
 
         let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "CallProcedure x86 stub is not location independent");
+        debug_assert_eq!(
+            code,
+            asm.assemble(0x1111_2222)?,
+            "CallProcedure x86 stub is not location independent"
+        );
 
         Ok(code)
     }
@@ -161,7 +165,11 @@ impl<'a> Syringe<'a> {
         asm.ret()?; // Restore stack ptr. (Callee cleanup)
 
         let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "CallProcedure x64 stub is not location independent");
+        debug_assert_eq!(
+            code,
+            asm.assemble(0x1111_2222)?,
+            "CallProcedure x64 stub is not location independent"
+        );
 
         Ok(code)
     }
@@ -173,7 +181,7 @@ impl<'a> Syringe<'a> {
         assert!(!get_proc_address.is_null());
         assert!(!return_buffer.is_null());
         assert_eq!(get_proc_address as u32 as usize, get_proc_address as usize);
-        assert_eq!(return_buffer as u32 as usize,return_buffer as usize);
+        assert_eq!(return_buffer as u32 as usize, return_buffer as usize);
 
         // assembly code from https://github.com/Reloaded-Project/Reloaded.Injector/blob/77a9a87392cc75fa087d7004e8cdef054e880428/Source/Reloaded.Injector/Shellcode.cs#L159
         // mov eax, dword [esp + 4]         // CreateRemoteThread lpParameter
@@ -194,7 +202,11 @@ impl<'a> Syringe<'a> {
         asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
 
         let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "GetProcAddress x86 stub is not location independent");
+        debug_assert_eq!(
+            code,
+            asm.assemble(0x1111_2222)?,
+            "GetProcAddress x86 stub is not location independent"
+        );
 
         Ok(code)
     }
@@ -228,7 +240,11 @@ impl<'a> Syringe<'a> {
         asm.ret()?; // Restore stack ptr. (Callee cleanup)
 
         let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "GetProcAddress x64 stub is not location independent");
+        debug_assert_eq!(
+            code,
+            asm.assemble(0x1111_2222)?,
+            "GetProcAddress x64 stub is not location independent"
+        );
 
         Ok(code)
     }

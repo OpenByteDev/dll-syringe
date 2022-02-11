@@ -11,8 +11,8 @@ use std::{
     process::Child,
 };
 
-use sysinfo::{PidExt, ProcessExt, SystemExt};
 use get_last_error::Win32Error;
+use sysinfo::{PidExt, ProcessExt, SystemExt};
 use winapi::{
     shared::minwindef::{DWORD, FALSE},
     um::{

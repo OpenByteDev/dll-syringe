@@ -5,19 +5,22 @@ use std::{
 
 use num_enum::{IntoPrimitive, TryFromPrimitive, TryFromPrimitiveError};
 use thiserror::Error;
-use winapi::{um::{
-    minwinbase::{
-        EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EXCEPTION_BREAKPOINT,
-        EXCEPTION_DATATYPE_MISALIGNMENT, EXCEPTION_FLT_DENORMAL_OPERAND,
-        EXCEPTION_FLT_DIVIDE_BY_ZERO, EXCEPTION_FLT_INEXACT_RESULT,
-        EXCEPTION_FLT_INVALID_OPERATION, EXCEPTION_FLT_OVERFLOW, EXCEPTION_FLT_STACK_CHECK,
-        EXCEPTION_FLT_UNDERFLOW, EXCEPTION_GUARD_PAGE, EXCEPTION_ILLEGAL_INSTRUCTION,
-        EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW, EXCEPTION_INVALID_DISPOSITION,
-        EXCEPTION_INVALID_HANDLE, EXCEPTION_IN_PAGE_ERROR, EXCEPTION_NONCONTINUABLE_EXCEPTION,
-        EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP, EXCEPTION_STACK_OVERFLOW,
+use winapi::{
+    shared::winerror::ERROR_PARTIAL_COPY,
+    um::{
+        minwinbase::{
+            EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EXCEPTION_BREAKPOINT,
+            EXCEPTION_DATATYPE_MISALIGNMENT, EXCEPTION_FLT_DENORMAL_OPERAND,
+            EXCEPTION_FLT_DIVIDE_BY_ZERO, EXCEPTION_FLT_INEXACT_RESULT,
+            EXCEPTION_FLT_INVALID_OPERATION, EXCEPTION_FLT_OVERFLOW, EXCEPTION_FLT_STACK_CHECK,
+            EXCEPTION_FLT_UNDERFLOW, EXCEPTION_GUARD_PAGE, EXCEPTION_ILLEGAL_INSTRUCTION,
+            EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW, EXCEPTION_INVALID_DISPOSITION,
+            EXCEPTION_INVALID_HANDLE, EXCEPTION_IN_PAGE_ERROR, EXCEPTION_NONCONTINUABLE_EXCEPTION,
+            EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP, EXCEPTION_STACK_OVERFLOW,
+        },
+        winnt::STATUS_UNWIND_CONSOLIDATE,
     },
-    winnt::STATUS_UNWIND_CONSOLIDATE,
-}, shared::winerror::ERROR_PARTIAL_COPY};
+};
 
 #[derive(Debug, Error)]
 /// Error enum representing either a windows api error or a nul error from an invalid interior nul.
@@ -95,8 +98,9 @@ impl From<get_last_error::Win32Error> for SyringeError {
 
 impl From<io::Error> for SyringeError {
     fn from(err: io::Error) -> Self {
-        if cfg!(target_arch = "x86_64") && err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _) || 
-            err.kind() == io::ErrorKind::PermissionDenied {
+        if cfg!(target_arch = "x86_64") && err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+            || err.kind() == io::ErrorKind::PermissionDenied
+        {
             Self::ProcessInaccessible
         } else {
             Self::Io(err)
@@ -113,7 +117,9 @@ impl From<IoOrNulError> for SyringeError {
     }
 }
 
-#[derive(Debug, TryFromPrimitive, IntoPrimitive, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, TryFromPrimitive, IntoPrimitive, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash,
+)]
 #[repr(u32)]
 /// Codes for unhandled windows exceptions from [msdn](https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode).
 pub enum ExceptionCode {

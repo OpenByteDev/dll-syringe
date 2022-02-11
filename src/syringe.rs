@@ -3,11 +3,11 @@ use get_last_error::Win32Error;
 use iced_x86::{code_asm::*, IcedError};
 use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
-use std::{io, ffi::c_void, lazy::OnceCell, mem, path::Path};
+use std::{ffi::c_void, io, lazy::OnceCell, mem, path::Path};
 use u16cstr::u16cstr;
 use widestring::U16CString;
 use winapi::shared::{
-    minwindef::{BOOL, DWORD, HMODULE, FALSE},
+    minwindef::{BOOL, DWORD, FALSE, HMODULE},
     ntdef::LPCWSTR,
 };
 
@@ -134,8 +134,10 @@ impl<'a> Syringe<'a> {
             .remote_allocator
             .alloc_and_copy(wide_module_path.as_slice())?;
 
-        let injected_module_handle = load_library_w.call(remote_wide_module_path.as_mut_ptr())?;
-        let injected_module = unsafe { ProcessModule::new_unchecked(injected_module_handle, self.process) };
+        let injected_module_handle =
+            load_library_w.call(remote_wide_module_path.as_raw_ptr().cast())?;
+        let injected_module =
+            unsafe { ProcessModule::new_unchecked(injected_module_handle, self.process) };
 
         debug_assert_eq!(
             injected_module,
@@ -164,7 +166,10 @@ impl<'a> Syringe<'a> {
         let free_library_result = exit_code as BOOL;
 
         if free_library_result == FALSE {
-            return Err(SyringeError::RemoteIo(io::Error::new(io::ErrorKind::Other, "failed to eject module from process")));
+            return Err(SyringeError::RemoteIo(io::Error::new(
+                io::ErrorKind::Other,
+                "failed to eject module from process",
+            )));
         }
         if let Ok(exception) = ExceptionCode::try_from_primitive(exit_code) {
             return Err(SyringeError::RemoteException(exception));
@@ -198,18 +203,23 @@ impl<'a> Syringe<'a> {
 
     pub(crate) fn remote_exit_code_to_exception(exit_code: u32) -> Result<(), SyringeError> {
         if exit_code == 0 {
-            return Ok(())
+            return Ok(());
         }
 
         match ExceptionCode::try_from_primitive(exit_code) {
             Ok(exception) => Err(SyringeError::RemoteException(exception)),
-            Err(_) => Err(SyringeError::RemoteIo(io::Error::new(io::ErrorKind::Other, "unknown remote process error"))),
+            Err(_) => Err(SyringeError::RemoteIo(io::Error::new(
+                io::ErrorKind::Other,
+                "unknown remote process error",
+            ))),
         }
     }
 
-    pub(crate) fn remote_exit_code_to_error_or_exception(exit_code: u32) -> Result<(), SyringeError> {
+    pub(crate) fn remote_exit_code_to_error_or_exception(
+        exit_code: u32,
+    ) -> Result<(), SyringeError> {
         if exit_code == 0 {
-            return Ok(())
+            return Ok(());
         }
 
         match ExceptionCode::try_from_primitive(exit_code) {
@@ -399,7 +409,11 @@ impl<'a> LoadLibraryWStub<'a> {
         asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
 
         let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "LoadLibraryW x86 stub is not location independent");
+        debug_assert_eq!(
+            code,
+            asm.assemble(0x1111_2222)?,
+            "LoadLibraryW x86 stub is not location independent"
+        );
 
         Ok(code)
     }
@@ -434,7 +448,11 @@ impl<'a> LoadLibraryWStub<'a> {
         asm.ret()?; // Restore stack ptr. (Callee cleanup)
 
         let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(code, asm.assemble(0x1111_2222)?, "LoadLibraryW x64 stub is not location independent");
+        debug_assert_eq!(
+            code,
+            asm.assemble(0x1111_2222)?,
+            "LoadLibraryW x64 stub is not location independent"
+        );
 
         Ok(code)
     }

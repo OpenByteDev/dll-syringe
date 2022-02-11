@@ -1,7 +1,8 @@
 use std::{
     convert::TryInto,
     ffi::{CStr, CString, OsString},
-    path::{Path, PathBuf}, ptr::NonNull,
+    path::{Path, PathBuf},
+    ptr::NonNull,
 };
 
 use crate::{
@@ -9,12 +10,12 @@ use crate::{
     utils::WinPathBuf,
     ProcessRef,
 };
+use get_last_error::Win32Error;
 use path_absolutize::Absolutize;
 use widestring::{U16CStr, U16CString};
-use get_last_error::Win32Error;
 use winapi::{
     shared::{
-        minwindef::{__some_function, HMODULE, HINSTANCE__},
+        minwindef::{__some_function, HINSTANCE__, HMODULE},
         winerror::ERROR_MOD_NOT_FOUND,
     },
     um::{
@@ -93,23 +94,17 @@ impl<'a> ProcessModule<'a> {
 
     /// Searches for a module with the given name or path in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn find_local(
-        module_name_or_path: impl AsRef<Path>,
-    ) -> Result<Option<Self>, IoOrNulError> {
+    pub fn find_local(module_name_or_path: impl AsRef<Path>) -> Result<Option<Self>, IoOrNulError> {
         Self::find(module_name_or_path, ProcessRef::current())
     }
     /// Searches for a module with the given name in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn find_local_by_name(
-        module_name: impl AsRef<Path>,
-    ) -> Result<Option<Self>, IoOrNulError> {
+    pub fn find_local_by_name(module_name: impl AsRef<Path>) -> Result<Option<Self>, IoOrNulError> {
         Self::_find_local_by_name_or_abs_path(module_name)
     }
     /// Searches for a module with the given path in the current process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
-    pub fn find_local_by_path(
-        module_path: impl AsRef<Path>,
-    ) -> Result<Option<Self>, IoOrNulError> {
+    pub fn find_local_by_path(module_path: impl AsRef<Path>) -> Result<Option<Self>, IoOrNulError> {
         let absolute_path = module_path.as_ref().absolutize()?;
         Self::_find_local_by_name_or_abs_path(absolute_path)
     }
