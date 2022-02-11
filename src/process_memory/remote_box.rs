@@ -1,4 +1,4 @@
-use std::{cell::RefCell, marker::PhantomData, mem, rc::Rc};
+use std::{cell::RefCell, marker::PhantomData, mem, ptr::NonNull, rc::Rc};
 
 use get_last_error::Win32Error;
 
@@ -21,15 +21,24 @@ impl<'a> RemoteBoxAllocator<'a> {
         self.0.borrow().process()
     }
 
-    fn _alloc<T: ?Sized>(&mut self, size: usize) -> Result<RemoteBox<'a, T>, Win32Error> {
+    pub unsafe fn alloc_raw<T: ?Sized>(
+        &mut self,
+        size: usize,
+    ) -> Result<RemoteBox<'a, T>, Win32Error> {
         let allocation = self.0.borrow_mut().alloc(size)?;
         Ok(RemoteBox::new(self.0.clone(), allocation))
     }
-    pub fn alloc_uninit<T>(&mut self) -> Result<RemoteBox<'a, T>, Win32Error> {
-        self._alloc(mem::size_of::<T>())
+    pub fn alloc_uninit<T: Sized>(&mut self) -> Result<RemoteBox<'a, T>, Win32Error> {
+        unsafe { self.alloc_raw(mem::size_of::<T>()) }
+    }
+    pub fn alloc_uninit_for<T: ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<RemoteBox<'a, T>, Win32Error> {
+        unsafe { self.alloc_raw(mem::size_of_val(value)) }
     }
     pub fn alloc_and_copy<T: ?Sized>(&mut self, value: &T) -> Result<RemoteBox<'a, T>, Win32Error> {
-        let b = self._alloc(mem::size_of_val(value))?;
+        let b = self.alloc_uninit_for(value)?;
         b.write(value)?;
         Ok(b)
     }
@@ -66,7 +75,7 @@ impl<'a, T: ?Sized> RemoteBox<'a, T> {
     pub fn memory(&self) -> ProcessMemorySlice<'a> {
         unsafe {
             ProcessMemorySlice::from_raw_parts(
-                self.allocation.as_mut_ptr(),
+                self.allocation.as_raw_ptr(),
                 self.allocation.len,
                 self.process(),
             )
@@ -76,6 +85,10 @@ impl<'a, T: ?Sized> RemoteBox<'a, T> {
     pub fn write(&self, value: &T) -> Result<(), Win32Error> {
         self.memory().write_struct(0, value)
     }
+
+    pub fn as_raw_ptr(&mut self) -> *mut u8 {
+        self.allocation.as_raw_ptr()
+    }
 }
 
 impl<'a, T: Sized> RemoteBox<'a, T> {
@@ -83,23 +96,8 @@ impl<'a, T: Sized> RemoteBox<'a, T> {
         unsafe { self.memory().read_struct::<T>(0) }
     }
 
-    #[allow(dead_code)]
-    pub fn as_ptr(&mut self) -> *const T {
+    pub fn as_ptr(&mut self) -> NonNull<T> {
         self.allocation.as_ptr().cast()
-    }
-
-    pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.allocation.as_mut_ptr().cast()
-    }
-}
-
-impl<'a, T> RemoteBox<'a, [T]> {
-    pub fn as_ptr(&mut self) -> *const T {
-        self.allocation.as_ptr().cast()
-    }
-
-    pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.allocation.as_mut_ptr().cast()
     }
 }
 

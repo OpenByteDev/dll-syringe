@@ -60,15 +60,15 @@ impl<'a> Syringe<'a> {
             .alloc_and_copy(CString::new(name).unwrap().as_bytes_with_nul())?;
         stub.parameter.write(&GetProcAddressParams {
             module_handle: module.handle() as u64,
-            name: name.as_ptr() as u64,
+            name: name.as_raw_ptr() as u64,
         })?;
 
         // clear the result
         stub.result.write(&ptr::null_mut())?;
 
         let exit_code = self.process.run_remote_thread(
-            unsafe { mem::transmute(stub.code.as_mut_ptr()) },
-            stub.parameter.as_mut_ptr().cast(),
+            unsafe { mem::transmute(stub.code.as_raw_ptr()) },
+            stub.parameter.as_raw_ptr().cast(),
         )?;
         Syringe::remote_exit_code_to_exception(exit_code)?;
 
@@ -93,13 +93,13 @@ impl<'a> Syringe<'a> {
                 let code = if self.process.is_x86()? {
                     Syringe::build_get_proc_address_x86(
                         remote_get_proc_address as *const _,
-                        result.as_mut_ptr().cast(),
+                        result.as_raw_ptr().cast(),
                     )
                     .unwrap()
                 } else {
                     Syringe::build_get_proc_address_x64(
                         remote_get_proc_address as *const _,
-                        result.as_mut_ptr().cast(),
+                        result.as_raw_ptr().cast(),
                     )
                     .unwrap()
                 };
@@ -238,14 +238,14 @@ impl<'a> Syringe<'a> {
 /// The procedure abides by the `extern "system" fn(*const T, *mut R)` signature.
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "remote_procedure")))]
 #[derive(Debug)]
-pub struct RemoteProcedure<'a, T, R> {
+pub struct RemoteProcedure<'a, T: ?Sized, R> {
     ptr: RemoteProcedurePtr,
     stub: OnceCell<RemoteProcedureStub<'a, T, R>>,
     remote_allocator: RemoteBoxAllocator<'a>,
     phantom: PhantomData<fn(T) -> R>,
 }
 
-impl<'a, T, R> RemoteProcedure<'a, T, R> {
+impl<'a, T: ?Sized, R> RemoteProcedure<'a, T, R> {
     fn new(ptr: RemoteProcedurePtr, remote_allocator: RemoteBoxAllocator<'a>) -> Self {
         Self {
             ptr,
@@ -264,13 +264,37 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
     pub const fn as_ptr(&self) -> *const c_void {
         self.ptr.as_ptr()
     }
+}
 
+impl<'a, T: ?Sized, R> RemoteProcedure<'a, T, R> {
     /// Calls the remote procedure with the given argument.
     /// As the argument is copied to the memory of the remote process, changes made in the called function will not be reflected in the local copy.
     pub fn call(&mut self, arg: &T) -> Result<R, SyringeError> {
-        self.stub
-            .get_or_try_init(|| Self::build_stub(self.ptr.as_ptr(), &mut self.remote_allocator))?;
-        let stub = self.stub.get_mut().unwrap();
+        let stub = if let Some(stub) = self.stub.get_mut() {
+            // Stub already built -> check if argument will fit in the reserved parameter memory and if not, rebuild the stub
+            if mem::size_of_val(arg) <= stub.parameter.memory().len() {
+                stub
+            } else {
+                self.stub
+                    .set(Self::build_stub(
+                        self.ptr.as_ptr(),
+                        &mut self.remote_allocator,
+                        arg,
+                    )?)
+                    .unwrap_or_else(|_| unreachable!());
+                self.stub.get_mut().unwrap()
+            }
+        } else {
+            // Stub not built -> build it
+            self.stub
+                .set(Self::build_stub(
+                    self.ptr.as_ptr(),
+                    &mut self.remote_allocator,
+                    arg,
+                )?)
+                .unwrap_or_else(|_| unreachable!());
+            self.stub.get_mut().unwrap()
+        };
 
         stub.call(arg)
     }
@@ -278,14 +302,15 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
     fn build_stub(
         procedure: *const c_void,
         remote_allocator: &mut RemoteBoxAllocator<'a>,
+        arg: &T,
     ) -> Result<RemoteProcedureStub<'a, T, R>, SyringeError> {
-        let parameter = remote_allocator.alloc_uninit::<T>()?;
+        let parameter = remote_allocator.alloc_uninit_for(arg)?;
         let mut result = remote_allocator.alloc_uninit::<R>()?;
 
         let code = if remote_allocator.process().is_x86()? {
-            Syringe::build_call_procedure_x86(procedure, result.as_mut_ptr().cast()).unwrap()
+            Syringe::build_call_procedure_x86(procedure, result.as_raw_ptr().cast()).unwrap()
         } else {
-            Syringe::build_call_procedure_x64(procedure, result.as_mut_ptr().cast()).unwrap()
+            Syringe::build_call_procedure_x64(procedure, result.as_raw_ptr().cast()).unwrap()
         };
         let code = remote_allocator.alloc_and_copy(code.as_slice())?;
         code.memory().flush_instruction_cache()?;
@@ -306,18 +331,18 @@ pub(crate) struct GetProcAddressParams {
 }
 
 #[derive(Debug)]
-pub(crate) struct RemoteProcedureStub<'a, T, R> {
+pub(crate) struct RemoteProcedureStub<'a, T: ?Sized, R> {
     pub code: RemoteBox<'a, [u8]>,
     pub parameter: RemoteBox<'a, T>,
     pub result: RemoteBox<'a, R>,
 }
 
-impl<'a, T, R> RemoteProcedureStub<'a, T, R> {
+impl<'a, T: ?Sized, R> RemoteProcedureStub<'a, T, R> {
     pub fn call(&mut self, arg: &T) -> Result<R, SyringeError> {
         self.parameter.write(arg)?;
         let exit_code = self.code.memory().process().run_remote_thread(
-            unsafe { mem::transmute(self.code.as_ptr()) },
-            self.parameter.as_mut_ptr().cast(),
+            unsafe { mem::transmute(self.code.as_raw_ptr()) },
+            self.parameter.as_raw_ptr().cast(),
         )?;
         Syringe::remote_exit_code_to_exception(exit_code)?;
 

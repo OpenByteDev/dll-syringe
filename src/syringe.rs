@@ -333,14 +333,14 @@ impl<'a> LoadLibraryWStub<'a> {
         let code = if remote_allocator.process().is_x86()? {
             Self::build_code_x86(
                 inject_data.get_load_library_fn_ptr() as *const _,
-                result.as_mut_ptr().cast(),
+                result.as_raw_ptr().cast(),
                 inject_data.get_get_last_error() as *const _,
             )
             .unwrap()
         } else {
             Self::build_code_x64(
                 inject_data.get_load_library_fn_ptr() as *const _,
-                result.as_mut_ptr().cast(),
+                result.as_raw_ptr().cast(),
                 inject_data.get_get_last_error() as *const _,
             )
             .unwrap()
@@ -353,7 +353,7 @@ impl<'a> LoadLibraryWStub<'a> {
     fn call(&mut self, remote_wide_module_path: *mut u16) -> Result<ModuleHandle, SyringeError> {
         // creating a thread that will call LoadLibraryW with a pointer to payload_path as argument
         let exit_code = self.process().run_remote_thread(
-            unsafe { mem::transmute(self.code.as_ptr()) },
+            unsafe { mem::transmute(self.code.as_raw_ptr()) },
             remote_wide_module_path.cast(),
         )?;
 

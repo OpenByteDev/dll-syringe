@@ -1,4 +1,4 @@
-use std::{collections::LinkedList, mem};
+use std::{collections::LinkedList, mem, ptr::NonNull};
 
 use get_last_error::Win32Error;
 
@@ -212,11 +212,10 @@ pub struct Allocation {
 }
 
 impl Allocation {
-    pub const fn as_ptr(&self) -> *const u8 {
-        self.base as *const u8
+    pub const fn as_ptr(&self) -> NonNull<u8> {
+        unsafe { NonNull::new_unchecked(self.as_raw_ptr()) }
     }
-
-    pub const fn as_mut_ptr(&self) -> *mut u8 {
+    pub const fn as_raw_ptr(&self) -> *mut u8 {
         self.base as *mut u8
     }
 }
@@ -246,7 +245,7 @@ mod tests {
         let alloc = allocator.alloc(data.len()).unwrap();
         assert!(alloc.len >= data.len());
         let alloc_mem =
-            unsafe { ProcessMemorySlice::from_raw_parts(alloc.as_mut_ptr(), alloc.len, process) };
+            unsafe { ProcessMemorySlice::from_raw_parts(alloc.as_raw_ptr(), alloc.len, process) };
         alloc_mem.write(0, &data).unwrap();
 
         assert_eq!(allocator.count_allocated_bytes(), alloc.len);
@@ -265,7 +264,7 @@ mod tests {
             let alloc = allocator.alloc(i).unwrap();
             assert!(alloc.len >= i);
             let alloc_mem = unsafe {
-                ProcessMemorySlice::from_raw_parts(alloc.as_mut_ptr(), alloc.len, process)
+                ProcessMemorySlice::from_raw_parts(alloc.as_raw_ptr(), alloc.len, process)
             };
             alloc_mem.write(0, &data[0..i]).unwrap();
 
@@ -349,15 +348,18 @@ mod tests {
         let mut allocator = FixedBufferAllocator::new(memory);
 
         let a = allocator.alloc(mem::size_of::<u8>()).unwrap();
-        assert_eq!(a.as_ptr() as usize % mem::align_of::<u8>(), 0);
+        assert_eq!(a.as_raw_ptr() as usize % mem::align_of::<u8>(), 0);
         let b = allocator.alloc(mem::size_of::<u16>()).unwrap();
-        assert_eq!(b.as_ptr() as usize % mem::align_of::<u16>(), 0);
+        assert_eq!(b.as_raw_ptr() as usize % mem::align_of::<u16>(), 0);
         let c = allocator.alloc(mem::size_of::<u32>()).unwrap();
-        assert_eq!(c.as_ptr() as usize % mem::align_of::<u32>(), 0);
+        assert_eq!(c.as_raw_ptr() as usize % mem::align_of::<u32>(), 0);
         let d = allocator.alloc(mem::size_of::<u64>()).unwrap();
-        assert_eq!(d.as_ptr() as usize % mem::align_of::<u64>(), 0);
+        assert_eq!(d.as_raw_ptr() as usize % mem::align_of::<u64>(), 0);
         let e = allocator.alloc(mem::size_of::<AlignTestStruct>()).unwrap();
-        assert_eq!(e.as_ptr() as usize % mem::align_of::<AlignTestStruct>(), 0);
+        assert_eq!(
+            e.as_raw_ptr() as usize % mem::align_of::<AlignTestStruct>(),
+            0
+        );
     }
 
     #[test]
