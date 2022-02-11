@@ -145,7 +145,6 @@ fn inject_with_crashed_process_fails_with_io(
     let result = syringe.inject(payload_path);
     assert!(result.is_err());
     let err = result.unwrap_err();
-    dbg!(&err);
     assert!(matches!(err, SyringeError::ProcessInaccessible));
 
     Ok(())
