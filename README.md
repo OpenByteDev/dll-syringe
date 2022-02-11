@@ -71,7 +71,7 @@ syringe.eject(injected_payload).unwrap();
 
 Note that currently only functions with a signature of `extern "system" fn(args: *mut A, result: *mut B) -> ()` are supported. When the payload and the procedure are compiled for a different target architecture the passed types have to have the same size.
 
-The definition of the exported function above can be simplified using [`dll-syringe-payload-utils`](https://docs.rs/dll-syringe-payload-utils):
+The definition of the exported function above can be simplified using [`dll-syringe-payload-utils`](https://github.com/OpenByteDev/dll-syringe-payload-utils):
 ```rust
 dll_syringe_payload_utils::remote_procedure! {
     fn add(a: f64, b: f64) -> f64 {
