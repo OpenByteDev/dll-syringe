@@ -101,23 +101,3 @@ syringe_test! {
         assert_eq!(count_zeros_result, buffer.len() as u32 / 2);
     }
 }
-
-syringe_test! {
-    fn call_procedure_with_unsized_arg(
-        process: Process,
-        payload_path: &Path,
-    ) {
-        let mut syringe = Syringe::for_process(&process);
-        let module = syringe.inject(payload_path).unwrap();
-
-        let mut remote_count_zeros = syringe
-            .get_procedure::<[u8], u32>(module, "count_zeros_unsized").unwrap()
-            .unwrap();
-        let mut buffer = [0u8; 42];
-        for i in 0..buffer.len() {
-            buffer[i] = if i % 2 == 0 { 0u8 } else { 1u8 };
-        }
-        let count_zeros_result = remote_count_zeros.call(&buffer[..]).unwrap();
-        assert_eq!(count_zeros_result, buffer.len() as u32 / 2);
-    }
-}

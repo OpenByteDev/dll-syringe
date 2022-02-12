@@ -282,6 +282,50 @@ impl<'a, T: ?Sized, R> RemoteProcedure<'a, T, R> {
     }
 }
 
+impl<'a, T, R> RemoteProcedure<'a, T, R> {
+    /// Calls the remote procedure with the given argument.
+    /// As the argument is copied to the memory of the remote process, changes made in the called function will not be reflected in the local copy.
+    pub fn call(&mut self, arg: &T) -> Result<R, SyringeError> {
+        let stub = if let Some(stub) = self.stub.get_mut() {
+            stub
+        } else {
+            self.stub
+                .set(Self::build_stub(
+                    self.ptr.as_ptr(),
+                    &mut self.remote_allocator
+                )?)
+                .unwrap_or_else(|_| unreachable!());
+            self.stub.get_mut().unwrap()
+        };
+
+        stub.call(arg)
+    }
+
+    fn build_stub(
+        procedure: *const c_void,
+        remote_allocator: &mut RemoteBoxAllocator<'a>,
+    ) -> Result<RemoteProcedureStub<'a, T, R>, SyringeError> {
+        let parameter = remote_allocator.alloc_uninit::<T>()?;
+        let mut result = remote_allocator.alloc_uninit::<R>()?;
+
+        let code = if remote_allocator.process().is_x86()? {
+            Syringe::build_call_procedure_x86(procedure, result.as_raw_ptr().cast()).unwrap()
+        } else {
+            Syringe::build_call_procedure_x64(procedure, result.as_raw_ptr().cast()).unwrap()
+        };
+        let code = remote_allocator.alloc_and_copy(code.as_slice())?;
+        code.memory().flush_instruction_cache()?;
+
+        Ok(RemoteProcedureStub {
+            code,
+            parameter,
+            result,
+        })
+    }
+}
+
+/*
+TODO: finish the payload part of this code.
 impl<'a, T: ?Sized, R> RemoteProcedure<'a, T, R> {
     /// Calls the remote procedure with the given argument.
     /// As the argument is copied to the memory of the remote process, changes made in the called function will not be reflected in the local copy.
@@ -338,6 +382,7 @@ impl<'a, T: ?Sized, R> RemoteProcedure<'a, T, R> {
         })
     }
 }
+*/
 
 #[derive(Debug)]
 #[repr(C)]
