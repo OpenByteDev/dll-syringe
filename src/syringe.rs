@@ -107,7 +107,12 @@ impl<'a> Syringe<'a> {
         }
     }
 
-    /// Inject the module at the given path into the target process.
+    /// Gets the process associated with this syringe.
+    pub fn process(&self) -> ProcessRef<'a> {
+        self.process
+    }
+
+    /// Injects the module at the given path into the target process.
     ///
     /// # Limitations
     /// - The target process and the given module need to be of the same bitness.
@@ -117,6 +122,10 @@ impl<'a> Syringe<'a> {
         &mut self,
         payload_path: impl AsRef<Path>,
     ) -> Result<ProcessModule<'a>, SyringeError> {
+        debug_assert!(
+            self.process.find_module_by_path(payload_path.as_ref())?.is_none(),
+        );
+
         self.load_library_w_stub.get_or_try_init(|| {
             let inject_data = self
                 .inject_help_data
@@ -143,6 +152,23 @@ impl<'a> Syringe<'a> {
         );
 
         Ok(injected_module)
+    }
+
+    /// Injects the module at the given path into the target process if it is not already loaded.
+    ///
+    /// # Limitations
+    /// - The target process and the given module need to be of the same bitness.
+    /// - If the current process is `x64` the target process can be either `x64` (always available) or `x86` (with the `into_x86_from_x64` feature enabled).
+    /// - If the current process is `x86` the target process can only be `x86`.
+    pub fn get_or_inject(
+        &mut self,
+        payload_path: impl AsRef<Path>,
+    ) -> Result<ProcessModule<'a>, SyringeError> {
+        match self.process.find_module_by_path(payload_path.as_ref()) {
+            Ok(Some(module)) => Ok(module),
+            Ok(None) => self.inject(payload_path),
+            Err(err) => Err(err.into()),
+        }
     }
 
     /// Ejects a previously injected module from its target process.
