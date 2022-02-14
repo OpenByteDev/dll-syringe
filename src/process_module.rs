@@ -1,6 +1,7 @@
 use std::{
     convert::TryInto,
     ffi::{CStr, CString, OsString},
+    io,
     path::{Path, PathBuf},
     ptr::NonNull,
 };
@@ -10,7 +11,6 @@ use crate::{
     utils::WinPathBuf,
     ProcessRef,
 };
-use get_last_error::Win32Error;
 use path_absolutize::Absolutize;
 use widestring::{U16CStr, U16CString};
 use winapi::{
@@ -119,8 +119,8 @@ impl<'a> ProcessModule<'a> {
     ) -> Result<Option<Self>, IoOrNulError> {
         let handle = unsafe { GetModuleHandleW(module.as_ptr()) };
         if handle.is_null() {
-            let err = Win32Error::get_last_error();
-            if err.code() == ERROR_MOD_NOT_FOUND {
+            let err = io::Error::last_os_error();
+            if err.raw_os_error().unwrap() == ERROR_MOD_NOT_FOUND as _ {
                 return Ok(None);
             }
 
@@ -178,14 +178,14 @@ impl<'a> ProcessModule<'a> {
     }
 
     /// Gets the path that the module was loaded from.
-    pub fn path(&self) -> Result<PathBuf, Win32Error> {
+    pub fn path(&self) -> Result<PathBuf, io::Error> {
         if self.is_local() {
             self._get_path_of_local()
         } else {
             self._get_path_of_remote()
         }
     }
-    fn _get_path_of_local(&self) -> Result<PathBuf, Win32Error> {
+    fn _get_path_of_local(&self) -> Result<PathBuf, io::Error> {
         assert!(self.is_local());
 
         let mut module_path_buf = WinPathBuf::new();
@@ -198,14 +198,14 @@ impl<'a> ProcessModule<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
 
         let module_path_len = result as usize;
         let module_path = unsafe { module_path_buf.assume_init_path_buf(module_path_len) };
         Ok(module_path)
     }
-    fn _get_path_of_remote(&self) -> Result<PathBuf, Win32Error> {
+    fn _get_path_of_remote(&self) -> Result<PathBuf, io::Error> {
         assert!(self.is_remote());
 
         let mut module_path_buf = WinPathBuf::new();
@@ -219,7 +219,7 @@ impl<'a> ProcessModule<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
 
         let module_path_len = result as usize;
@@ -228,20 +228,20 @@ impl<'a> ProcessModule<'a> {
     }
 
     /// Gets the base name (= file name) of the module.
-    pub fn base_name(&self) -> Result<OsString, Win32Error> {
+    pub fn base_name(&self) -> Result<OsString, io::Error> {
         if self.is_local() {
             self._get_base_name_of_local()
         } else {
             self._get_base_name_of_remote()
         }
     }
-    fn _get_base_name_of_local(&self) -> Result<OsString, Win32Error> {
+    fn _get_base_name_of_local(&self) -> Result<OsString, io::Error> {
         assert!(self.is_local());
 
         self._get_path_of_local()
             .map(|path| path.file_name().unwrap().to_owned())
     }
-    fn _get_base_name_of_remote(&self) -> Result<OsString, Win32Error> {
+    fn _get_base_name_of_remote(&self) -> Result<OsString, io::Error> {
         assert!(self.is_remote());
 
         let mut module_name_buf = WinPathBuf::new();
@@ -255,7 +255,7 @@ impl<'a> ProcessModule<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
 
         let module_name_len = result as usize;
@@ -282,12 +282,12 @@ impl<'a> ProcessModule<'a> {
     pub(crate) fn __get_local_procedure(
         &self,
         proc_name: &CStr,
-    ) -> Result<*const __some_function, Win32Error> {
+    ) -> Result<*const __some_function, io::Error> {
         assert!(self.is_local());
 
         let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ptr()) };
         if fn_ptr.is_null() {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
         Ok(fn_ptr)
     }

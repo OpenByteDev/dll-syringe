@@ -4,6 +4,7 @@ use std::{
     convert::TryInto,
     ffi::c_void,
     hash::{Hash, Hasher},
+    io,
     mem::{self, MaybeUninit},
     num::NonZeroU32,
     os::windows::{
@@ -15,7 +16,6 @@ use std::{
     time::Duration,
 };
 
-use get_last_error::Win32Error;
 use winapi::{
     shared::{
         minwindef::{FALSE, HMODULE},
@@ -156,7 +156,7 @@ impl<'a> ProcessRef<'a> {
     }
 
     /// Promotes the given instance to an owning [`Process`] instance.
-    pub fn promote_to_owned(borrowed: &Self) -> Result<Process, Win32Error> {
+    pub fn promote_to_owned(borrowed: &Self) -> Result<Process, io::Error> {
         let raw_handle = borrowed.as_raw_handle();
         let process = unsafe { GetCurrentProcess() };
         let mut new_handle = MaybeUninit::uninit();
@@ -172,15 +172,15 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
         Ok(unsafe { Process::from_raw_handle(new_handle.assume_init()) })
     }
 
     /// Returns the id of this process.
-    pub fn pid(&self) -> Result<NonZeroU32, Win32Error> {
+    pub fn pid(&self) -> Result<NonZeroU32, io::Error> {
         let result = unsafe { GetProcessId(self.handle()) };
-        NonZeroU32::new(result).ok_or_else(Win32Error::get_last_error)
+        NonZeroU32::new(result).ok_or_else(io::Error::last_os_error)
     }
 
     /// Returns the handles of all the modules currently loaded in this process.
@@ -188,7 +188,7 @@ impl<'a> ProcessRef<'a> {
     /// # Note
     /// If the process is currently starting up and has not loaded all its modules the returned list may be incomplete.
     /// This can be worked around by repeatedly calling this method.
-    pub fn module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, Win32Error> {
+    pub fn module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, io::Error> {
         let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
         let mut module_buf_byte_size = mem::size_of::<HMODULE>() * module_buf.len();
         let mut bytes_needed_target = MaybeUninit::uninit();
@@ -202,7 +202,7 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
 
         let mut bytes_needed = unsafe { bytes_needed_target.assume_init() } as usize;
@@ -236,7 +236,7 @@ impl<'a> ProcessRef<'a> {
                     )
                 };
                 if result == 0 {
-                    return Err(Win32Error::get_last_error());
+                    return Err(io::Error::last_os_error());
                 }
                 bytes_needed = unsafe { bytes_needed_target.assume_init() } as usize;
 
@@ -265,7 +265,7 @@ impl<'a> ProcessRef<'a> {
     pub fn find_module_by_name(
         &self,
         module_name: impl AsRef<Path>,
-    ) -> Result<Option<ProcessModule<'a>>, Win32Error> {
+    ) -> Result<Option<ProcessModule<'a>>, io::Error> {
         let target_module_name = module_name.as_ref();
 
         // add default file extension if missing
@@ -299,7 +299,7 @@ impl<'a> ProcessRef<'a> {
     pub fn find_module_by_path(
         &self,
         module_path: impl AsRef<Path>,
-    ) -> Result<Option<ProcessModule<'a>>, Win32Error> {
+    ) -> Result<Option<ProcessModule<'a>>, io::Error> {
         let target_module_path = module_path.as_ref();
 
         // add default file extension if missing
@@ -330,7 +330,7 @@ impl<'a> ProcessRef<'a> {
         &self,
         module_name: impl AsRef<Path>,
         timeout: Duration,
-    ) -> Result<Option<ProcessModule<'a>>, Win32Error> {
+    ) -> Result<Option<ProcessModule<'a>>, io::Error> {
         retry_with_filter(
             || self.find_module_by_name(module_name.as_ref()),
             Option::is_some,
@@ -345,7 +345,7 @@ impl<'a> ProcessRef<'a> {
         &self,
         module_path: impl AsRef<Path>,
         timeout: Duration,
-    ) -> Result<Option<ProcessModule<'a>>, Win32Error> {
+    ) -> Result<Option<ProcessModule<'a>>, io::Error> {
         retry_with_filter(
             || self.find_module_by_path(module_path.as_ref()),
             Option::is_some,
@@ -358,47 +358,47 @@ impl<'a> ProcessRef<'a> {
     ///
     /// # Note
     /// This method returns `false` for a 32-bit process running under 32-bit Windows or 64-bit Windows 10 on ARM.
-    pub fn is_wow64(&self) -> Result<bool, Win32Error> {
+    pub fn is_wow64(&self) -> Result<bool, io::Error> {
         let mut is_wow64 = MaybeUninit::uninit();
         let result = unsafe { IsWow64Process(self.handle(), is_wow64.as_mut_ptr()) };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
         Ok(unsafe { is_wow64.assume_init() } != FALSE)
     }
 
     /// Returns whether this process is a 64-bit process.
-    pub fn is_x64(&self) -> Result<bool, Win32Error> {
+    pub fn is_x64(&self) -> Result<bool, io::Error> {
         Ok(Self::is_x64_windows()? && !self.is_wow64()?)
     }
 
     /// Returns whether this process is a 32-bit process.
-    pub fn is_x86(&self) -> Result<bool, Win32Error> {
+    pub fn is_x86(&self) -> Result<bool, io::Error> {
         Ok(Self::is_x32_windows()? || Self::is_x64_windows()? && self.is_wow64()?)
     }
 
-    fn is_x32_windows() -> Result<bool, Win32Error> {
+    fn is_x32_windows() -> Result<bool, io::Error> {
         // TODO: cache?
         // TODO: use GetNativeSystemInfo() instead?
         let result = unsafe { GetSystemWow64DirectoryA(ptr::null_mut(), 0) };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
-        Ok(Win32Error::get_last_error().code() == ERROR_CALL_NOT_IMPLEMENTED)
+        Ok(io::Error::last_os_error().raw_os_error().unwrap() == ERROR_CALL_NOT_IMPLEMENTED as i32)
     }
-    fn is_x64_windows() -> Result<bool, Win32Error> {
+    fn is_x64_windows() -> Result<bool, io::Error> {
         Self::is_x32_windows().map(|r| !r)
     }
 
     /// Gets the executable path of this process.
-    pub fn path(&self) -> Result<PathBuf, Win32Error> {
+    pub fn path(&self) -> Result<PathBuf, io::Error> {
         if self.is_current() {
             self._get_path_of_current()
         } else {
             self._get_path_of_remote()
         }
     }
-    fn _get_path_of_current(&self) -> Result<PathBuf, Win32Error> {
+    fn _get_path_of_current(&self) -> Result<PathBuf, io::Error> {
         assert!(self.is_current());
 
         let mut module_path_buf = WinPathBuf::new();
@@ -411,14 +411,14 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error().into());
         }
 
         let module_path_len = result as usize;
         let module_path = unsafe { module_path_buf.assume_init_path_buf(module_path_len) };
         Ok(module_path)
     }
-    fn _get_path_of_remote(&self) -> Result<PathBuf, Win32Error> {
+    fn _get_path_of_remote(&self) -> Result<PathBuf, io::Error> {
         assert!(!self.is_current());
 
         let mut module_path_buf = WinPathBuf::new();
@@ -432,7 +432,7 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error().into());
         }
 
         let module_path_len = result as usize;
@@ -441,15 +441,15 @@ impl<'a> ProcessRef<'a> {
     }
 
     /// Terminates this process with exit code 1.
-    pub fn kill(self) -> Result<(), Win32Error> {
+    pub fn kill(self) -> Result<(), io::Error> {
         self.kill_with_exit_code(1)
     }
 
     /// Terminates this process with the given exit code.
-    pub fn kill_with_exit_code(self, exit_code: u32) -> Result<(), Win32Error> {
+    pub fn kill_with_exit_code(self, exit_code: u32) -> Result<(), io::Error> {
         let result = unsafe { TerminateProcess(self.handle(), exit_code) };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error().into());
         }
         Ok(())
     }
@@ -459,19 +459,19 @@ impl<'a> ProcessRef<'a> {
         &self,
         remote_fn: extern "system" fn(*mut c_void) -> u32,
         parameter: *mut c_void,
-    ) -> Result<u32, Win32Error> {
+    ) -> Result<u32, io::Error> {
         let thread_handle = self.start_remote_thread(remote_fn, parameter)?;
 
         let reason = unsafe { WaitForSingleObject(thread_handle.as_raw_handle(), INFINITE) };
         if reason == WAIT_FAILED {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error().into());
         }
 
         let mut exit_code = MaybeUninit::uninit();
         let result =
             unsafe { GetExitCodeThread(thread_handle.as_raw_handle(), exit_code.as_mut_ptr()) };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error().into());
         }
         assert_ne!(
             result as u32, STILL_ACTIVE,
@@ -487,7 +487,7 @@ impl<'a> ProcessRef<'a> {
         &self,
         remote_fn: extern "system" fn(*mut c_void) -> u32,
         parameter: *mut c_void,
-    ) -> Result<OwnedHandle, Win32Error> {
+    ) -> Result<OwnedHandle, io::Error> {
         // create a remote thread that will call LoadLibraryW with payload_path as its argument.
         let thread_handle = unsafe {
             CreateRemoteThread(
@@ -501,7 +501,7 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if thread_handle.is_null() {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error().into());
         }
 
         Ok(unsafe { OwnedHandle::from_raw_handle(thread_handle) })

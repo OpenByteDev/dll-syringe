@@ -33,12 +33,6 @@ pub enum IoOrNulError {
     Io(#[from] io::Error),
 }
 
-impl From<get_last_error::Win32Error> for IoOrNulError {
-    fn from(err: get_last_error::Win32Error) -> Self {
-        Self::Io(err.into())
-    }
-}
-
 /// Error enum for errors during a call to [`ProcessModule::get_local_procedure`].
 ///
 /// [`ProcessModule::get_local_procedure`]: crate::ProcessModule::get_local_procedure
@@ -53,12 +47,6 @@ pub enum GetLocalProcedureError {
     /// Variant representing an unsupported target process.
     #[error("unsupported remote target process")]
     UnsupportedRemoteTarget,
-}
-
-impl From<get_last_error::Win32Error> for GetLocalProcedureError {
-    fn from(err: get_last_error::Win32Error) -> Self {
-        Self::Io(err.into())
-    }
 }
 
 // TODO: add more specialized error variants
@@ -88,12 +76,6 @@ pub enum SyringeError {
     #[cfg(feature = "into_x86_from_x64")]
     #[error("failed to load pe file: {}", _0)]
     Goblin(#[from] goblin::error::Error),
-}
-
-impl From<get_last_error::Win32Error> for SyringeError {
-    fn from(err: get_last_error::Win32Error) -> Self {
-        io::Error::from(err).into()
-    }
 }
 
 impl From<io::Error> for SyringeError {

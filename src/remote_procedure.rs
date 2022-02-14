@@ -292,7 +292,7 @@ impl<'a, T, R> RemoteProcedure<'a, T, R> {
             self.stub
                 .set(Self::build_stub(
                     self.ptr.as_ptr(),
-                    &mut self.remote_allocator
+                    &mut self.remote_allocator,
                 )?)
                 .unwrap_or_else(|_| unreachable!());
             self.stub.get_mut().unwrap()

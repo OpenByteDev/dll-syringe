@@ -1,5 +1,6 @@
 use std::{
     hash::{Hash, Hasher},
+    io,
     ops::{Deref, DerefMut},
     os::windows::{
         prelude::{
@@ -11,7 +12,6 @@ use std::{
     process::Child,
 };
 
-use get_last_error::Win32Error;
 use sysinfo::{PidExt, ProcessExt, SystemExt};
 use winapi::{
     shared::minwindef::{DWORD, FALSE},
@@ -131,7 +131,7 @@ impl AsMut<ProcessRef<'static>> for Process {
 // Creation and Destruction
 impl Process {
     /// Creates a new instance from the given pid.
-    pub fn from_pid(pid: u32) -> Result<Self, Win32Error> {
+    pub fn from_pid(pid: u32) -> Result<Self, io::Error> {
         let handle = unsafe {
             OpenProcess(
                 // access required for performing dll injection
@@ -142,7 +142,7 @@ impl Process {
         };
 
         if handle.is_null() {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
 
         Ok(unsafe { Self::from_raw_handle(handle) })
@@ -207,7 +207,7 @@ impl Process {
     }
 
     /// Creates a new owning [`Process`] instance for this process by duplicating the underlying handle.
-    pub fn try_clone(&self) -> Result<Self, Win32Error> {
+    pub fn try_clone(&self) -> Result<Self, io::Error> {
         ProcessRef::promote_to_owned(&self.get_ref())
     }
 
@@ -222,15 +222,15 @@ impl Process {
     }
 
     /// Terminates this process with exit code 1.
-    pub fn kill(self) -> Result<(), Win32Error> {
+    pub fn kill(self) -> Result<(), io::Error> {
         self.kill_with_exit_code(1)
     }
 
     /// Terminates this process with the given exit code.
-    pub fn kill_with_exit_code(self, exit_code: u32) -> Result<(), Win32Error> {
+    pub fn kill_with_exit_code(self, exit_code: u32) -> Result<(), io::Error> {
         let result = unsafe { TerminateProcess(self.handle(), exit_code) };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
         Ok(())
     }

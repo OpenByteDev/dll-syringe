@@ -1,6 +1,4 @@
-use std::{cell::RefCell, marker::PhantomData, mem, ptr::NonNull, rc::Rc};
-
-use get_last_error::Win32Error;
+use std::{cell::RefCell, io, marker::PhantomData, mem, ptr::NonNull, rc::Rc};
 
 use crate::{
     process_memory::{Allocation, DynamicMultiBufferAllocator, ProcessMemorySlice, RawAllocator},
@@ -24,20 +22,20 @@ impl<'a> RemoteBoxAllocator<'a> {
     pub unsafe fn alloc_raw<T: ?Sized>(
         &mut self,
         size: usize,
-    ) -> Result<RemoteBox<'a, T>, Win32Error> {
+    ) -> Result<RemoteBox<'a, T>, io::Error> {
         let allocation = self.0.borrow_mut().alloc(size)?;
         Ok(RemoteBox::new(self.0.clone(), allocation))
     }
-    pub fn alloc_uninit<T: Sized>(&mut self) -> Result<RemoteBox<'a, T>, Win32Error> {
+    pub fn alloc_uninit<T: Sized>(&mut self) -> Result<RemoteBox<'a, T>, io::Error> {
         unsafe { self.alloc_raw(mem::size_of::<T>()) }
     }
     pub fn alloc_uninit_for<T: ?Sized>(
         &mut self,
         value: &T,
-    ) -> Result<RemoteBox<'a, T>, Win32Error> {
+    ) -> Result<RemoteBox<'a, T>, io::Error> {
         unsafe { self.alloc_raw(mem::size_of_val(value)) }
     }
-    pub fn alloc_and_copy<T: ?Sized>(&mut self, value: &T) -> Result<RemoteBox<'a, T>, Win32Error> {
+    pub fn alloc_and_copy<T: ?Sized>(&mut self, value: &T) -> Result<RemoteBox<'a, T>, io::Error> {
         let b = self.alloc_uninit_for(value)?;
         b.write(value)?;
         Ok(b)
@@ -82,7 +80,7 @@ impl<'a, T: ?Sized> RemoteBox<'a, T> {
         }
     }
 
-    pub fn write(&self, value: &T) -> Result<(), Win32Error> {
+    pub fn write(&self, value: &T) -> Result<(), io::Error> {
         self.memory().write_struct(0, value)
     }
 
@@ -92,7 +90,7 @@ impl<'a, T: ?Sized> RemoteBox<'a, T> {
 }
 
 impl<'a, T: Sized> RemoteBox<'a, T> {
-    pub fn read(&self) -> Result<T, Win32Error> {
+    pub fn read(&self) -> Result<T, io::Error> {
         unsafe { self.memory().read_struct::<T>(0) }
     }
 

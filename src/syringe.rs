@@ -1,5 +1,4 @@
 use cstr::cstr;
-use get_last_error::Win32Error;
 use iced_x86::{code_asm::*, IcedError};
 use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
@@ -223,7 +222,9 @@ impl<'a> Syringe<'a> {
 
         match ExceptionCode::try_from_primitive(exit_code) {
             Ok(exception) => Err(SyringeError::RemoteException(exception)),
-            Err(_) => Err(SyringeError::RemoteIo(Win32Error::new(exit_code).into())),
+            Err(_) => Err(SyringeError::RemoteIo(
+                io::Error::from_raw_os_error(exit_code as _).into(),
+            )),
         }
     }
 
@@ -309,12 +310,12 @@ impl<'a> Syringe<'a> {
     }
 
     #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
-    fn wow64_dir() -> Result<PathBuf, Win32Error> {
+    fn wow64_dir() -> Result<PathBuf, io::Error> {
         let mut path_buf = MaybeUninit::uninit_array::<MAX_PATH>();
         let path_buf_len: u32 = path_buf.len().try_into().unwrap();
         let result = unsafe { GetSystemWow64DirectoryW(path_buf[0].as_mut_ptr(), path_buf_len) };
         if result == 0 {
-            return Err(Win32Error::get_last_error());
+            return Err(io::Error::last_os_error());
         }
 
         let path_len = result as usize;

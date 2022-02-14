@@ -1,6 +1,4 @@
-use std::{collections::LinkedList, mem, ptr::NonNull};
-
-use get_last_error::Win32Error;
+use std::{collections::LinkedList, io, mem, ptr::NonNull};
 
 use crate::{process_memory::ProcessMemoryBuffer, ProcessRef};
 
@@ -30,7 +28,7 @@ impl<'a> DynamicMultiBufferAllocator<'a> {
         self.process
     }
 
-    fn alloc_page(&mut self, min_size: usize) -> Result<&mut FixedBufferAllocator<'a>, Win32Error> {
+    fn alloc_page(&mut self, min_size: usize) -> Result<&mut FixedBufferAllocator<'a>, io::Error> {
         let os_page_size = ProcessMemoryBuffer::os_page_size();
         let page_size = (min_size / os_page_size + 1) * os_page_size;
         let mem = ProcessMemoryBuffer::allocate(self.process, page_size)?;
@@ -49,14 +47,14 @@ impl<'a> DynamicMultiBufferAllocator<'a> {
 }
 
 impl RawAllocator for DynamicMultiBufferAllocator<'_> {
-    type Error = Win32Error;
+    type Error = io::Error;
     type Alloc = Allocation;
 
     fn alloc(&mut self, size: usize) -> Result<Self::Alloc, Self::Error> {
         for page in &mut self.pages {
             match page.alloc(size) {
                 Ok(allocation) => return Ok(allocation),
-                Err(AllocError::Win32(e)) => return Err(e),
+                Err(AllocError::Io(e)) => return Err(e),
                 Err(AllocError::OutOfMemory) => continue,
             }
         }
@@ -64,7 +62,7 @@ impl RawAllocator for DynamicMultiBufferAllocator<'_> {
         let page = self.alloc_page(size)?;
         match page.alloc(size) {
             Ok(allocation) => Ok(allocation),
-            Err(AllocError::Win32(e)) => Err(e),
+            Err(AllocError::Io(e)) => Err(e),
             Err(AllocError::OutOfMemory) => unreachable!(),
         }
     }
@@ -224,8 +222,8 @@ impl Allocation {
 pub enum AllocError {
     #[error("out of memory")]
     OutOfMemory,
-    #[error("windows api error: {}", _0)]
-    Win32(#[from] Win32Error),
+    #[error("io error: {}", _0)]
+    Io(#[from] io::Error),
 }
 
 #[cfg(test)]
