@@ -21,7 +21,7 @@ process_test! {
 }
 
 syringe_test! {
-    fn get_procedure_address_of_injected_fn(
+    fn get_procedure_address_of_dll_main(
         process: Process,
         payload_path: &Path,
     ) {
