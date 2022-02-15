@@ -54,3 +54,14 @@ process_test! {
         assert_eq!("test_target.exe", name);
     }
 }
+
+process_test! {
+    fn kill_guard(
+        process: Process
+    ) {
+        let guard = process.try_clone().unwrap().kill_on_drop();
+        assert!(guard.is_alive());
+        drop(guard);
+        assert!(!process.is_alive());
+    }
+}
