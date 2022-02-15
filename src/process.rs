@@ -41,7 +41,7 @@ pub const PROCESS_INJECTION_ACCESS: DWORD = PROCESS_CREATE_THREAD
 /// This struct owns the underlying process handle.
 ///
 /// # Note
-/// The underlying handle has to have the following [privileges](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights):
+/// The underlying handle has the following [privileges](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights):
 ///  - `PROCESS_CREATE_THREAD`
 ///  - `PROCESS_QUERY_INFORMATION`
 ///  - `PROCESS_VM_OPERATION`
@@ -211,7 +211,7 @@ impl Process {
         ProcessRef::promote_to_owned(&self.get_ref())
     }
 
-    /// Leak the underlying handle and return it as a non-owning [`ProcessRef`] instance.
+    /// Leaks the underlying handle and return it as a non-owning [`ProcessRef`] instance.
     #[allow(clippy::must_use_candidate)]
     pub fn leak(self) -> ProcessRef<'static> {
         unsafe {

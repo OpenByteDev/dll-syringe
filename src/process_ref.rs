@@ -45,7 +45,7 @@ use crate::{
 /// This struct does NOT own the underlying process handle.
 ///
 /// # Note
-/// The underlying handle has to have the following [privileges](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights):
+/// The underlying handle has the following [privileges](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights):
 ///  - `PROCESS_CREATE_THREAD`
 ///  - `PROCESS_QUERY_INFORMATION`
 ///  - `PROCESS_VM_OPERATION`
