@@ -210,6 +210,7 @@ pub struct Allocation {
 }
 
 impl Allocation {
+    #[allow(dead_code)]
     pub const fn as_ptr(&self) -> NonNull<u8> {
         unsafe { NonNull::new_unchecked(self.as_raw_ptr()) }
     }

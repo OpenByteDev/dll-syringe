@@ -94,6 +94,7 @@ impl<'a, T: Sized> RemoteBox<'a, T> {
         unsafe { self.memory().read_struct::<T>(0) }
     }
 
+    #[allow(dead_code)]
     pub fn as_ptr(&mut self) -> NonNull<T> {
         self.allocation.as_ptr().cast()
     }
