@@ -220,15 +220,15 @@ impl Process {
             ))
         }
     }
-    
+
     /// Returns a [`ProcessKillGuard`] wrapping this process that will automatically kill this process when dropped.
-    pub fn kill_on_drop(self) -> ProcessKillGuard {
+    #[must_use]
+    pub const fn kill_on_drop(self) -> ProcessKillGuard {
         ProcessKillGuard(self)
     }
 }
 
-#[derive(Debug)]
-#[derive(shrinkwraprs::Shrinkwrap)]
+#[derive(Debug, shrinkwraprs::Shrinkwrap)]
 #[shrinkwrap(mutable)]
 /// A guard wrapping a [`Process`] that will be automatically killed on drop.
 pub struct ProcessKillGuard(pub Process);

@@ -92,8 +92,8 @@ syringe_test! {
             .get_procedure::<[u8; 100], u32>(module, "count_zeros").unwrap()
             .unwrap();
         let mut buffer = [0u8; 100];
-        for i in 0..buffer.len() {
-            buffer[i] = if i % 2 == 0 { 0u8 } else { 1u8 };
+        for (i, item) in buffer.iter_mut().enumerate() {
+            *item = if i % 2 == 0 { 0u8 } else { 1u8 };
         }
         let count_zeros_result = remote_count_zeros.call(&buffer).unwrap();
         assert_eq!(count_zeros_result, buffer.len() as u32 / 2);

@@ -5,7 +5,8 @@
     maybe_uninit_array_assume_init,
     once_cell,
     io_safety,
-    linked_list_cursors
+    linked_list_cursors,
+    vec_into_raw_parts
 )]
 #![warn(
     unsafe_op_in_unsafe_fn,

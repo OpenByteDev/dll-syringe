@@ -21,7 +21,7 @@ process_test! {
     fn list_module_handles_on_crashed(
         process: Process
     ) {
-        process.clone().kill().unwrap();
+        process.kill().unwrap();
         // assert this does not hang
         let _ = process.module_handles();
     }
@@ -32,7 +32,7 @@ process_test! {
         process: Process
     ) {
         assert!(process.is_alive());
-        process.clone().kill().unwrap();
+        process.kill().unwrap();
         assert!(!process.is_alive());
     }
 }

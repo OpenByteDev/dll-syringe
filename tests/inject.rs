@@ -36,7 +36,7 @@ syringe_test! {
         payload_path: &Path,
     ) {
         let mut syringe = Syringe::for_process(&process);
-        process.clone().kill().unwrap();
+        process.kill().unwrap();
 
         let result = syringe.inject(payload_path);
         assert!(result.is_err());

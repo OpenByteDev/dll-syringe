@@ -108,7 +108,7 @@ impl<'a> Syringe<'a> {
     }
 
     /// Gets the process associated with this syringe.
-    pub fn process(&self) -> ProcessRef<'a> {
+    pub const fn process(&self) -> ProcessRef<'a> {
         self.process
     }
 
@@ -122,9 +122,10 @@ impl<'a> Syringe<'a> {
         &mut self,
         payload_path: impl AsRef<Path>,
     ) -> Result<ProcessModule<'a>, SyringeError> {
-        debug_assert!(
-            self.process.find_module_by_path(payload_path.as_ref())?.is_none(),
-        );
+        debug_assert!(self
+            .process
+            .find_module_by_path(payload_path.as_ref())?
+            .is_none(),);
 
         self.load_library_w_stub.get_or_try_init(|| {
             let inject_data = self
@@ -248,9 +249,9 @@ impl<'a> Syringe<'a> {
 
         match ExceptionCode::try_from_primitive(exit_code) {
             Ok(exception) => Err(SyringeError::RemoteException(exception)),
-            Err(_) => Err(SyringeError::RemoteIo(
-                io::Error::from_raw_os_error(exit_code as _).into(),
-            )),
+            Err(_) => Err(SyringeError::RemoteIo(io::Error::from_raw_os_error(
+                exit_code as _,
+            ))),
         }
     }
 

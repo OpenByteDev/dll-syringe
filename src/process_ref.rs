@@ -28,7 +28,7 @@ use winapi::{
             CreateRemoteThread, GetCurrentProcess, GetExitCodeProcess, GetExitCodeThread,
             GetProcessId, TerminateProcess,
         },
-        psapi::{EnumProcessModulesEx, LIST_MODULES_ALL, GetProcessImageFileNameW},
+        psapi::{EnumProcessModulesEx, GetProcessImageFileNameW, LIST_MODULES_ALL},
         synchapi::WaitForSingleObject,
         winbase::{INFINITE, WAIT_FAILED},
         winnt::DUPLICATE_SAME_ACCESS,
@@ -188,6 +188,11 @@ impl<'a> ProcessRef<'a> {
     /// If the process is currently starting up and has not loaded all its modules yet, the returned list may be incomplete.
     /// This can be worked around by repeatedly calling this method.
     pub fn module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, io::Error> {
+        unsafe fn assume_init_vec<T>(vec: Vec<MaybeUninit<T>>) -> Vec<T> {
+            let (ptr, len, capacity) = vec.into_raw_parts();
+            unsafe { Vec::from_raw_parts(ptr.cast(), len, capacity) }
+        }
+
         let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
         let mut module_buf_byte_size = mem::size_of::<HMODULE>() * module_buf.len();
         let mut bytes_needed_target = MaybeUninit::uninit();
@@ -249,11 +254,7 @@ impl<'a> ProcessRef<'a> {
 
                 if bytes_needed <= module_buf_byte_size {
                     module_buf_len = bytes_needed / mem::size_of::<HMODULE>();
-                    let module_buf_vec = unsafe {
-                        mem::transmute::<Vec<MaybeUninit<HMODULE>>, Vec<ModuleHandle>>(
-                            module_buf_vec,
-                        )
-                    };
+                    let module_buf_vec = unsafe { assume_init_vec(module_buf_vec) };
                     break ArrayOrVecSlice::from_vec(module_buf_vec, 0..module_buf_len);
                 }
             }
@@ -423,7 +424,7 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if result == 0 {
-            return Err(io::Error::last_os_error().into());
+            return Err(io::Error::last_os_error());
         }
 
         let process_path_len = result as usize;
@@ -433,7 +434,8 @@ impl<'a> ProcessRef<'a> {
 
     /// Gets the base name (= file name) of the executable of this process.
     pub fn base_name(&self) -> Result<OsString, io::Error> {
-        self.path().map(|path| path.file_name().unwrap().to_os_string())
+        self.path()
+            .map(|path| path.file_name().unwrap().to_os_string())
     }
 
     /// Terminates this process with exit code 1.
@@ -445,7 +447,7 @@ impl<'a> ProcessRef<'a> {
     pub fn kill_with_exit_code(self, exit_code: u32) -> Result<(), io::Error> {
         let result = unsafe { TerminateProcess(self.handle(), exit_code) };
         if result == 0 {
-            return Err(io::Error::last_os_error().into());
+            return Err(io::Error::last_os_error());
         }
         Ok(())
     }
@@ -460,14 +462,14 @@ impl<'a> ProcessRef<'a> {
 
         let reason = unsafe { WaitForSingleObject(thread_handle.as_raw_handle(), INFINITE) };
         if reason == WAIT_FAILED {
-            return Err(io::Error::last_os_error().into());
+            return Err(io::Error::last_os_error());
         }
 
         let mut exit_code = MaybeUninit::uninit();
         let result =
             unsafe { GetExitCodeThread(thread_handle.as_raw_handle(), exit_code.as_mut_ptr()) };
         if result == 0 {
-            return Err(io::Error::last_os_error().into());
+            return Err(io::Error::last_os_error());
         }
         assert_ne!(
             result as u32, STILL_ACTIVE,
@@ -497,7 +499,7 @@ impl<'a> ProcessRef<'a> {
             )
         };
         if thread_handle.is_null() {
-            return Err(io::Error::last_os_error().into());
+            return Err(io::Error::last_os_error());
         }
 
         Ok(unsafe { OwnedHandle::from_raw_handle(thread_handle) })
