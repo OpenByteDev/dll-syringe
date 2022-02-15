@@ -10,7 +10,7 @@ license = "MIT"
 authors = ["OpenByte <development.openbyte@gmail.com>"]
 edition = "2021"
 categories = []
-keywords = ["dll-injection", "dll", "inject", "windows"]
+keywords = ["dll-injection", "dll", "injector", "windows"]
 
 [dependencies]
 winapi = { version = "0.3", features = ["processthreadsapi", "libloaderapi", "memoryapi", "wow64apiset"], default-features = false }
