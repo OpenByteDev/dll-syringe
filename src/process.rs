@@ -16,7 +16,7 @@ use sysinfo::{PidExt, ProcessExt, SystemExt};
 use winapi::{
     shared::minwindef::{DWORD, FALSE},
     um::{
-        processthreadsapi::{OpenProcess, TerminateProcess},
+        processthreadsapi::OpenProcess,
         winnt::{
             PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION,
             PROCESS_VM_READ, PROCESS_VM_WRITE,
@@ -219,19 +219,5 @@ impl Process {
                 self.into_raw_handle(),
             ))
         }
-    }
-
-    /// Terminates this process with exit code 1.
-    pub fn kill(self) -> Result<(), io::Error> {
-        self.kill_with_exit_code(1)
-    }
-
-    /// Terminates this process with the given exit code.
-    pub fn kill_with_exit_code(self, exit_code: u32) -> Result<(), io::Error> {
-        let result = unsafe { TerminateProcess(self.handle(), exit_code) };
-        if result == 0 {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(())
     }
 }
