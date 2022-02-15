@@ -130,12 +130,7 @@ macro_rules! syringe_test {
                     .spawn().unwrap()
                     .into();
 
-                let dummy_process_clone = dummy_process.try_clone().unwrap();
-                let _guard = dispose::defer(|| {
-                    if dummy_process_clone.is_alive() {
-                        dummy_process_clone.kill().unwrap();
-                    }
-                });
+                let _guard = dummy_process.try_clone().unwrap().kill_on_drop();
 
                 test(dummy_process, payload_path.as_ref())
             }
@@ -189,12 +184,7 @@ macro_rules! process_test {
                     .unwrap()
                     .into();
 
-                let dummy_process_clone = dummy_process.try_clone().unwrap();
-                let _guard = dispose::defer(|| {
-                    if dummy_process_clone.is_alive() {
-                        dummy_process_clone.kill().unwrap();
-                    }
-                });
+                let _guard = dummy_process.try_clone().unwrap().kill_on_drop();
 
                 test(dummy_process)
             }
