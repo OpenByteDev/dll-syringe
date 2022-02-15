@@ -80,7 +80,7 @@ pub enum SyringeError {
 
 impl From<io::Error> for SyringeError {
     fn from(err: io::Error) -> Self {
-        if cfg!(target_arch = "x86_64") && err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
             || err.kind() == io::ErrorKind::PermissionDenied
         {
             Self::ProcessInaccessible

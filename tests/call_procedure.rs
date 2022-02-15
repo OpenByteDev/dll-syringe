@@ -5,10 +5,9 @@ use dll_syringe::Syringe;
 #[allow(unused)]
 mod common;
 
-syringe_test! {
+process_test! {
     fn get_procedure_address_of_win32_fn(
         process: Process,
-        _payload_path: &Path,
     ) {
         let mut syringe = Syringe::for_process(&process);
 
@@ -34,10 +33,9 @@ syringe_test! {
     }
 }
 
-syringe_test! {
+process_test! {
     fn get_procedure_address_of_invaid(
         process: Process,
-        _payload_path: &Path,
     ) {
         let mut syringe = Syringe::for_process(&process);
         let module = process.wait_for_module_by_name("kernel32.dll", std::time::Duration::from_secs(1)).unwrap().unwrap();

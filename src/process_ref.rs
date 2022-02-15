@@ -19,17 +19,16 @@ use std::{
 use winapi::{
     shared::{
         minwindef::{FALSE, HMODULE},
-        winerror::ERROR_CALL_NOT_IMPLEMENTED,
+        winerror::{ERROR_CALL_NOT_IMPLEMENTED, ERROR_PARTIAL_COPY},
     },
     um::{
         handleapi::DuplicateHandle,
-        libloaderapi::GetModuleFileNameW,
         minwinbase::STILL_ACTIVE,
         processthreadsapi::{
             CreateRemoteThread, GetCurrentProcess, GetExitCodeProcess, GetExitCodeThread,
             GetProcessId, TerminateProcess,
         },
-        psapi::{EnumProcessModulesEx, GetModuleBaseNameW, LIST_MODULES_ALL, GetModuleFileNameExW},
+        psapi::{EnumProcessModulesEx, LIST_MODULES_ALL, GetProcessImageFileNameW},
         synchapi::WaitForSingleObject,
         winbase::{INFINITE, WAIT_FAILED},
         winnt::DUPLICATE_SAME_ACCESS,
@@ -146,7 +145,7 @@ impl<'a> ProcessRef<'a> {
     pub fn is_alive(&self) -> bool {
         let mut exit_code = MaybeUninit::uninit();
         let result = unsafe { GetExitCodeProcess(self.handle(), exit_code.as_mut_ptr()) };
-        result != FALSE && unsafe { exit_code.assume_init() } == 0
+        result != FALSE && unsafe { exit_code.assume_init() } == STILL_ACTIVE
     }
 
     /// Returns the underlying raw process handle.
@@ -192,17 +191,25 @@ impl<'a> ProcessRef<'a> {
         let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
         let mut module_buf_byte_size = mem::size_of::<HMODULE>() * module_buf.len();
         let mut bytes_needed_target = MaybeUninit::uninit();
-        let result = unsafe {
-            EnumProcessModulesEx(
-                self.handle(),
-                module_buf.as_mut_ptr(),
-                module_buf_byte_size.try_into().unwrap(),
-                bytes_needed_target.as_mut_ptr(),
-                LIST_MODULES_ALL,
-            )
-        };
-        if result == 0 {
-            return Err(io::Error::last_os_error());
+        loop {
+            let result = unsafe {
+                EnumProcessModulesEx(
+                    self.handle(),
+                    module_buf.as_mut_ptr(),
+                    module_buf_byte_size.try_into().unwrap(),
+                    bytes_needed_target.as_mut_ptr(),
+                    LIST_MODULES_ALL,
+                )
+            };
+            if result == 0 {
+                let err = io::Error::last_os_error();
+                if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _) && self.is_alive() {
+                    continue;
+                }
+                return Err(err);
+            }
+
+            break;
         }
 
         let mut bytes_needed = unsafe { bytes_needed_target.assume_init() } as usize;
@@ -406,41 +413,11 @@ impl<'a> ProcessRef<'a> {
 
     /// Gets the executable path of this process.
     pub fn path(&self) -> Result<PathBuf, io::Error> {
-        if self.is_current() {
-            self._get_path_of_current()
-        } else {
-            self._get_path_of_remote()
-        }
-    }
-    fn _get_path_of_current(&self) -> Result<PathBuf, io::Error> {
-        assert!(self.is_current());
-
         let mut process_path_buf = WinPathBuf::new();
         let process_path_buf_size: u32 = process_path_buf.len().try_into().unwrap();
         let result = unsafe {
-            GetModuleFileNameW(
-                ptr::null_mut(),
-                process_path_buf.as_mut_ptr(),
-                process_path_buf_size,
-            )
-        };
-        if result == 0 {
-            return Err(io::Error::last_os_error().into());
-        }
-
-        let process_path_len = result as usize;
-        let process_path = unsafe { process_path_buf.assume_init_path_buf(process_path_len) };
-        Ok(process_path)
-    }
-    fn _get_path_of_remote(&self) -> Result<PathBuf, io::Error> {
-        assert!(!self.is_current());
-
-        let mut process_path_buf = WinPathBuf::new();
-        let process_path_buf_size: u32 = process_path_buf.len().try_into().unwrap();
-        let result = unsafe {
-            GetModuleFileNameExW(
+            GetProcessImageFileNameW(
                 self.handle(),
-                ptr::null_mut(),
                 process_path_buf.as_mut_ptr(),
                 process_path_buf_size,
             )
@@ -456,38 +433,7 @@ impl<'a> ProcessRef<'a> {
 
     /// Gets the base name (= file name) of the executable of this process.
     pub fn base_name(&self) -> Result<OsString, io::Error> {
-        if self.is_current() {
-            self._get_base_name_of_current()
-        } else {
-            self._get_base_name_of_remote()
-        }
-    }
-    fn _get_base_name_of_current(&self) -> Result<OsString, io::Error> {
-        assert!(self.is_current());
-
-        self._get_path_of_current()
-            .map(|path| path.file_name().unwrap().to_owned())
-    }
-    fn _get_base_name_of_remote(&self) -> Result<OsString, io::Error> {
-        assert!(!self.is_current());
-
-        let mut process_name_buf = WinPathBuf::new();
-        let process_name_buf_size: u32 = process_name_buf.len().try_into().unwrap();
-        let result = unsafe {
-            GetModuleBaseNameW(
-                self.handle(),
-                ptr::null_mut(),
-                process_name_buf.as_mut_ptr(),
-                process_name_buf_size,
-            )
-        };
-        if result == 0 {
-            return Err(io::Error::last_os_error());
-        }
-
-        let process_name_len = result as usize;
-        let process_name = unsafe { process_name_buf.assume_init_os_string(process_name_len) };
-        Ok(process_name)
+        self.path().map(|path| path.file_name().unwrap().to_os_string())
     }
 
     /// Terminates this process with exit code 1.

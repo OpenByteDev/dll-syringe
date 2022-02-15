@@ -13,10 +13,9 @@ syringe_test! {
     }
 }
 
-syringe_test! {
+process_test! {
     fn inject_with_invalid_path_fails_with_remote_io(
         process: Process,
-        _payload_path: &Path,
     ) {
         let mut syringe = Syringe::for_process(&process);
         let result = syringe.inject("invalid path");

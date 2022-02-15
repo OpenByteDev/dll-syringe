@@ -147,3 +147,61 @@ macro_rules! syringe_test {
         }
     };
 }
+
+#[macro_export]
+macro_rules! process_test {
+    (fn $test_name:ident ($process:ident : Process $(,)?) $body:block) => {
+        mod $test_name {
+            use super::*;
+            use dll_syringe::Process;
+            use std::{
+                path::Path,
+                process::{Command, Stdio},
+            };
+
+            #[test]
+            #[cfg(any(
+                target_arch = "x86",
+                all(target_arch = "x86_64", feature = "into_x86_from_x64")
+            ))]
+            fn x86() {
+                test_with_setup(
+                    common::build_test_target_x86().unwrap(),
+                )
+            }
+
+            #[test]
+            #[cfg(target_arch = "x86_64")]
+            fn x86_64() {
+                test_with_setup(
+                    common::build_test_target_x64().unwrap(),
+                )
+            }
+
+            fn test_with_setup(
+                target_path: impl AsRef<Path>,
+            ) {
+                let dummy_process: Process = Command::new(target_path.as_ref())
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .unwrap()
+                    .into();
+
+                let dummy_process_clone = dummy_process.try_clone().unwrap();
+                let _guard = dispose::defer(|| {
+                    if dummy_process_clone.is_alive() {
+                        dummy_process_clone.kill().unwrap();
+                    }
+                });
+
+                test(dummy_process)
+            }
+
+            fn test(
+                $process : Process,
+            ) $body
+        }
+    };
+}
