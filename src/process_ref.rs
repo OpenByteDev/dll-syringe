@@ -1,7 +1,6 @@
 use std::{
     borrow::Cow,
     cmp,
-    convert::TryInto,
     ffi::{c_void, OsString},
     hash::{Hash, Hasher},
     io,
@@ -18,8 +17,10 @@ use std::{
 
 use winapi::{
     shared::{
-        minwindef::{FALSE, HMODULE},
-        winerror::{ERROR_CALL_NOT_IMPLEMENTED, ERROR_PARTIAL_COPY},
+        minwindef::{FALSE, HMODULE, MAX_PATH},
+        winerror::{
+            ERROR_CALL_NOT_IMPLEMENTED, ERROR_INSUFFICIENT_BUFFER, ERROR_PARTIAL_COPY, WAIT_TIMEOUT,
+        },
     },
     um::{
         handleapi::DuplicateHandle,
@@ -28,16 +29,16 @@ use winapi::{
             CreateRemoteThread, GetCurrentProcess, GetExitCodeProcess, GetExitCodeThread,
             GetProcessId, TerminateProcess,
         },
-        psapi::{EnumProcessModulesEx, GetProcessImageFileNameW, LIST_MODULES_ALL},
+        psapi::{EnumProcessModulesEx, LIST_MODULES_ALL},
         synchapi::WaitForSingleObject,
-        winbase::{INFINITE, WAIT_FAILED},
+        winbase::{QueryFullProcessImageNameW, INFINITE, WAIT_FAILED, WAIT_OBJECT_0},
         winnt::DUPLICATE_SAME_ACCESS,
         wow64apiset::{GetSystemWow64DirectoryA, IsWow64Process},
     },
 };
 
 use crate::{
-    utils::{retry_with_filter, ArrayOrVecSlice, UninitArrayBuf, WinPathBuf},
+    utils::{retry_with_filter, ArrayOrVecSlice, UninitArrayBuf},
     ModuleHandle, Process, ProcessHandle, ProcessModule,
 };
 
@@ -54,6 +55,9 @@ use crate::{
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
 pub struct ProcessRef<'a>(BorrowedHandle<'a>);
+
+unsafe impl Send for ProcessRef<'_> {}
+unsafe impl Sync for ProcessRef<'_> {}
 
 impl AsRawHandle for ProcessRef<'_> {
     fn as_raw_handle(&self) -> HANDLE {
@@ -188,21 +192,17 @@ impl<'a> ProcessRef<'a> {
     /// If the process is currently starting up and has not loaded all its modules yet, the returned list may be incomplete.
     /// This can be worked around by repeatedly calling this method.
     pub fn module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, io::Error> {
-        unsafe fn assume_init_vec<T>(vec: Vec<MaybeUninit<T>>) -> Vec<T> {
-            let (ptr, len, capacity) = vec.into_raw_parts();
-            unsafe { Vec::from_raw_parts(ptr.cast(), len, capacity) }
-        }
-
         let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
-        let mut module_buf_byte_size = mem::size_of::<HMODULE>() * module_buf.len();
-        let mut bytes_needed_target = MaybeUninit::uninit();
+        const HANDLE_SIZE: u32 = mem::size_of::<HMODULE>() as _;
+        let mut module_buf_byte_size = HANDLE_SIZE * module_buf.len() as u32;
+        let mut bytes_needed_new = MaybeUninit::uninit();
         loop {
             let result = unsafe {
                 EnumProcessModulesEx(
                     self.handle(),
                     module_buf.as_mut_ptr(),
-                    module_buf_byte_size.try_into().unwrap(),
-                    bytes_needed_target.as_mut_ptr(),
+                    module_buf_byte_size,
+                    bytes_needed_new.as_mut_ptr(),
                     LIST_MODULES_ALL,
                 )
             };
@@ -217,11 +217,11 @@ impl<'a> ProcessRef<'a> {
             break;
         }
 
-        let mut bytes_needed = unsafe { bytes_needed_target.assume_init() } as usize;
+        let mut bytes_needed = unsafe { bytes_needed_new.assume_init() };
 
         let modules = if bytes_needed <= module_buf_byte_size {
             // buffer size was sufficient
-            let module_buf_len = bytes_needed / mem::size_of::<HMODULE>();
+            let module_buf_len = (bytes_needed / HANDLE_SIZE) as usize;
             let module_buf_init = unsafe { module_buf.assume_init_all() };
             ArrayOrVecSlice::from_array(module_buf_init, 0..module_buf_len)
         } else {
@@ -233,32 +233,36 @@ impl<'a> ProcessRef<'a> {
             // the function run, if more modules have loaded in the meantime we need to resize the buffer again.
             // This can happen often if the process is currently starting up.
             loop {
-                module_buf_byte_size = cmp::max(bytes_needed, module_buf_byte_size * 2);
-                let mut module_buf_len = module_buf_byte_size / mem::size_of::<HMODULE>();
-                module_buf_vec.resize_with(module_buf_len, MaybeUninit::uninit);
+                module_buf_byte_size =
+                    cmp::max(bytes_needed, module_buf_byte_size.saturating_mul(2));
+                let mut module_buf_len = (module_buf_byte_size / HANDLE_SIZE) as usize;
+                module_buf_vec.resize(module_buf_len, MaybeUninit::uninit());
 
-                bytes_needed_target = MaybeUninit::uninit();
+                let mut bytes_needed_new = MaybeUninit::uninit();
                 let result = unsafe {
                     EnumProcessModulesEx(
                         self.handle(),
                         module_buf_vec[0].as_mut_ptr(),
-                        module_buf_byte_size.try_into().unwrap(),
-                        bytes_needed_target.as_mut_ptr(),
+                        module_buf_byte_size,
+                        bytes_needed_new.as_mut_ptr(),
                         LIST_MODULES_ALL,
                     )
                 };
                 if result == 0 {
                     return Err(io::Error::last_os_error());
                 }
-                bytes_needed = unsafe { bytes_needed_target.assume_init() } as usize;
+                bytes_needed = unsafe { bytes_needed_new.assume_init() };
 
                 if bytes_needed <= module_buf_byte_size {
-                    module_buf_len = bytes_needed / mem::size_of::<HMODULE>();
-                    let module_buf_vec = unsafe { assume_init_vec(module_buf_vec) };
-                    break ArrayOrVecSlice::from_vec(module_buf_vec, 0..module_buf_len);
+                    module_buf_len = (bytes_needed / HANDLE_SIZE) as usize;
+                    break unsafe {
+                        ArrayOrVecSlice::from_vec_assume_init(module_buf_vec, 0..module_buf_len)
+                    };
                 }
             }
         };
+
+        debug_assert!(modules.iter().all(|module| !module.is_null()));
 
         Ok(modules)
     }
@@ -414,22 +418,25 @@ impl<'a> ProcessRef<'a> {
 
     /// Gets the executable path of this process.
     pub fn path(&self) -> Result<PathBuf, io::Error> {
-        let mut process_path_buf = WinPathBuf::new();
-        let process_path_buf_size: u32 = process_path_buf.len().try_into().unwrap();
-        let result = unsafe {
-            GetProcessImageFileNameW(
-                self.handle(),
-                process_path_buf.as_mut_ptr(),
-                process_path_buf_size,
-            )
-        };
-        if result == 0 {
-            return Err(io::Error::last_os_error());
-        }
-
-        let process_path_len = result as usize;
-        let process_path = unsafe { process_path_buf.assume_init_path_buf(process_path_len) };
-        Ok(process_path)
+        win_fill_path_buf_helper(|buf_ptr, buf_size| {
+            let mut buf_size = buf_size as u32;
+            let result =
+                unsafe { QueryFullProcessImageNameW(self.handle(), 0, buf_ptr, &mut buf_size) };
+            if result == 0 {
+                let err = io::Error::last_os_error();
+                if err.raw_os_error().unwrap() == ERROR_INSUFFICIENT_BUFFER as i32 {
+                    FillPathBufResult::BufTooSmall {
+                        size_hint: Some(buf_size as usize),
+                    }
+                } else {
+                    FillPathBufResult::Error(err)
+                }
+            } else {
+                FillPathBufResult::Success {
+                    actual_len: buf_size as usize,
+                }
+            }
+        })
     }
 
     /// Gets the base name (= file name) of the executable of this process.
@@ -471,7 +478,7 @@ impl<'a> ProcessRef<'a> {
         if result == 0 {
             return Err(io::Error::last_os_error());
         }
-        assert_ne!(
+        debug_assert_ne!(
             result as u32, STILL_ACTIVE,
             "GetExitCodeThread returned STILL_ACTIVE after WaitForSingleObject"
         );
@@ -506,35 +513,42 @@ impl<'a> ProcessRef<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+enum FillPathBufResult {
+    BufTooSmall { size_hint: Option<usize> },
+    Success { actual_len: usize },
+    Error(io::Error),
+}
 
-    #[test]
-    fn current_process_is_current() {
-        let process = ProcessRef::current();
-        assert!(process.is_current());
-
-        let process = Process::from_pid(process.pid().unwrap().get()).unwrap();
-        assert!(process.is_current());
-    }
-
-    #[test]
-    fn remote_process_is_not_current() {
-        let mut all = Process::all().into_iter();
-        let process_a = all.next().unwrap();
-        let process_b = all.next().unwrap();
-        assert!(!process_a.is_current() || !process_b.is_current());
-    }
-
-    #[test]
-    fn current_pseudo_process_eq_current_process() {
-        let pseudo = ProcessRef::current();
-        let normal = Process::from_pid(pseudo.pid().unwrap().get()).unwrap();
-
-        assert_eq!(pseudo, normal.get_ref());
-        assert_eq!(pseudo, normal);
-        assert_eq!(ProcessRef::promote_to_owned(&pseudo).unwrap(), normal);
-        assert_eq!(pseudo, ProcessRef::promote_to_owned(&normal).unwrap());
+fn win_fill_path_buf_helper(
+    mut f: impl FnMut(*mut u16, usize) -> FillPathBufResult,
+) -> Result<PathBuf, io::Error> {
+    let mut buf = UninitArrayBuf::<u16, MAX_PATH>::new();
+    match f(buf.as_mut_ptr(), buf.len()) {
+        FillPathBufResult::BufTooSmall { mut size_hint } => {
+            let mut vec_buf = Vec::new();
+            let mut buf_len = buf.len();
+            loop {
+                buf_len = cmp::max(buf_len.saturating_mul(2), size_hint.unwrap_or(0));
+                vec_buf.resize(buf_len, MaybeUninit::uninit());
+                match f(vec_buf[0].as_mut_ptr(), vec_buf.len()) {
+                    FillPathBufResult::Success { actual_len } => {
+                        let slice =
+                            unsafe { MaybeUninit::slice_assume_init_ref(&vec_buf[..actual_len]) };
+                        let wide_str = widestring::U16Str::from_slice(slice);
+                        return Ok(wide_str.to_os_string().into());
+                    }
+                    FillPathBufResult::Error(e) => return Err(e),
+                    FillPathBufResult::BufTooSmall {
+                        size_hint: new_size_hint,
+                    } => size_hint = new_size_hint,
+                }
+            }
+        }
+        FillPathBufResult::Success { actual_len } => {
+            let slice = unsafe { buf.assume_init_slice(..actual_len) };
+            let wide_str = widestring::U16Str::from_slice(slice);
+            Ok(wide_str.to_os_string().into())
+        }
+        FillPathBufResult::Error(e) => Err(e),
     }
 }

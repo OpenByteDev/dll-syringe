@@ -1,4 +1,7 @@
-use std::ops::{Bound, Deref, RangeBounds};
+use std::{
+    mem::MaybeUninit,
+    ops::{Bound, Deref, RangeBounds},
+};
 
 #[derive(Debug)]
 pub(crate) enum ArrayOrVec<T, const SIZE: usize> {
@@ -61,11 +64,30 @@ impl<T, const SIZE: usize> ArrayOrVecSlice<T, SIZE> {
         }
     }
 
+    #[allow(dead_code)]
+    pub unsafe fn from_array_assume_init(
+        array: [MaybeUninit<T>; SIZE],
+        range: impl RangeBounds<usize>,
+    ) -> Self {
+        Self::from_array(unsafe { MaybeUninit::array_assume_init(array) }, range)
+    }
+
     pub fn from_vec(vec: Vec<T>, range: impl RangeBounds<usize>) -> Self {
         Self {
             data: ArrayOrVec::Vec(vec),
             range: (range.start_bound().cloned(), range.end_bound().cloned()),
         }
+    }
+
+    pub unsafe fn from_vec_assume_init(
+        vec: Vec<MaybeUninit<T>>,
+        range: impl RangeBounds<usize>,
+    ) -> Self {
+        let (ptr, length, capacity) = vec.into_raw_parts();
+        Self::from_vec(
+            unsafe { Vec::from_raw_parts(ptr.cast(), length, capacity) },
+            range,
+        )
     }
 
     #[allow(dead_code)]

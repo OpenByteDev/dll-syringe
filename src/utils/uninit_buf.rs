@@ -15,6 +15,14 @@ impl<T, const SIZE: usize> UninitArrayBuf<T, SIZE> {
         Self(MaybeUninit::uninit_array::<SIZE>())
     }
 
+    pub const fn as_slice(&self) -> &[MaybeUninit<T>] {
+        self.0.as_slice()
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [MaybeUninit<T>] {
+        self.0.as_mut_slice()
+    }
+
     pub const fn len(&self) -> usize {
         self.0.len()
     }
@@ -33,14 +41,15 @@ impl<T, const SIZE: usize> UninitArrayBuf<T, SIZE> {
 
     pub unsafe fn assume_init_slice(&self, range: impl RangeBounds<usize>) -> &[T] {
         // TODO: this has to be easier some other way
-        let slice = &(&self.0)[(range.start_bound().cloned(), range.end_bound().cloned())];
+        let slice = &self.as_slice()[(range.start_bound().cloned(), range.end_bound().cloned())];
         unsafe { MaybeUninit::slice_assume_init_ref(slice) }
     }
 
     #[allow(dead_code)]
     pub unsafe fn assume_init_slice_mut(&mut self, range: impl RangeBounds<usize>) -> &mut [T] {
         // TODO: this has to be easier some other way
-        let slice = &mut (&mut self.0)[(range.start_bound().cloned(), range.end_bound().cloned())];
+        let slice =
+            &mut self.as_mut_slice()[(range.start_bound().cloned(), range.end_bound().cloned())];
         unsafe { MaybeUninit::slice_assume_init_mut(slice) }
     }
 }
