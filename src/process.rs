@@ -51,6 +51,9 @@ pub const PROCESS_INJECTION_ACCESS: DWORD = PROCESS_CREATE_THREAD
 #[derive(Debug)]
 pub struct Process(OwnedHandle);
 
+unsafe impl Send for Process {}
+unsafe impl Sync for Process {}
+
 impl AsRawHandle for Process {
     fn as_raw_handle(&self) -> HANDLE {
         self.0.as_raw_handle()

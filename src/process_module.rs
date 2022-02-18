@@ -37,6 +37,9 @@ pub struct ProcessModule<'a> {
     process: ProcessRef<'a>,
 }
 
+unsafe impl Send for ProcessModule<'_> {}
+unsafe impl Sync for ProcessModule<'_> {}
+
 impl<'a> ProcessModule<'a> {
     /// Contructs a new instance from the given module handle and its corresponding process.
     ///
