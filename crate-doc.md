@@ -13,13 +13,13 @@ A crate for DLL injection on windows.
 The example below will inject and then eject the module at the path `injection_payload.dll` into the process called "ExampleProcess".
 
 ```rust no_run
-use dll_syringe::{Syringe, Process};
+use dll_syringe::{Syringe, process::OwnedProcess};
 
 // find target process by name
-let target_process = Process::find_first_by_name("ExampleProcess").unwrap();
+let target_process = OwnedProcess::find_first_by_name("ExampleProcess").unwrap();
 
 // create a new syringe for the target process
-let mut syringe = Syringe::for_process(&target_process);
+let syringe = Syringe::for_process(target_process);
 
 // inject the payload into the target process
 let injected_payload = syringe.inject("injection_payload.dll").unwrap();
@@ -43,18 +43,18 @@ pub extern "system" fn add(numbers: *const (f64, f64), result: *mut f64) {
 
 The code of the injector/caller will look like this.
 ```rust no_run
-use dll_syringe::{Syringe, Process};
+use dll_syringe::{Syringe, process::OwnedProcess};
 
 // find target process by name
-let target_process = Process::find_first_by_name("ExampleProcess").unwrap();
+let target_process = OwnedProcess::find_first_by_name("ExampleProcess").unwrap();
 
 // create a new syringe for the target process
-let mut syringe = Syringe::for_process(&target_process);
+let syringe = Syringe::for_process(target_process);
 
 // inject the payload into the target process
 let injected_payload = syringe.inject("injection_payload.dll").unwrap();
 
-let result: f64 = syringe.get_procedure(injected_payload, "add").unwrap().unwrap().call(&(2f64, 4f64)).unwrap();
+let result = syringe.get_procedure::<(f64, f64), f64>(injected_payload, "add").unwrap().unwrap().call(&(2.0, 4.0)).unwrap();
 println!("{}", result); // prints 6
 
 // eject the payload from the target (optional)
