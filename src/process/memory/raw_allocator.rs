@@ -24,6 +24,7 @@ impl<'a> DynamicMultiBufferAllocator<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn process(&self) -> BorrowedProcess<'_> {
         self.process.borrowed()
     }
