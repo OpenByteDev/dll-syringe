@@ -306,15 +306,19 @@ fn is_x32_windows() -> Result<bool, io::Error> {
     if result == 0 {
         let err = io::Error::last_os_error();
         if err.raw_os_error().unwrap() == ERROR_CALL_NOT_IMPLEMENTED as _ {
-            Ok(false)
+            Ok(true)
         } else {
             Err(err)
         }
     } else {
-        Ok(true)
+        Ok(false)
     }
 }
 
 fn is_x64_windows() -> Result<bool, io::Error> {
-    is_x32_windows().map(|r| !r)
+    if cfg!(target_arch = "x86_64") {
+        Ok(true)
+    } else {
+        Ok(!is_x32_windows()?)
+    }
 }
