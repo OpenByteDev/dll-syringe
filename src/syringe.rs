@@ -202,8 +202,7 @@ impl Syringe {
                 .remote_allocator
                 .process()
                 .module_handles()?
-                .as_ref()
-                .contains(&module.handle()),
+                .any(|m| m == module.handle()),
             "ejected module survived"
         );
 

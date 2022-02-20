@@ -134,7 +134,7 @@ impl<'a> Process for BorrowedProcess<'a> {
 
         let modules = self.module_handles()?;
 
-        for &module_handle in modules.as_ref() {
+        for module_handle in modules {
             let module = unsafe { ProcessModule::new_unchecked(module_handle, *self) };
             let module_name = module.base_name()?;
 
@@ -163,7 +163,7 @@ impl<'a> Process for BorrowedProcess<'a> {
 
         let modules = self.module_handles()?;
 
-        for &module_handle in modules.as_ref() {
+        for module_handle in modules {
             let module = unsafe { ProcessModule::new_unchecked(module_handle, *self) };
             let module_path = module.path()?.into_os_string();
 
@@ -235,7 +235,7 @@ impl<'a> BorrowedProcess<'a> {
     /// # Note
     /// If the process is currently starting up and has not yet loaded all its modules, the returned list may be incomplete.
     /// This can be worked around by repeatedly calling this method.
-    pub fn module_handles(&self) -> Result<impl AsRef<[ModuleHandle]>, io::Error> {
+    pub fn module_handles(&self) -> Result<impl ExactSizeIterator<Item = ModuleHandle>, io::Error> {
         let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
         const HANDLE_SIZE: u32 = mem::size_of::<HMODULE>() as _;
         let mut module_buf_byte_size = HANDLE_SIZE * module_buf.len() as u32;
@@ -308,6 +308,6 @@ impl<'a> BorrowedProcess<'a> {
 
         debug_assert!(modules.iter().all(|module| !module.is_null()));
 
-        Ok(modules)
+        Ok(modules.into_iter())
     }
 }

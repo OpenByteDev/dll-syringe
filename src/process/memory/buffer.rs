@@ -2,7 +2,7 @@ use std::{
     io,
     marker::PhantomData,
     mem::{self, MaybeUninit},
-    ops::{Bound, Deref, DerefMut, Range, RangeBounds},
+    ops::{Deref, DerefMut, RangeBounds},
     os::windows::prelude::AsRawHandle,
     ptr, slice,
 };
@@ -20,7 +20,10 @@ use winapi::{
     },
 };
 
-use crate::process::{BorrowedProcess, Process};
+use crate::{
+    process::{BorrowedProcess, Process},
+    utils,
+};
 
 /// A owned buffer in the memory space of a (remote) process.
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "process_memory")))]
@@ -360,7 +363,7 @@ impl<'a> ProcessMemorySlice<'a> {
     /// Returns a slice of this buffer.
     #[must_use]
     pub fn slice(&self, bounds: impl RangeBounds<usize>) -> Self {
-        let range = range_from_bounds(self.ptr as usize, self.len, &bounds);
+        let range = utils::range_from_bounds(self.ptr as usize, self.len, &bounds);
         Self {
             process: self.process,
             ptr: range.start as *mut _,
@@ -381,25 +384,4 @@ impl<'a> ProcessMemorySlice<'a> {
             Ok(())
         }
     }
-}
-
-fn range_from_bounds(offset: usize, len: usize, range: &impl RangeBounds<usize>) -> Range<usize> {
-    let rel_start = match range.start_bound() {
-        Bound::Unbounded => 0,
-        Bound::Included(start) => *start,
-        Bound::Excluded(start) => start + 1,
-    };
-    let rel_end = match range.end_bound() {
-        Bound::Unbounded => len,
-        Bound::Included(end) => *end,
-        Bound::Excluded(end) => end - 1,
-    };
-
-    assert!(rel_start <= len, "range start out of bounds");
-    assert!(rel_end <= len, "range end out of bounds");
-    assert!(rel_end >= rel_start, "range end before start");
-
-    let start = offset + rel_start;
-    let end = offset + rel_end;
-    Range { start, end }
 }
