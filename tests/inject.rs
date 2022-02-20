@@ -1,23 +1,23 @@
-use dll_syringe::{error::SyringeError, Syringe};
+use dll_syringe::{error::SyringeError, process::Process, Syringe};
 
 #[allow(unused)]
 mod common;
 
 syringe_test! {
     fn inject_with_valid_path_succeeds(
-        process: Process,
+        process: OwnedProcess,
         payload_path: &Path,
     ) {
-        let mut syringe = Syringe::for_process(&process);
+        let syringe = Syringe::for_process(process);
         syringe.inject(payload_path).unwrap();
     }
 }
 
 process_test! {
     fn inject_with_invalid_path_fails_with_remote_io(
-        process: Process,
+        process: OwnedProcess,
     ) {
-        let mut syringe = Syringe::for_process(&process);
+        let syringe = Syringe::for_process(process);
         let result = syringe.inject("invalid path");
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -32,11 +32,11 @@ process_test! {
 
 syringe_test! {
     fn inject_with_crashed_process_fails_with_io(
-        process: Process,
+        process: OwnedProcess,
         payload_path: &Path,
     ) {
-        let mut syringe = Syringe::for_process(&process);
-        process.kill().unwrap();
+        let syringe = Syringe::for_process(process);
+        syringe.process().kill().unwrap();
 
         let result = syringe.inject(payload_path);
         assert!(result.is_err());

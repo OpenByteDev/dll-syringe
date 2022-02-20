@@ -89,10 +89,10 @@ pub fn build_helper_crate(
 
 #[macro_export]
 macro_rules! syringe_test {
-    (fn $test_name:ident ($process:ident : Process, $payload_path:ident : &Path $(,)?) $body:block) => {
+    (fn $test_name:ident ($process:ident : OwnedProcess, $payload_path:ident : &Path $(,)?) $body:block) => {
         mod $test_name {
             use super::*;
-            use dll_syringe::Process;
+            use dll_syringe::process::OwnedProcess;
             use std::{
                 path::Path,
                 process::{Command, Stdio},
@@ -123,7 +123,7 @@ macro_rules! syringe_test {
                 payload_path: impl AsRef<Path>,
                 target_path: impl AsRef<Path>,
             ) {
-                let dummy_process: Process = Command::new(target_path.as_ref())
+                let dummy_process: OwnedProcess = Command::new(target_path.as_ref())
                     .stdin(Stdio::null())
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
@@ -136,7 +136,7 @@ macro_rules! syringe_test {
             }
 
             fn test(
-                $process : Process,
+                $process : OwnedProcess,
                 $payload_path : &Path,
             ) $body
         }
@@ -145,10 +145,10 @@ macro_rules! syringe_test {
 
 #[macro_export]
 macro_rules! process_test {
-    (fn $test_name:ident ($process:ident : Process $(,)?) $body:block) => {
+    (fn $test_name:ident ($process:ident : OwnedProcess $(,)?) $body:block) => {
         mod $test_name {
             use super::*;
-            use dll_syringe::Process;
+            use dll_syringe::process::OwnedProcess;
             use std::{
                 path::Path,
                 process::{Command, Stdio},
@@ -176,7 +176,7 @@ macro_rules! process_test {
             fn test_with_setup(
                 target_path: impl AsRef<Path>,
             ) {
-                let dummy_process: Process = Command::new(target_path.as_ref())
+                let dummy_process: OwnedProcess = Command::new(target_path.as_ref())
                     .stdin(Stdio::null())
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
@@ -190,7 +190,7 @@ macro_rules! process_test {
             }
 
             fn test(
-                $process : Process,
+                $process : OwnedProcess,
             ) $body
         }
     };

@@ -5,10 +5,10 @@ mod common;
 
 syringe_test! {
     fn eject(
-        process: Process,
+        process: OwnedProcess,
         payload_path: &Path,
     ) {
-        let mut syringe = Syringe::for_process(&process);
+        let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
         syringe.eject(module).unwrap();
     }

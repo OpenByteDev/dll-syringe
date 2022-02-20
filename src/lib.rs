@@ -36,30 +36,14 @@
 mod syringe;
 pub use syringe::*;
 
-mod process;
-pub use process::*;
-
-mod process_ref;
-pub use process_ref::*;
-
-mod process_module;
-pub use process_module::*;
+/// Module containing process abstractions and utilities.
+pub mod process;
 
 #[cfg(any(feature = "remote_procedure", feature = "doc_cfg"))]
 #[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "remote_procedure")))]
 mod remote_procedure;
 #[cfg(any(feature = "remote_procedure", feature = "doc_cfg"))]
 pub use remote_procedure::*;
-
-#[cfg_attr(not(feature = "process_memory"), allow(dead_code))]
-#[cfg(any(feature = "process_memory", feature = "doc_cfg"))]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "process_memory")))]
-/// Module containing utilities for dealing with memory of another process.
-pub mod process_memory;
-#[cfg_attr(not(feature = "process_memory"), allow(dead_code))]
-#[cfg(not(any(feature = "process_memory", feature = "doc_cfg")))]
-/// Module containing utilities for dealing with memory of another process.
-pub(crate) mod process_memory;
 
 pub(crate) mod utils;
 

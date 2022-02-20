@@ -1,4 +1,4 @@
-use dll_syringe::{Process, ProcessRef};
+use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
 use std::{fs, time::Duration};
 
 #[allow(unused)]
@@ -6,7 +6,7 @@ mod common;
 
 process_test! {
     fn list_modules_on_running_succeeds(
-        process: Process
+        process: OwnedProcess
     ) {
         process.modules().unwrap();
     }
@@ -14,15 +14,15 @@ process_test! {
 
 process_test! {
     fn list_module_handles_on_running_succeeds(
-        process: Process
+        process: OwnedProcess
     ) {
-        process.module_handles().unwrap();
+        process.borrowed().module_handles().unwrap();
     }
 }
 
 process_test! {
-    fn wait_for_module_with_kernel32_suceeds(
-        process: Process
+    fn wait_for_module_with_kernel32_succeeds(
+        process: OwnedProcess
     ) {
         process.wait_for_module_by_name("kernel32.dll", Duration::from_secs(1)).unwrap();
     }
@@ -30,17 +30,17 @@ process_test! {
 
 process_test! {
     fn list_module_handles_on_crashed_does_not_hang(
-        process: Process
+        process: OwnedProcess
     ) {
         process.kill().unwrap();
         // assert this does not hang
-        let _ = process.module_handles();
+        let _ = process.borrowed().module_handles();
     }
 }
 
 process_test! {
     fn is_alive_is_true_for_running(
-        process: Process
+        process: OwnedProcess
     ) {
         assert!(process.is_alive());
         process.kill().unwrap();
@@ -50,7 +50,7 @@ process_test! {
 
 process_test! {
     fn is_alive_is_false_for_killed(
-        process: Process
+        process: OwnedProcess
     ) {
         process.kill().unwrap();
         assert!(!process.is_alive());
@@ -59,7 +59,7 @@ process_test! {
 
 process_test! {
     fn path_returns_correct_path(
-        process: Process
+        process: OwnedProcess
     ) {
         let path = process.path().unwrap();
         assert_eq!(path.components().last().unwrap().as_os_str().to_string_lossy().as_ref(), "test_target.exe");
@@ -69,7 +69,7 @@ process_test! {
 
 process_test! {
     fn base_name_returns_correct_path(
-        process: Process
+        process: OwnedProcess
     ) {
         let name = process.base_name().unwrap().to_string_lossy().to_string();
         assert_eq!("test_target.exe", name);
@@ -78,7 +78,7 @@ process_test! {
 
 process_test! {
     fn kill_guard_kills_process_on_drop(
-        process: Process
+        process: OwnedProcess
     ) {
         let guard = process.try_clone().unwrap().kill_on_drop();
         assert!(guard.is_alive());
@@ -89,7 +89,7 @@ process_test! {
 
 process_test! {
     fn long_process_paths_are_supported(
-        process: Process
+        process: OwnedProcess
     ) {
         let process_path = process.path().unwrap();
         process.kill().unwrap();
@@ -103,7 +103,7 @@ process_test! {
         exe_path.push("test_target.exe");
         fs::copy(process_path, &exe_path).unwrap();
 
-        let process_with_long_name: Process = Command::new(&exe_path)
+        let process_with_long_name: OwnedProcess = Command::new(&exe_path)
             .spawn()
             .unwrap()
             .into();
@@ -113,16 +113,16 @@ process_test! {
 
 #[test]
 fn current_process_is_current() {
-    let process = ProcessRef::current();
+    let process = BorrowedProcess::current();
     assert!(process.is_current());
 
-    let process = Process::from_pid(process.pid().unwrap().get()).unwrap();
+    let process = OwnedProcess::from_pid(process.pid().unwrap().get()).unwrap();
     assert!(process.is_current());
 }
 
 #[test]
 fn remote_process_is_not_current() {
-    let mut all = Process::all().into_iter();
+    let mut all = OwnedProcess::all().into_iter();
     let process_a = all.next().unwrap();
     let process_b = all.next().unwrap();
     assert!(!process_a.is_current() || !process_b.is_current());
@@ -130,11 +130,11 @@ fn remote_process_is_not_current() {
 
 #[test]
 fn current_pseudo_process_eq_current_process() {
-    let pseudo = ProcessRef::current();
-    let normal = Process::from_pid(pseudo.pid().unwrap().get()).unwrap();
+    let pseudo = BorrowedProcess::current();
+    let normal = OwnedProcess::from_pid(pseudo.pid().unwrap().get()).unwrap();
 
-    assert_eq!(pseudo, normal.get_ref());
+    assert_eq!(pseudo, normal.borrowed());
     assert_eq!(pseudo, normal);
-    assert_eq!(ProcessRef::promote_to_owned(&pseudo).unwrap(), normal);
-    assert_eq!(pseudo, ProcessRef::promote_to_owned(&normal).unwrap());
+    assert_eq!(pseudo.try_to_owned().unwrap(), normal);
+    assert_eq!(pseudo, normal.try_clone().unwrap());
 }

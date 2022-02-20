@@ -2,39 +2,29 @@ use std::time::Duration;
 
 use stopwatch::Stopwatch;
 
-#[allow(dead_code)]
-pub(crate) fn retry<R, E>(operation: impl Fn() -> Result<R, E>, timeout: Duration) -> Result<R, E> {
-    retry_with_filter(operation, |_| true, timeout)
+pub(crate) fn retry_with_timeout<R>(
+    operation: impl Fn() -> Option<R>,
+    timeout: Duration,
+) -> Option<R> {
+    retry_faillable_until_some_with_timeout(|| Ok::<_, ()>(operation()), timeout).unwrap()
 }
 
-pub(crate) fn retry_with_filter<R, E>(
+pub(crate) fn retry_faillable_with_timeout<R, E>(
     operation: impl Fn() -> Result<R, E>,
-    predicate: impl Fn(&R) -> bool,
     timeout: Duration,
 ) -> Result<R, E> {
-    retry_with_args_and_filter(|_| operation(), predicate, timeout, &())
+    retry_faillable_until_some_with_timeout(|| operation().map(Some), timeout).map(|o| o.unwrap())
 }
 
-#[allow(dead_code)]
-pub(crate) fn retry_with_args<A, R, E>(
-    operation: impl Fn(&A) -> Result<R, E>,
+pub(crate) fn retry_faillable_until_some_with_timeout<R, E>(
+    operation: impl Fn() -> Result<Option<R>, E>,
     timeout: Duration,
-    args: &A,
-) -> Result<R, E> {
-    retry_with_args_and_filter(operation, |_| true, timeout, args)
-}
-
-pub(crate) fn retry_with_args_and_filter<A, R, E>(
-    operation: impl Fn(&A) -> Result<R, E>,
-    predicate: impl Fn(&R) -> bool,
-    timeout: Duration,
-    args: &A,
-) -> Result<R, E> {
+) -> Result<Option<R>, E> {
     let stopwatch = Stopwatch::start_new();
     loop {
-        match operation(args) {
+        match operation() {
             Ok(result) => {
-                if predicate(&result) {
+                if result.is_some() || stopwatch.elapsed() >= timeout {
                     return Ok(result);
                 }
             }
@@ -44,5 +34,49 @@ pub(crate) fn retry_with_args_and_filter<A, R, E>(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{cell::Cell, time::Duration};
+
+    use retry::{retry_faillable_until_some_with_timeout, retry_faillable_with_timeout};
+
+    use crate::utils::retry;
+
+    #[test]
+    fn retry_with_zero_timeout_tries_once_and_returns() {
+        let tries = Cell::new(0);
+        let result = retry_faillable_with_timeout(
+            || {
+                tries.set(tries.get() + 1);
+                Ok::<(), ()>(())
+            },
+            Duration::ZERO,
+        );
+        assert_eq!(tries.get(), 1);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn retry_faillible_with_timeout_tries_until_the_timeout() {
+        let tries = Cell::new(0);
+        let result: Result<(), ()> = retry_faillable_with_timeout(
+            || {
+                tries.set(tries.get() + 1);
+                Err(())
+            },
+            Duration::from_millis(25),
+        );
+        assert!(result.is_err());
+        assert!(tries.get() >= 1);
+    }
+
+    #[test]
+    fn retry_faillible_until_some_with_timeout_returns_ok_none_if_always_ok_none() {
+        let result: Result<Option<()>, ()> =
+            retry_faillable_until_some_with_timeout(|| Ok(None), Duration::from_millis(25));
+        assert_eq!(result, Ok(None));
     }
 }

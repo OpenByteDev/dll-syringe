@@ -1,6 +1,6 @@
 use std::{collections::LinkedList, io, mem, ptr::NonNull};
 
-use crate::{process_memory::ProcessMemoryBuffer, ProcessRef};
+use crate::process::{memory::ProcessMemoryBuffer, BorrowedProcess, Process};
 
 pub trait RawAllocator {
     type Error;
@@ -12,20 +12,20 @@ pub trait RawAllocator {
 
 #[derive(Debug)]
 pub struct DynamicMultiBufferAllocator<'a> {
-    process: ProcessRef<'a>,
+    process: BorrowedProcess<'a>,
     pages: Vec<FixedBufferAllocator<'a>>,
 }
 
 impl<'a> DynamicMultiBufferAllocator<'a> {
-    pub const fn new(process: ProcessRef<'a>) -> Self {
+    pub const fn new(process: BorrowedProcess<'a>) -> Self {
         Self {
             process,
             pages: Vec::new(),
         }
     }
 
-    pub const fn process(&self) -> ProcessRef<'a> {
-        self.process
+    pub fn process(&self) -> BorrowedProcess<'_> {
+        self.process.borrowed()
     }
 
     fn alloc_page(&mut self, min_size: usize) -> Result<&mut FixedBufferAllocator<'a>, io::Error> {
@@ -46,7 +46,7 @@ impl<'a> DynamicMultiBufferAllocator<'a> {
     }
 }
 
-impl RawAllocator for DynamicMultiBufferAllocator<'_> {
+impl<'a> RawAllocator for DynamicMultiBufferAllocator<'a> {
     type Error = io::Error;
     type Alloc = Allocation;
 
@@ -90,7 +90,7 @@ pub struct FixedBufferAllocator<'a> {
 impl<'a> FixedBufferAllocator<'a> {
     pub fn new(mem: ProcessMemoryBuffer<'a>) -> Self {
         let free_list = LinkedList::from([MemoryBlock {
-            base: mem.as_mut_ptr() as usize,
+            base: mem.as_ptr() as usize,
             len: mem.len(),
         }]);
         Self { mem, free_list }
@@ -102,7 +102,7 @@ impl<'a> FixedBufferAllocator<'a> {
     }
 
     #[allow(dead_code)]
-    pub fn process(&self) -> ProcessRef<'a> {
+    pub fn process(&self) -> BorrowedProcess<'a> {
         self.memory().process()
     }
 
@@ -231,13 +231,13 @@ pub enum AllocError {
 mod tests {
     use std::mem;
 
-    use crate::process_memory::ProcessMemorySlice;
+    use crate::process::memory::ProcessMemorySlice;
 
     use super::*;
 
     #[test]
     fn single_alloc() {
-        let process = ProcessRef::current();
+        let process = BorrowedProcess::current();
         let mut allocator = DynamicMultiBufferAllocator::new(process);
 
         let data = [42u8; 100];
@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn multi_alloc() {
-        let process = ProcessRef::current();
+        let process = BorrowedProcess::current();
         let mut allocator = DynamicMultiBufferAllocator::new(process);
 
         let data = &[42u8; 100];
@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn free() {
-        let process = ProcessRef::current();
+        let process = BorrowedProcess::current();
         let memory = ProcessMemoryBuffer::allocate(process, 512).unwrap();
         let mut allocator = FixedBufferAllocator::new(memory);
 
@@ -330,7 +330,7 @@ mod tests {
 
     #[test]
     fn multi_page_alloc() {
-        let process = ProcessRef::current();
+        let process = BorrowedProcess::current();
         let mut allocator = DynamicMultiBufferAllocator::new(process);
 
         let page_size = ProcessMemoryBuffer::os_page_size();
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn correct_align() {
-        let process = ProcessRef::current();
+        let process = BorrowedProcess::current();
         let memory = ProcessMemoryBuffer::allocate_page(process).unwrap();
         let mut allocator = FixedBufferAllocator::new(memory);
 
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn large_alloc() {
-        let process = ProcessRef::current();
+        let process = BorrowedProcess::current();
         let mut allocator = DynamicMultiBufferAllocator::new(process);
 
         let page_size = ProcessMemoryBuffer::os_page_size();

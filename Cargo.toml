@@ -24,6 +24,7 @@ u16cstr = { version = "0.3", default-features = false }
 iced-x86 = { version = "1.16", features = ["std", "code_asm"], default-features = false, optional = true }
 num_enum = { version = "0.5", default-features = false }
 shrinkwraprs = { version = "0.3", default-features = false }
+same-file = { version = "1.0", default-features = false }
 
 [target.'cfg(target_arch = "x86")'.dependencies]
 

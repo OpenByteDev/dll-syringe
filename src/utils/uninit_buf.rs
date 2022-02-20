@@ -1,11 +1,5 @@
-use std::{
-    ffi::OsString,
-    mem::MaybeUninit,
-    ops::{Deref, DerefMut, RangeBounds},
-    path::PathBuf,
-};
+use std::{cmp, io, mem::MaybeUninit, ops::RangeBounds, path::PathBuf};
 
-use widestring::{error::MissingNulTerminator, U16CStr, U16Str};
 use winapi::shared::minwindef::MAX_PATH;
 
 pub(crate) struct UninitArrayBuf<T, const SIZE: usize>([MaybeUninit<T>; SIZE]);
@@ -54,50 +48,42 @@ impl<T, const SIZE: usize> UninitArrayBuf<T, SIZE> {
     }
 }
 
-pub(crate) struct WinPathBuf(UninitArrayBuf<u16, MAX_PATH>);
-
-impl WinPathBuf {
-    pub const fn new() -> Self {
-        Self(UninitArrayBuf::new())
-    }
-
-    pub unsafe fn assume_init_os_string(&self, len: usize) -> OsString {
-        unsafe { self.assume_init_u16_str(len) }.to_os_string()
-    }
-
-    pub unsafe fn assume_init_path_buf(&self, len: usize) -> PathBuf {
-        unsafe { self.assume_init_os_string(len) }.into()
-    }
-
-    pub unsafe fn assume_init_u16_str(&self, len: usize) -> &U16Str {
-        let slice = unsafe { self.0.assume_init_slice(..len) };
-        U16Str::from_slice(slice)
-    }
-
-    pub unsafe fn assume_init_u16_str_with_nul(
-        &self,
-        len: usize,
-    ) -> Result<&U16CStr, MissingNulTerminator> {
-        let slice = unsafe { self.0.assume_init_slice(..len) };
-        U16CStr::from_slice_truncate(slice)
-    }
-
-    pub unsafe fn assume_init_u16_str_with_nul_unchecked(&self, len: usize) -> &U16CStr {
-        let slice = unsafe { self.0.assume_init_slice(..len) };
-        unsafe { U16CStr::from_slice_unchecked(slice) }
-    }
+pub enum FillPathBufResult {
+    BufTooSmall { size_hint: Option<usize> },
+    Success { actual_len: usize },
+    Error(io::Error),
 }
 
-impl Deref for WinPathBuf {
-    type Target = UninitArrayBuf<u16, MAX_PATH>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for WinPathBuf {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+pub fn win_fill_path_buf_helper(
+    mut f: impl FnMut(*mut u16, usize) -> FillPathBufResult,
+) -> Result<PathBuf, io::Error> {
+    let mut buf = UninitArrayBuf::<u16, MAX_PATH>::new();
+    match f(buf.as_mut_ptr(), buf.len()) {
+        FillPathBufResult::BufTooSmall { mut size_hint } => {
+            let mut vec_buf = Vec::new();
+            let mut buf_len = buf.len();
+            loop {
+                buf_len = cmp::max(buf_len.saturating_mul(2), size_hint.unwrap_or(0));
+                vec_buf.resize(buf_len, MaybeUninit::uninit());
+                match f(vec_buf[0].as_mut_ptr(), vec_buf.len()) {
+                    FillPathBufResult::Success { actual_len } => {
+                        let slice =
+                            unsafe { MaybeUninit::slice_assume_init_ref(&vec_buf[..actual_len]) };
+                        let wide_str = widestring::U16Str::from_slice(slice);
+                        return Ok(wide_str.to_os_string().into());
+                    }
+                    FillPathBufResult::Error(e) => return Err(e),
+                    FillPathBufResult::BufTooSmall {
+                        size_hint: new_size_hint,
+                    } => size_hint = new_size_hint,
+                }
+            }
+        }
+        FillPathBufResult::Success { actual_len } => {
+            let slice = unsafe { buf.assume_init_slice(..actual_len) };
+            let wide_str = widestring::U16Str::from_slice(slice);
+            Ok(wide_str.to_os_string().into())
+        }
+        FillPathBufResult::Error(e) => Err(e),
     }
 }
