@@ -65,10 +65,11 @@ pub enum SyringeError {
     /// Variant representing a windows api error inside the target process.
     #[error("remote io error: {}", _0)]
     RemoteIo(io::Error),
-    /// Variant representing a windows api error inside the target process.
+    /// Variant representing an unhandled exception inside the target process.
     #[error("remote exception: {}", _0)]
     RemoteException(ExceptionCode),
-    /// Variant representing an inaccessible target process. This can occur if it crashed or was terminated.
+    /// Variant representing an inaccessible target process.
+    /// This can occur if it crashed or was terminated.
     #[error("inaccessible target process")]
     ProcessInaccessible,
     /// Variant representing an error while loading an pe file.
