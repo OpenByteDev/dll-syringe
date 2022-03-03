@@ -68,6 +68,14 @@ impl<P: Process> ProcessModule<P> {
         unsafe { ProcessModule::new_unchecked(handle, P::current()) }
     }
 
+    /// Returns a borrowed instance of this module.
+    pub fn borrowed(&self) -> BorrowedProcessModule<'_> {
+        ProcessModule {
+            handle: self.handle,
+            process: self.process.borrowed(),
+        }
+    }
+
     /// Searches for a module with the given name or path in the given process.
     /// If the extension is omitted, the default library extension `.dll` is appended.
     pub fn find(
