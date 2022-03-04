@@ -323,7 +323,7 @@ impl<P: Process> ProcessModule<P> {
     }
 }
 
-impl ProcessModule<BorrowedProcess<'_>> {
+impl BorrowedProcessModule<'_> {
     /// Tries to create a new [`OwnedProcessModule`] instance for this process module.
     pub fn try_to_owned(&self) -> Result<OwnedProcessModule, io::Error> {
         self.process
@@ -332,6 +332,20 @@ impl ProcessModule<BorrowedProcess<'_>> {
                 process,
                 handle: self.handle,
             })
+    }
+}
+
+impl TryFrom<BorrowedProcessModule<'_>> for OwnedProcessModule {
+    type Error = io::Error;
+
+    fn try_from(module: BorrowedProcessModule<'_>) -> Result<Self, Self::Error> {
+        module.try_to_owned()
+    }
+}
+
+impl<'a> From<&'a OwnedProcessModule> for BorrowedProcessModule<'a> {
+    fn from(module: &'a OwnedProcessModule) -> Self {
+        module.borrowed()
     }
 }
 

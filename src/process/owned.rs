@@ -67,6 +67,14 @@ impl From<Child> for OwnedProcess {
     }
 }
 
+impl TryFrom<BorrowedProcess<'_>> for OwnedProcess {
+    type Error = io::Error;
+
+    fn try_from(process: BorrowedProcess<'_>) -> Result<Self, Self::Error> {
+        process.try_to_owned()
+    }
+}
+
 impl PartialEq for OwnedProcess {
     fn eq(&self, other: &Self) -> bool {
         self.borrowed() == other.borrowed()
