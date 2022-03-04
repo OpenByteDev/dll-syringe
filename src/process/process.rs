@@ -93,7 +93,7 @@ pub trait Process: AsHandle + AsRawHandle {
     where
         Self: Sized,
     {
-        unsafe { Self::from_handle(Self::current_handle()) }
+        unsafe { Self::from_handle_unchecked(Self::current_handle()) }
     }
 
     /// Returns whether this instance represents the current process.
