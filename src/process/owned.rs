@@ -93,7 +93,7 @@ impl<'a> Process for OwnedProcess {
     type Handle = OwnedHandle;
 
     fn borrowed(&self) -> BorrowedProcess<'_> {
-        unsafe { BorrowedProcess::borrow_handle(self.as_handle()) }
+        unsafe { BorrowedProcess::from_handle_unchecked(self.as_handle()) }
     }
 
     fn try_clone(&self) -> Result<Self, io::Error> {
@@ -104,7 +104,7 @@ impl<'a> Process for OwnedProcess {
         self.0
     }
 
-    unsafe fn from_handle(handle: Self::Handle) -> Self {
+    unsafe fn from_handle_unchecked(handle: Self::Handle) -> Self {
         Self(handle)
     }
 
@@ -244,7 +244,7 @@ impl OwnedProcess {
     #[must_use]
     pub unsafe fn borrowed_static(&self) -> BorrowedProcess<'static> {
         unsafe {
-            BorrowedProcess::borrow_handle(BorrowedHandle::borrow_raw(self.as_raw_handle()))
+            BorrowedProcess::from_handle_unchecked(BorrowedHandle::borrow_raw(self.as_raw_handle()))
         }
     }
 

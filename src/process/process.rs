@@ -46,6 +46,14 @@ pub const PROCESS_INJECTION_ACCESS: DWORD = PROCESS_CREATE_THREAD
     | PROCESS_VM_WRITE;
 
 /// A trait representing a running process.
+///
+/// # Note
+/// The underlying handle has the following [privileges](https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights):
+///  - `PROCESS_CREATE_THREAD`
+///  - `PROCESS_QUERY_INFORMATION`
+///  - `PROCESS_VM_OPERATION`
+///  - `PROCESS_VM_WRITE`
+///  - `PROCESS_VM_READ`
 pub trait Process: AsHandle + AsRawHandle {
     /// The underlying handle type.
     type Handle;
@@ -67,7 +75,7 @@ pub trait Process: AsHandle + AsRawHandle {
     /// # Safety
     /// The caller must ensure that the handle is a valid process handle and has the required priviledges.
     #[must_use]
-    unsafe fn from_handle(handle: Self::Handle) -> Self;
+    unsafe fn from_handle_unchecked(handle: Self::Handle) -> Self;
 
     /// Returns the raw pseudo handle representing the current process.
     #[must_use]

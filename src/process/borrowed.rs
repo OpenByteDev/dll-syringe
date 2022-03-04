@@ -111,8 +111,8 @@ impl<'a> Process for BorrowedProcess<'a> {
         Ok(*self)
     }
 
-    unsafe fn from_handle(handle: Self::Handle) -> Self {
-        unsafe { BorrowedProcess::borrow_handle(handle) }
+    unsafe fn from_handle_unchecked(handle: Self::Handle) -> Self {
+        Self(handle)
     }
 
     fn current_handle() -> Self::Handle {
@@ -199,15 +199,6 @@ impl<'a> Process for BorrowedProcess<'a> {
 }
 
 impl<'a> BorrowedProcess<'a> {
-    /// Creates a new instance from a borrowed handle.
-    ///
-    /// # Safety
-    /// The handle needs to fulfill the priviliges listed in the [struct documentation](BorrowedProcess).
-    #[must_use]
-    pub const unsafe fn borrow_handle(handle: BorrowedHandle<'a>) -> Self {
-        Self(handle)
-    }
-
     /// Tries to create a new [`OwnedProcess`] instance for this process.
     pub fn try_to_owned(&self) -> Result<OwnedProcess, io::Error> {
         let raw_handle = self.as_raw_handle();
