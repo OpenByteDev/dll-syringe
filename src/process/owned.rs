@@ -244,7 +244,7 @@ impl OwnedProcess {
     #[must_use]
     pub unsafe fn borrowed_static(&self) -> BorrowedProcess<'static> {
         unsafe {
-            BorrowedProcess::borrow_handle(BorrowedHandle::borrow_raw_handle(self.as_raw_handle()))
+            BorrowedProcess::borrow_handle(BorrowedHandle::borrow_raw(self.as_raw_handle()))
         }
     }
 

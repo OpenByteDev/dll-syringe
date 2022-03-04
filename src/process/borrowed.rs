@@ -116,7 +116,7 @@ impl<'a> Process for BorrowedProcess<'a> {
     }
 
     fn current_handle() -> Self::Handle {
-        unsafe { BorrowedHandle::borrow_raw_handle(Self::raw_current_handle()) }
+        unsafe { BorrowedHandle::borrow_raw(Self::raw_current_handle()) }
     }
 
     fn find_module_by_name(
