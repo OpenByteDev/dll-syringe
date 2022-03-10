@@ -19,7 +19,6 @@
     clippy::must_use_candidate,
     clippy::inconsistent_struct_constructor,
     clippy::wrong_self_convention,
-    clippy::missing_const_for_fn,
     clippy::new_without_default,
     rustdoc::broken_intra_doc_links,
     rustdoc::private_intra_doc_links

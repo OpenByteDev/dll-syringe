@@ -223,6 +223,7 @@ impl Syringe {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn remote_exit_code_to_exception(exit_code: u32) -> Result<(), SyringeError> {
         if exit_code == 0 {
             return Ok(());
