@@ -13,7 +13,7 @@ A windows dll injection library written in Rust.
 | ---------------- | -------------- | ------------------------------------------ |
 | 32-bit           | 32-bit         | Yes                                        |
 | 32-bit           | 64-bit         | No                                         |
-| 64-bit           | 32-bit         | Yes (requires feature `into_x86_from_x64`) |
+| 64-bit           | 32-bit         | Yes (requires feature `into-x86-from-x64`) |
 | 64-bit           | 64-bit         | Yes                                        |
 
 ## Usage

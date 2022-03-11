@@ -29,20 +29,22 @@
     clippy::missing_errors_doc,
     clippy::borrow_as_ptr
 )]
-#![cfg_attr(feature = "doc_cfg", doc = include_str!("../crate-doc.md"))]
-#![cfg_attr(not(feature = "doc_cfg"), allow(missing_docs))]
-#![cfg_attr(feature = "doc_cfg", feature(doc_cfg))]
+#![cfg_attr(feature = "doc-cfg", doc = include_str!("../crate-doc.md"))]
+#![cfg_attr(not(feature = "doc-cfg"), allow(missing_docs))]
+#![cfg_attr(feature = "doc-cfg", feature(doc_cfg))]
 
+#[cfg(feature = "syringe")]
 mod syringe;
+#[cfg(feature = "syringe")]
 pub use syringe::*;
 
 /// Module containing process abstractions and utilities.
 pub mod process;
 
-#[cfg(any(feature = "remote_procedure", feature = "doc_cfg"))]
-#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "remote_procedure")))]
+#[cfg(feature = "rpc")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
 mod remote_procedure;
-#[cfg(any(feature = "remote_procedure", feature = "doc_cfg"))]
+#[cfg(feature = "rpc")]
 pub use remote_procedure::*;
 
 pub(crate) mod utils;

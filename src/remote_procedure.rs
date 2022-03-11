@@ -21,7 +21,7 @@ use crate::{
 
 type RemoteProcedurePtr = NonNull<c_void>;
 
-#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "remote_procedure")))]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
 impl Syringe {
     /// Loads an exported function from the given module from the target process.
     /// The function does not have to be from an injected module.
@@ -256,7 +256,7 @@ impl Syringe {
 
 /// A remote procedure from a module of a remote process.
 /// The procedure abides by the `extern "system" fn(*const T, *mut R)` signature.
-#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "remote_procedure")))]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
 #[derive(Debug)]
 pub struct RemoteProcedure<T: ?Sized, R> {
     ptr: RemoteProcedurePtr,

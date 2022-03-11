@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// A owned buffer in the memory space of a (remote) process.
-#[cfg_attr(feature = "doc_cfg", doc(cfg(feature = "process_memory")))]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "process-memory")))]
 #[derive(Debug)]
 pub struct ProcessMemoryBuffer<'a>(ProcessMemorySlice<'a>);
 

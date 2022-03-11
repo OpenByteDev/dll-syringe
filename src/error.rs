@@ -52,6 +52,8 @@ pub enum GetLocalProcedureAddressError {
 // TODO: add more specialized error variants
 /// Error enum for errors during syringe operations like injection, ejection or remote procedure calling.
 #[derive(Debug, Error)]
+#[cfg(feature = "syringe")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
 pub enum SyringeError {
     /// Variant representing an illegal interior nul value.
     #[error("interior nul found")]
@@ -74,7 +76,7 @@ pub enum SyringeError {
     ProcessInaccessible,
     /// Variant representing an error while loading an pe file.
     #[cfg(target_arch = "x86_64")]
-    #[cfg(feature = "into_x86_from_x64")]
+    #[cfg(feature = "into-x86-from-x64")]
     #[error("failed to load pe file: {}", _0)]
     Goblin(#[from] goblin::error::Error),
 }

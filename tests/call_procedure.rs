@@ -1,4 +1,4 @@
-#![cfg(feature = "remote_procedure")]
+#![cfg(feature = "rpc")]
 
 use dll_syringe::{process::Process, Syringe};
 use std::time::Duration;

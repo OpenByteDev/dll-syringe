@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-#[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
+#[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
 use {
     goblin::pe::PE,
     std::{convert::TryInto, fs, mem::MaybeUninit, path::PathBuf, time::Duration},
@@ -26,13 +26,13 @@ use {
     winapi::{shared::minwindef::MAX_PATH, um::wow64apiset::GetSystemWow64DirectoryW},
 };
 
-#[cfg(feature = "remote_procedure")]
+#[cfg(feature = "rpc")]
 use winapi::shared::{minwindef::FARPROC, ntdef::LPCSTR};
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
 type GetLastErrorFn = unsafe extern "system" fn() -> DWORD;
-#[cfg(feature = "remote_procedure")]
+#[cfg(feature = "rpc")]
 type GetProcAddressFn = unsafe extern "system" fn(HMODULE, LPCSTR) -> FARPROC;
 
 #[derive(Debug, Clone)]
@@ -41,7 +41,7 @@ pub(crate) struct InjectHelpData {
     load_library_offset: usize,
     free_library_offset: usize,
     get_last_error_offset: usize,
-    #[cfg(feature = "remote_procedure")]
+    #[cfg(feature = "rpc")]
     get_proc_address_offset: usize,
 }
 
@@ -57,7 +57,7 @@ impl InjectHelpData {
     pub fn get_get_last_error(&self) -> GetLastErrorFn {
         unsafe { mem::transmute(self.kernel32_module as usize + self.get_last_error_offset) }
     }
-    #[cfg(feature = "remote_procedure")]
+    #[cfg(feature = "rpc")]
     pub fn get_proc_address_fn_ptr(&self) -> GetProcAddressFn {
         unsafe { mem::transmute(self.kernel32_module as usize + self.get_proc_address_offset) }
     }
@@ -84,11 +84,12 @@ impl InjectHelpData {
 /// syringe.eject(injected_payload).unwrap();
 /// ```
 #[derive(Debug)]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
 pub struct Syringe {
     pub(crate) inject_help_data: OnceCell<InjectHelpData>,
     pub(crate) remote_allocator: RemoteBoxAllocator,
     load_library_w_stub: OnceCell<LoadLibraryWStub>,
-    #[cfg(feature = "remote_procedure")]
+    #[cfg(feature = "rpc")]
     pub(crate) get_proc_address_stub:
         OnceCell<crate::RemoteProcedureStub<crate::GetProcAddressParams, FARPROC>>,
 }
@@ -101,7 +102,7 @@ impl Syringe {
             remote_allocator: RemoteBoxAllocator::new(process),
             inject_help_data: OnceCell::new(),
             load_library_w_stub: OnceCell::new(),
-            #[cfg(feature = "remote_procedure")]
+            #[cfg(feature = "rpc")]
             get_proc_address_stub: OnceCell::new(),
         }
     }
@@ -217,7 +218,7 @@ impl Syringe {
 
         match (is_target_x64, is_self_x64) {
             (true, true) | (false, false) => Self::load_inject_help_data_for_current_target(),
-            #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
+            #[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
             (false, true) => Self::_load_inject_help_data_for_process(process),
             _ => Err(SyringeError::UnsupportedTarget),
         }
@@ -264,7 +265,7 @@ impl Syringe {
             kernel32_module.get_local_procedure_address_cstr(cstr!("FreeLibrary"))?;
         let get_last_error_fn_ptr =
             kernel32_module.get_local_procedure_address_cstr(cstr!("GetLastError"))?;
-        #[cfg(feature = "remote_procedure")]
+        #[cfg(feature = "rpc")]
         let get_proc_address_fn_ptr =
             kernel32_module.get_local_procedure_address_cstr(cstr!("GetProcAddress"))?;
 
@@ -274,14 +275,14 @@ impl Syringe {
             free_library_offset: free_library_fn_ptr as usize - kernel32_module.handle() as usize,
             get_last_error_offset: get_last_error_fn_ptr as usize
                 - kernel32_module.handle() as usize,
-            #[cfg(feature = "remote_procedure")]
+            #[cfg(feature = "rpc")]
             get_proc_address_offset: get_proc_address_fn_ptr as usize
                 - kernel32_module.handle() as usize,
         })
     }
 
     #[cfg(target_arch = "x86_64")]
-    #[cfg(feature = "into_x86_from_x64")]
+    #[cfg(feature = "into-x86-from-x64")]
     fn _load_inject_help_data_for_process(
         process: BorrowedProcess<'_>,
     ) -> Result<InjectHelpData, SyringeError> {
@@ -321,7 +322,7 @@ impl Syringe {
             .find(|export| matches!(export.name, Some("GetLastError")))
             .unwrap();
 
-        #[cfg(feature = "remote_procedure")]
+        #[cfg(feature = "rpc")]
         let get_proc_address_export = pe
             .exports
             .iter()
@@ -333,12 +334,12 @@ impl Syringe {
             load_library_offset: load_library_export.rva,
             free_library_offset: free_library_export.rva,
             get_last_error_offset: get_last_error_export.rva,
-            #[cfg(feature = "remote_procedure")]
+            #[cfg(feature = "rpc")]
             get_proc_address_offset: get_proc_address_export.rva,
         })
     }
 
-    #[cfg(all(target_arch = "x86_64", feature = "into_x86_from_x64"))]
+    #[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
     fn wow64_dir() -> Result<PathBuf, io::Error> {
         let mut path_buf = MaybeUninit::uninit_array::<MAX_PATH>();
         let path_buf_len: u32 = path_buf.len().try_into().unwrap();

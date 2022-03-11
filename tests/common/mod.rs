@@ -101,7 +101,7 @@ macro_rules! syringe_test {
             #[test]
             #[cfg(any(
                 target_arch = "x86",
-                all(target_arch = "x86_64", feature = "into_x86_from_x64")
+                all(target_arch = "x86_64", feature = "into-x86-from-x64")
             ))]
             fn x86() {
                 test_with_setup(
@@ -157,7 +157,7 @@ macro_rules! process_test {
             #[test]
             #[cfg(any(
                 target_arch = "x86",
-                all(target_arch = "x86_64", feature = "into_x86_from_x64")
+                all(target_arch = "x86_64", feature = "into-x86-from-x64")
             ))]
             fn x86() {
                 test_with_setup(

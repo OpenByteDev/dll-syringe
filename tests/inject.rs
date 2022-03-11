@@ -1,3 +1,5 @@
+#![cfg(feature = "syringe")]
+
 use dll_syringe::{error::SyringeError, process::Process, Syringe};
 
 #[allow(unused)]
