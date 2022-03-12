@@ -51,3 +51,5 @@ pub(crate) mod utils;
 
 /// Module containing the error enums used in this crate.
 pub mod error;
+
+pub mod function;
