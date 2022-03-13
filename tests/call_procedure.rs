@@ -1,6 +1,6 @@
 #![cfg(feature = "rpc")]
 
-use dll_syringe::{process::Process, Syringe};
+use dll_syringe::{error::RpcError, process::Process, Syringe};
 use std::time::Duration;
 
 #[allow(unused)]
@@ -35,7 +35,7 @@ syringe_test! {
 }
 
 process_test! {
-    fn get_procedure_address_of_invaid(
+    fn get_procedure_address_of_invalid(
         process: OwnedProcess,
     ) {
         let syringe = Syringe::for_process(process);
@@ -46,57 +46,50 @@ process_test! {
 }
 
 syringe_test! {
-    fn call_procedure_simple(
+    fn call_procedure_with_payload_utils_simple(
         process: OwnedProcess,
         payload_path: &Path,
     ) {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        // Simple echo test
-        let remote_echo = syringe.get_procedure::<u32, u32>(module, "echo").unwrap();
-        assert!(remote_echo.is_some());
-        let remote_echo = remote_echo.unwrap();
-        let echo_result: u32 = remote_echo.call(&0x1234_5678u32).unwrap();
-        assert_eq!(echo_result, 0x1234_5678u32);
-
-        // "Complex" addition test
-        let remote_add = syringe.get_procedure(module, "add").unwrap().unwrap();
-        let add_result: f64 = remote_add.call(&(4.2f64, 0.1f64)).unwrap();
-        assert_eq!(add_result as f64, 4.2f64 + 0.1f64);
+        let remote_add = syringe.get_procedure::<fn(u32, u32) -> u32>(module, "add3").unwrap().unwrap();
+        let add_result = remote_add.call(&42, &10).unwrap();
+        assert_eq!(add_result, 52);
     }
 }
 
 syringe_test! {
-    fn call_procedure_with_payload_utils(
+    fn call_procedure_with_payload_utils_complex(
         process: OwnedProcess,
         payload_path: &Path,
     ) {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_add2 = syringe.get_procedure(module, "add2").unwrap().unwrap();
-        let add2_result: f64 = remote_add2.call(&(4.2f64, 0.1f64)).unwrap();
-        assert_eq!(add2_result as f64, 4.2f64 + 0.1f64);
+        let remote_sum = syringe.get_procedure::<fn(Vec<u64>) -> u64>(module, "sum").unwrap().unwrap();
+        let sum_result = remote_sum.call(&vec![1, 2, 3, 4, 5, 6, 7, 8, 9]).unwrap();
+        assert_eq!(sum_result, 45);
     }
 }
 
 syringe_test! {
-    fn call_procedure_with_large_arg(
+    fn call_procedure_with_payload_utils_panic(
         process: OwnedProcess,
         payload_path: &Path,
     ) {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_count_zeros = syringe
-            .get_procedure::<[u8; 100], u32>(module, "count_zeros").unwrap()
-            .unwrap();
-        let mut buffer = [0u8; 100];
-        for (i, item) in buffer.iter_mut().enumerate() {
-            *item = if i % 2 == 0 { 0u8 } else { 1u8 };
-        }
-        let count_zeros_result = remote_count_zeros.call(&buffer).unwrap();
-        assert_eq!(count_zeros_result, buffer.len() as u32 / 2);
+        let remote_does_panic = syringe.get_procedure::<fn()>(module, "does_panic").unwrap().unwrap();
+        let result = remote_does_panic.call();
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, RpcError::RemoteProcedure(_)));
+        let err_message = match err {
+            RpcError::RemoteProcedure(e) => e.to_string(),
+            _ => panic!("Expected RpcError::RemoteProcedure"),
+        };
+        assert_eq!(err_message, String::from("Some error message"));
     }
 }

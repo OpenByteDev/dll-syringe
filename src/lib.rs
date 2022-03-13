@@ -6,7 +6,8 @@
     once_cell,
     io_safety,
     linked_list_cursors,
-    vec_into_raw_parts
+    vec_into_raw_parts,
+    generic_associated_types
 )]
 #![warn(
     unsafe_op_in_unsafe_fn,
@@ -43,13 +44,27 @@ pub mod process;
 
 #[cfg(feature = "rpc")]
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
-mod remote_procedure;
+mod rpc;
 #[cfg(feature = "rpc")]
-pub use remote_procedure::*;
+pub use rpc::*;
 
 pub(crate) mod utils;
 
 /// Module containing the error enums used in this crate.
 pub mod error;
 
+/// Module containing traits and types for working with function pointers.
 pub mod function;
+
+#[cfg(feature = "payload-utils")]
+#[doc(hidden)]
+pub mod payload_utils;
+
+#[cfg(any(feature = "payload-utils", feature = "rpc"))]
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub(crate) struct ArgAndResultBufInfo {
+    pub data: u64,
+    pub len: u64,
+    pub is_error: bool,
+}

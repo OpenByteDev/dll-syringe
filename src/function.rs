@@ -2,13 +2,21 @@ use std::{fmt::Display, str::FromStr};
 
 use winapi::shared::minwindef::{__some_function, FARPROC};
 
+/// Type alias for a raw untyped function pointer.
 pub type RawFunctionPtr = FARPROC;
+/// Type alias for the pointee of a raw function pointer.
 pub type RawFunctionPtrTarget = __some_function;
 
 /// Trait representing a function.
-pub trait FunctionPtr: Sized + Copy + Sync + 'static {
+///
+/// # Safety
+/// This trait should only be implemented for function pointers and the associated types and constants have to match the function pointer type.
+pub unsafe trait FunctionPtr: Sized + Copy + Send + Sync + 'static {
     /// The argument types as a tuple.
     type Args;
+
+    /// The argument types as a tuple of references.
+    type RefArgs<'a>;
 
     /// The return type.
     type Output;
@@ -19,13 +27,12 @@ pub trait FunctionPtr: Sized + Copy + Sync + 'static {
     /// Is this function unsafe.
     const UNSAFE: bool;
 
-    /// Is this function unsafe.
-    const CALLING_CONVENTION: CallingConvention;
+    /// The ABI of this function.
+    const ABI: Abi;
 
-    /// Constructs a `Function` from an untyped function pointer.
+    /// Constructs a [`FunctionPtr`] from an untyped function pointer.
     ///
     /// # Safety
-    ///
     /// This function is unsafe because it can not check if the argument points to a function
     /// of the correct type.
     unsafe fn from_ptr(ptr: RawFunctionPtr) -> Self;
@@ -34,86 +41,98 @@ pub trait FunctionPtr: Sized + Copy + Sync + 'static {
     fn as_ptr(&self) -> RawFunctionPtr;
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum CallingConvention {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// The abi or calling convention of a function pointer.
+pub enum Abi {
+    /// The default ABI when you write a normal `fn foo()` in any Rust code.
     Rust,
+    /// This is the same as `extern fn foo()`; whatever the default your C compiler supports.
     C,
+    /// Usually the same as [`extern "C"`](Abi::C), except on Win32, in which case it's [`"stdcall"`](Abi::Stdcall), or what you should use to link to the Windows API itself.
     System,
+    /// The default for C code on x86_64 Windows.
     Win64,
+    /// The default for C code on non-Windows x86_64.
     Sysv64,
+    /// The default for ARM.
     Aapcs,
+    /// The default for x86_32 C code.
     Cdecl,
+    /// The default for the Win32 API on x86_32.
     Stdcall,
+    /// The `fastcall` ABI -- corresponds to MSVC's `__fastcall` and GCC and clang's `__attribute__((fastcall))`
     Fastcall,
+    /// The `vectorcall` ABI -- corresponds to MSVC's `__vectorcall` and GCC and clang's `__attribute__((vectorcall))`
     Vectorcall,
 }
 
-impl CallingConvention {
+impl Abi {
+    /// Returns the string representation of this ABI.
     #[must_use]
     pub const fn to_str(&self) -> &'static str {
         match self {
-            CallingConvention::Rust => "Rust",
-            CallingConvention::C => "C",
-            CallingConvention::System => "System",
-            CallingConvention::Win64 => "Win64",
-            CallingConvention::Sysv64 => "Sysv64",
-            CallingConvention::Aapcs => "Aapcs",
-            CallingConvention::Cdecl => "Cdecl",
-            CallingConvention::Stdcall => "Stdcall",
-            CallingConvention::Fastcall => "Fastcall",
-            CallingConvention::Vectorcall => "Vectorcall",
+            Abi::Rust => "Rust",
+            Abi::C => "C",
+            Abi::System => "System",
+            Abi::Win64 => "Win64",
+            Abi::Sysv64 => "Sysv64",
+            Abi::Aapcs => "Aapcs",
+            Abi::Cdecl => "Cdecl",
+            Abi::Stdcall => "Stdcall",
+            Abi::Fastcall => "Fastcall",
+            Abi::Vectorcall => "Vectorcall",
         }
     }
 }
 
-impl FromStr for CallingConvention {
+impl FromStr for Abi {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "" | "Rust" => Ok(CallingConvention::C),
-            "C" => Ok(CallingConvention::C),
-            "system" => Ok(CallingConvention::System),
-            "win64" => Ok(CallingConvention::Win64),
-            "sysv64" => Ok(CallingConvention::Sysv64),
-            "aapcs" => Ok(CallingConvention::Aapcs),
-            "cdecl" => Ok(CallingConvention::Cdecl),
-            "stdcall" => Ok(CallingConvention::Stdcall),
-            "fastcall" => Ok(CallingConvention::Fastcall),
-            "vectorcall" => Ok(CallingConvention::Vectorcall),
+            "" | "Rust" => Ok(Abi::C),
+            "C" => Ok(Abi::C),
+            "system" => Ok(Abi::System),
+            "win64" => Ok(Abi::Win64),
+            "sysv64" => Ok(Abi::Sysv64),
+            "aapcs" => Ok(Abi::Aapcs),
+            "cdecl" => Ok(Abi::Cdecl),
+            "stdcall" => Ok(Abi::Stdcall),
+            "fastcall" => Ok(Abi::Fastcall),
+            "vectorcall" => Ok(Abi::Vectorcall),
             _ => Err(()),
         }
     }
 }
 
 #[must_use]
-const fn call_conv_from_str(conv: &'static str) -> Option<CallingConvention> {
+const fn call_conv_from_str(conv: &'static str) -> Option<Abi> {
     if konst::eq_str(conv, "") || konst::eq_str(conv, "Rust") {
-        Some(CallingConvention::Rust)
+        Some(Abi::Rust)
     } else if konst::eq_str(conv, "C") {
-        Some(CallingConvention::C)
+        Some(Abi::C)
     } else if konst::eq_str(conv, "system") {
-        Some(CallingConvention::System)
+        Some(Abi::System)
     } else if konst::eq_str(conv, "win64") {
-        Some(CallingConvention::Win64)
+        Some(Abi::Win64)
     } else if konst::eq_str(conv, "sysv64") {
-        Some(CallingConvention::Sysv64)
+        Some(Abi::Sysv64)
     } else if konst::eq_str(conv, "aapcs") {
-        Some(CallingConvention::Aapcs)
+        Some(Abi::Aapcs)
     } else if konst::eq_str(conv, "cdecl") {
-        Some(CallingConvention::Cdecl)
+        Some(Abi::Cdecl)
     } else if konst::eq_str(conv, "stdcall") {
-        Some(CallingConvention::Stdcall)
+        Some(Abi::Stdcall)
     } else if konst::eq_str(conv, "fastcall") {
-        Some(CallingConvention::Fastcall)
+        Some(Abi::Fastcall)
     } else if konst::eq_str(conv, "vectorcall") {
-        Some(CallingConvention::Vectorcall)
+        Some(Abi::Vectorcall)
     } else {
         None
     }
 }
 
-impl Display for CallingConvention {
+impl Display for Abi {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_str())
     }
@@ -146,15 +165,16 @@ macro_rules! impl_fn {
     };
 
     (@impl_core ($($nm:ident : $ty:ident),*) ($fn_type:ty) ($is_unsafe:expr) ($call_conv:expr)) => {
-        impl<Ret: 'static, $($ty: 'static),*> crate::function::FunctionPtr for $fn_type {
+        unsafe impl<Ret: 'static, $($ty: 'static),*> crate::function::FunctionPtr for $fn_type {
             type Args = ($($ty,)*);
+            type RefArgs<'a> = ($(&'a $ty,)*);
             type Output = Ret;
 
             const ARITY: ::core::primitive::usize = impl_fn!(@count ($($ty)*));
             const UNSAFE: ::core::primitive::bool = $is_unsafe;
-            const CALLING_CONVENTION: crate::function::CallingConvention = match call_conv_from_str($call_conv) {
+            const ABI: crate::function::Abi = match call_conv_from_str($call_conv) {
                 Some(c) => c,
-                None => panic!(concat!("invalid or unknown calling convention: ", $call_conv)),
+                None => panic!(concat!("invalid or unknown abi: ", $call_conv)),
             };
 
             unsafe fn from_ptr(ptr: crate::function::RawFunctionPtr) -> Self {

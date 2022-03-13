@@ -18,20 +18,20 @@ pub extern "system" fn add(numbers: *const (f64, f64), result: *mut f64) {
     unsafe { *result = (*numbers).0 + (*numbers).1 }
 }
 
-dll_syringe_payload_utils::remote_procedure! {
-    fn add2(a: f64, b: f64) -> f64 {
+dll_syringe::payload_procedure! {
+    fn add3(a: u32, b: u32) -> u32 {
         a + b
     }
 }
 
-dll_syringe_payload_utils::remote_procedure! {
-    fn count_zeros(buf: [u8; 100]) -> u32 {
-        let mut count = 0;
-        for i in 0..buf.len() {
-            if buf[i] == 0 {
-                count += 1;
-            }
-        }
-        count
+dll_syringe::payload_procedure! {
+    fn sum(nums: Vec<u64>) -> u64 {
+        nums.iter().sum()
+    }
+}
+
+dll_syringe::payload_procedure! {
+    fn does_panic() {
+        panic!("Some error message")
     }
 }

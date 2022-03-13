@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-winapi = { version = "0.3", features = ["minwindef"] }
-dll-syringe-payload-utils = "0.1.3"
+winapi = { version = "0.3", features = ["minwindef"], default-features = false }
+dll-syringe = { path = "../../..", features = ["payload-utils"], default-features = false }
+serde = { version = "1.0", default-features = false }
+bincode = { version = "1.3", default-features = false }
 
 [lib]
 crate-type = ["dylib"]

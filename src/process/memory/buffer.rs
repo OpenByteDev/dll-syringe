@@ -1,7 +1,7 @@
 use std::{
     io,
     marker::PhantomData,
-    mem::{self, MaybeUninit},
+    mem::{self, ManuallyDrop, MaybeUninit},
     ops::{Deref, DerefMut, RangeBounds},
     os::windows::prelude::AsRawHandle,
     ptr, slice,
@@ -137,6 +137,30 @@ impl<'a> ProcessMemoryBuffer<'a> {
         process: BorrowedProcess<'a>,
     ) -> Self {
         Self(unsafe { ProcessMemorySlice::from_raw_parts(ptr, len, process) })
+    }
+
+    /// Constructs a new buffer from the given raw parts.
+    pub fn into_raw_parts(self) -> (*mut u8, usize, BorrowedProcess<'a>) {
+        let parts = (self.ptr, self.len, self.process);
+        self.leak();
+        parts
+    }
+
+    /// Leaks the buffer and returns the underlying memory slice if the buffer is allocated in the current process.
+    pub fn into_dangling_local_slice(self) -> Result<&'static mut [u8], Self> {
+        if self.process.is_current() {
+            let slice = unsafe { slice::from_raw_parts_mut(self.ptr, self.len) };
+            self.leak();
+            Ok(slice)
+        } else {
+            Err(self)
+        }
+    }
+
+    /// Leaks the buffer and returns a [`ProcessMemorySlice`] spanning this buffer.
+    pub fn leak(self) -> ProcessMemorySlice<'a> {
+        let this = ManuallyDrop::new(self);
+        this.0
     }
 
     /// Constructs a new slice spanning the whole buffer.
@@ -365,6 +389,26 @@ impl<'a> ProcessMemorySlice<'a> {
             ptr: range.start as *mut _,
             len: range.len(),
             data: PhantomData,
+        }
+    }
+
+    /// Constructs a new slice spanning the whole buffer.
+    #[must_use]
+    pub fn as_local_slice(&self) -> Option<&[u8]> {
+        if self.is_local() {
+            Some(unsafe { slice::from_raw_parts(self.ptr, self.len) })
+        } else {
+            None
+        }
+    }
+
+    /// Constructs a new mutable slice spanning the whole buffer.
+    #[must_use]
+    pub fn as_local_slice_mut(&mut self) -> Option<&mut [u8]> {
+        if self.is_local() {
+            Some(unsafe { slice::from_raw_parts_mut(self.ptr, self.len) })
+        } else {
+            None
         }
     }
 

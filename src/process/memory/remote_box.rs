@@ -1,4 +1,4 @@
-use std::{cell::RefCell, io, marker::PhantomData, mem, ptr::NonNull, rc::Rc};
+use std::{cell::RefCell, io, marker::PhantomData, mem, ptr::NonNull, rc::Rc, slice};
 
 use crate::process::{
     memory::{Allocation, DynamicMultiBufferAllocator, ProcessMemorySlice, RawAllocator},
@@ -28,20 +28,33 @@ impl RemoteBoxAllocator {
         self.0.process.borrowed()
     }
 
-    pub unsafe fn alloc_raw<T: ?Sized>(&self, size: usize) -> Result<RemoteBox<T>, io::Error> {
+    pub fn alloc_raw(&self, size: usize) -> Result<RemoteAllocation, io::Error> {
+        // TODO: optimize empty allocations
         let allocation = self.0.allocator.borrow_mut().alloc(size)?;
-        Ok(RemoteBox::new(self.clone(), allocation))
+        Ok(RemoteAllocation::new(self.clone(), allocation))
     }
-    pub fn alloc_uninit<T: Sized>(&self) -> Result<RemoteBox<T>, io::Error> {
-        unsafe { self.alloc_raw(mem::size_of::<T>()) }
+    pub fn alloc_uninit<T: Copy>(&self) -> Result<RemoteBox<T>, io::Error> {
+        let allocation = self.alloc_raw(mem::size_of::<T>())?;
+        Ok(RemoteBox::new(allocation))
     }
-    pub fn alloc_uninit_for<T: ?Sized>(&self, value: &T) -> Result<RemoteBox<T>, io::Error> {
-        unsafe { self.alloc_raw(mem::size_of_val(value)) }
+    #[allow(dead_code)]
+    pub fn alloc_uninit_for<T: Copy>(&self, value: &T) -> Result<RemoteBox<T>, io::Error> {
+        let allocation = self.alloc_raw(mem::size_of_val(value))?;
+        Ok(RemoteBox::new(allocation))
     }
-    pub fn alloc_and_copy<T: ?Sized>(&self, value: &T) -> Result<RemoteBox<T>, io::Error> {
+    #[allow(dead_code)]
+    pub fn alloc_and_copy<T: Copy>(&self, value: &T) -> Result<RemoteBox<T>, io::Error> {
         let b = self.alloc_uninit_for(value)?;
         b.write(value)?;
         Ok(b)
+    }
+    pub fn alloc_and_copy_buf<T: Copy>(&self, buf: &[T]) -> Result<RemoteAllocation, io::Error> {
+        let bytes = unsafe {
+            slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * mem::size_of::<T>())
+        };
+        let allocation = self.alloc_raw(bytes.len())?;
+        allocation.write_bytes(bytes)?;
+        Ok(allocation)
     }
 
     fn free(&self, allocation: &Allocation) {
@@ -50,18 +63,16 @@ impl RemoteBoxAllocator {
 }
 
 #[derive(Debug)]
-pub struct RemoteBox<T: ?Sized> {
+pub struct RemoteAllocation {
     allocation: Allocation,
     allocator: RemoteBoxAllocator,
-    phantom: PhantomData<T>,
 }
 
-impl<T: ?Sized> RemoteBox<T> {
+impl RemoteAllocation {
     const fn new(allocator: RemoteBoxAllocator, allocation: Allocation) -> Self {
         Self {
             allocation,
             allocator,
-            phantom: PhantomData,
         }
     }
 
@@ -79,8 +90,20 @@ impl<T: ?Sized> RemoteBox<T> {
         }
     }
 
-    pub fn write(&self, value: &T) -> Result<(), io::Error> {
-        self.memory().write_struct(0, value)
+    pub fn write_bytes(&self, value: &[u8]) -> Result<(), io::Error> {
+        self.memory().write(0, value)
+    }
+
+    pub fn read_bytes(&self, buf: &mut [u8]) -> Result<(), io::Error> {
+        self.memory().read(0, buf)
+    }
+
+    pub const fn len(&self) -> usize {
+        self.allocation.len
+    }
+
+    pub const fn as_ptr(&self) -> NonNull<u8> {
+        self.allocation.as_ptr()
     }
 
     pub const fn as_raw_ptr(&self) -> *mut u8 {
@@ -88,19 +111,42 @@ impl<T: ?Sized> RemoteBox<T> {
     }
 }
 
-impl<'a, T: Sized> RemoteBox<T> {
+impl Drop for RemoteAllocation {
+    fn drop(&mut self) {
+        self.allocator.free(&self.allocation);
+    }
+}
+
+#[derive(Debug)]
+pub struct RemoteBox<T: ?Sized + Copy> {
+    allocation: RemoteAllocation,
+    phantom: PhantomData<T>,
+}
+
+impl<T: ?Sized + Copy> RemoteBox<T> {
+    const fn new(allocation: RemoteAllocation) -> Self {
+        Self {
+            allocation,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn write(&self, value: &T) -> Result<(), io::Error> {
+        self.allocation.memory().write_struct(0, value)
+    }
+
+    pub const fn as_raw_ptr(&self) -> *mut u8 {
+        self.allocation.as_raw_ptr()
+    }
+}
+
+impl<'a, T: Sized + Copy> RemoteBox<T> {
     pub fn read(&self) -> Result<T, io::Error> {
-        unsafe { self.memory().read_struct::<T>(0) }
+        unsafe { self.allocation.memory().read_struct(0) }
     }
 
     #[allow(dead_code)]
     pub const fn as_ptr(&self) -> NonNull<T> {
         self.allocation.as_ptr().cast()
-    }
-}
-
-impl<T: ?Sized> Drop for RemoteBox<T> {
-    fn drop(&mut self) {
-        self.allocator.free(&self.allocation);
     }
 }

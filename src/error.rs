@@ -5,22 +5,22 @@ use std::{
 
 use num_enum::{IntoPrimitive, TryFromPrimitive, TryFromPrimitiveError};
 use thiserror::Error;
-use winapi::{
-    shared::winerror::ERROR_PARTIAL_COPY,
-    um::{
-        minwinbase::{
-            EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EXCEPTION_BREAKPOINT,
-            EXCEPTION_DATATYPE_MISALIGNMENT, EXCEPTION_FLT_DENORMAL_OPERAND,
-            EXCEPTION_FLT_DIVIDE_BY_ZERO, EXCEPTION_FLT_INEXACT_RESULT,
-            EXCEPTION_FLT_INVALID_OPERATION, EXCEPTION_FLT_OVERFLOW, EXCEPTION_FLT_STACK_CHECK,
-            EXCEPTION_FLT_UNDERFLOW, EXCEPTION_GUARD_PAGE, EXCEPTION_ILLEGAL_INSTRUCTION,
-            EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW, EXCEPTION_INVALID_DISPOSITION,
-            EXCEPTION_INVALID_HANDLE, EXCEPTION_IN_PAGE_ERROR, EXCEPTION_NONCONTINUABLE_EXCEPTION,
-            EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP, EXCEPTION_STACK_OVERFLOW,
-        },
-        winnt::STATUS_UNWIND_CONSOLIDATE,
+use winapi::um::{
+    minwinbase::{
+        EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EXCEPTION_BREAKPOINT,
+        EXCEPTION_DATATYPE_MISALIGNMENT, EXCEPTION_FLT_DENORMAL_OPERAND,
+        EXCEPTION_FLT_DIVIDE_BY_ZERO, EXCEPTION_FLT_INEXACT_RESULT,
+        EXCEPTION_FLT_INVALID_OPERATION, EXCEPTION_FLT_OVERFLOW, EXCEPTION_FLT_STACK_CHECK,
+        EXCEPTION_FLT_UNDERFLOW, EXCEPTION_GUARD_PAGE, EXCEPTION_ILLEGAL_INSTRUCTION,
+        EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW, EXCEPTION_INVALID_DISPOSITION,
+        EXCEPTION_INVALID_HANDLE, EXCEPTION_IN_PAGE_ERROR, EXCEPTION_NONCONTINUABLE_EXCEPTION,
+        EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP, EXCEPTION_STACK_OVERFLOW,
     },
+    winnt::STATUS_UNWIND_CONSOLIDATE,
 };
+
+#[cfg(feature = "syringe")]
+use winapi::shared::winerror::ERROR_PARTIAL_COPY;
 
 #[derive(Debug, Error)]
 /// Error enum representing either a windows api error or a nul error from an invalid interior nul.
@@ -49,8 +49,7 @@ pub enum GetLocalProcedureAddressError {
     UnsupportedRemoteTarget,
 }
 
-// TODO: add more specialized error variants
-/// Error enum for errors during syringe operations like injection, ejection or remote procedure calling.
+/// Error enum for errors during syringe operations like injection and ejection.
 #[derive(Debug, Error)]
 #[cfg(feature = "syringe")]
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
@@ -64,7 +63,7 @@ pub enum SyringeError {
     /// Variant representing an unsupported target process.
     #[error("unsupported target process")]
     UnsupportedTarget,
-    /// Variant representing a windows api error inside the target process.
+    /// Variant representing an io error inside the target process.
     #[error("remote io error: {}", _0)]
     RemoteIo(io::Error),
     /// Variant representing an unhandled exception inside the target process.
@@ -81,6 +80,7 @@ pub enum SyringeError {
     Goblin(#[from] goblin::error::Error),
 }
 
+#[cfg(feature = "syringe")]
 impl From<io::Error> for SyringeError {
     fn from(err: io::Error) -> Self {
         if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
@@ -93,11 +93,40 @@ impl From<io::Error> for SyringeError {
     }
 }
 
+#[cfg(feature = "syringe")]
+impl From<ExceptionCode> for SyringeError {
+    fn from(err: ExceptionCode) -> Self {
+        Self::RemoteException(err)
+    }
+}
+
+#[cfg(feature = "syringe")]
 impl From<IoOrNulError> for SyringeError {
     fn from(err: IoOrNulError) -> Self {
         match err {
             IoOrNulError::Nul(e) => e.into(),
             IoOrNulError::Io(e) => e.into(),
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<ExceptionOrIoError> for SyringeError {
+    fn from(err: ExceptionOrIoError) -> Self {
+        match err {
+            ExceptionOrIoError::Io(e) => Self::RemoteIo(e),
+            ExceptionOrIoError::Exception(e) => Self::RemoteException(e),
+        }
+    }
+}
+
+#[cfg(feature = "rpc")]
+impl From<RawRpcError> for SyringeError {
+    fn from(err: RawRpcError) -> Self {
+        match err {
+            RawRpcError::Io(err) => Self::Io(err),
+            RawRpcError::RemoteException(code) => Self::RemoteException(code),
+            RawRpcError::ProcessInaccessible => Self::ProcessInaccessible,
         }
     }
 }
@@ -204,6 +233,106 @@ impl Display for ExceptionCode {
             Self::SingleStep => write!(f, "A single step or trace operation has just been completed."),
             Self::StackOverflow => write!(f, "Recursion too deep; the stack overflowed."),
             Self::UnwindConsolidate => write!(f, "A frame consolidation has been executed."),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+#[cfg(feature = "syringe")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
+/// An error representing either an unhandled exception or an io error.
+pub enum ExceptionOrIoError {
+    /// Variant representing an io error.
+    #[error("remote io error: {}", _0)]
+    Io(io::Error),
+    /// Variant representing an unhandled exception.
+    #[error("remote exception: {}", _0)]
+    Exception(ExceptionCode),
+}
+
+#[derive(Debug, Error)]
+#[cfg(feature = "rpc")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
+/// An enum repsenting possible errors during remote procedure calls without serialization, deserialization or remote panics.
+pub enum RawRpcError {
+    /// Variant representing an io error.
+    #[error("io error: {}", _0)]
+    Io(io::Error),
+    /// Variant representing an unhandled exception inside the target process.
+    #[error("remote exception: {}", _0)]
+    RemoteException(ExceptionCode),
+    /// Variant representing an inaccessible target process.
+    /// This can occur if it crashed or was terminated.
+    #[error("inaccessible target process")]
+    ProcessInaccessible,
+}
+
+#[cfg(feature = "rpc")]
+impl From<io::Error> for RawRpcError {
+    fn from(err: io::Error) -> Self {
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+            || err.kind() == io::ErrorKind::PermissionDenied
+        {
+            Self::ProcessInaccessible
+        } else {
+            Self::Io(err)
+        }
+    }
+}
+
+#[cfg(feature = "rpc")]
+impl From<ExceptionCode> for RawRpcError {
+    fn from(err: ExceptionCode) -> Self {
+        Self::RemoteException(err)
+    }
+}
+
+#[derive(Debug, Error)]
+#[cfg(feature = "rpc")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
+/// An enum repsenting possible errors during remote procedure calls.
+pub enum RpcError {
+    /// Variant representing an io error.
+    #[error("io error: {}", _0)]
+    Io(io::Error),
+    /// Variant representing a windows api error inside the target process.
+    #[error("remote io error: {}", _0)]
+    RemoteIo(io::Error),
+    /// Variant representing an unhandled exception inside the target process.
+    #[error("remote exception: {}", _0)]
+    RemoteException(ExceptionCode),
+    /// Variant representing an inaccessible target process.
+    /// This can occur if it crashed or was terminated.
+    #[error("inaccessible target process")]
+    ProcessInaccessible,
+    /// Variant representing an error in the remote procedure.
+    #[error("remote procedure error: {}", _0)]
+    RemoteProcedure(String),
+    /// Variant representing an error while serializing or deserializing.
+    #[error("serde error: {}", _0)]
+    Serde(#[from] Box<bincode::ErrorKind>),
+}
+
+#[cfg(feature = "rpc")]
+impl From<io::Error> for RpcError {
+    fn from(err: io::Error) -> Self {
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+            || err.kind() == io::ErrorKind::PermissionDenied
+        {
+            Self::ProcessInaccessible
+        } else {
+            Self::Io(err)
+        }
+    }
+}
+
+#[cfg(feature = "rpc")]
+impl From<RawRpcError> for RpcError {
+    fn from(err: RawRpcError) -> Self {
+        match err {
+            RawRpcError::Io(err) => Self::Io(err),
+            RawRpcError::RemoteException(code) => Self::RemoteException(code),
+            RawRpcError::ProcessInaccessible => Self::ProcessInaccessible,
         }
     }
 }

@@ -2,7 +2,7 @@ use cstr::cstr;
 use iced_x86::{code_asm::*, IcedError};
 use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
-use std::{ffi::c_void, io, lazy::OnceCell, mem, path::Path};
+use std::{io, lazy::OnceCell, mem, path::Path};
 use u16cstr::u16cstr;
 use widestring::U16CString;
 use winapi::shared::{
@@ -11,9 +11,9 @@ use winapi::shared::{
 };
 
 use crate::{
-    error::{ExceptionCode, SyringeError},
+    error::{ExceptionCode, ExceptionOrIoError, SyringeError},
     process::{
-        memory::{RemoteBox, RemoteBoxAllocator},
+        memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, ModuleHandle, OwnedProcess, Process, ProcessModule,
     },
 };
@@ -33,7 +33,7 @@ type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
 type GetLastErrorFn = unsafe extern "system" fn() -> DWORD;
 #[cfg(feature = "rpc")]
-type GetProcAddressFn = unsafe extern "system" fn(HMODULE, LPCSTR) -> FARPROC;
+pub(crate) type GetProcAddressFn = unsafe extern "system" fn(HMODULE, LPCSTR) -> FARPROC;
 
 #[derive(Debug, Clone)]
 pub(crate) struct InjectHelpData {
@@ -134,7 +134,7 @@ impl Syringe {
             U16CString::from_os_str(module_path.as_os_str())?.into_vec_with_nul();
         let remote_wide_module_path = self
             .remote_allocator
-            .alloc_and_copy(wide_module_path.as_slice())?;
+            .alloc_and_copy_buf(wide_module_path.as_slice())?;
 
         let injected_module_handle =
             load_library_w.call(remote_wide_module_path.as_raw_ptr().cast())?;
@@ -225,30 +225,27 @@ impl Syringe {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn remote_exit_code_to_exception(exit_code: u32) -> Result<(), SyringeError> {
+    pub(crate) fn remote_exit_code_to_exception(exit_code: u32) -> Result<u32, ExceptionCode> {
         if exit_code == 0 {
-            return Ok(());
+            return Ok(exit_code);
         }
 
         match ExceptionCode::try_from_primitive(exit_code) {
-            Ok(exception) => Err(SyringeError::RemoteException(exception)),
-            Err(_) => Err(SyringeError::RemoteIo(io::Error::new(
-                io::ErrorKind::Other,
-                "unknown remote process error",
-            ))),
+            Ok(exception) => Err(exception),
+            Err(_) => Ok(exit_code),
         }
     }
 
     pub(crate) fn remote_exit_code_to_error_or_exception(
         exit_code: u32,
-    ) -> Result<(), SyringeError> {
+    ) -> Result<(), ExceptionOrIoError> {
         if exit_code == 0 {
             return Ok(());
         }
 
         match ExceptionCode::try_from_primitive(exit_code) {
-            Ok(exception) => Err(SyringeError::RemoteException(exception)),
-            Err(_) => Err(SyringeError::RemoteIo(io::Error::from_raw_os_error(
+            Ok(exception) => Err(ExceptionOrIoError::Exception(exception)),
+            Err(_) => Err(ExceptionOrIoError::Io(io::Error::from_raw_os_error(
                 exit_code as _,
             ))),
         }
@@ -356,7 +353,7 @@ impl Syringe {
 
 #[derive(Debug)]
 struct LoadLibraryWStub {
-    code: RemoteBox<[u8]>,
+    code: RemoteAllocation,
     result: RemoteBox<ModuleHandle>,
 }
 
@@ -369,20 +366,20 @@ impl LoadLibraryWStub {
 
         let code = if remote_allocator.process().is_x86()? {
             Self::build_code_x86(
-                inject_data.get_load_library_fn_ptr() as *const _,
+                inject_data.get_load_library_fn_ptr(),
                 result.as_raw_ptr().cast(),
-                inject_data.get_get_last_error() as *const _,
+                inject_data.get_get_last_error(),
             )
             .unwrap()
         } else {
             Self::build_code_x64(
-                inject_data.get_load_library_fn_ptr() as *const _,
+                inject_data.get_load_library_fn_ptr(),
                 result.as_raw_ptr().cast(),
-                inject_data.get_get_last_error() as *const _,
+                inject_data.get_get_last_error(),
             )
             .unwrap()
         };
-        let code = remote_allocator.alloc_and_copy(code.as_slice())?;
+        let code = remote_allocator.alloc_and_copy_buf(code.as_slice())?;
 
         Ok(Self { code, result })
     }
@@ -407,14 +404,13 @@ impl LoadLibraryWStub {
         self.code.process()
     }
 
+    #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
     fn build_code_x86(
-        load_library_w: *const c_void,
-        return_buffer: *mut c_void,
-        get_last_error: *const c_void,
+        load_library_w: LoadLibraryWFn,
+        return_buffer: *mut HMODULE,
+        get_last_error: GetLastErrorFn,
     ) -> Result<Vec<u8>, IcedError> {
-        assert!(!load_library_w.is_null());
         assert!(!return_buffer.is_null());
-        assert!(!get_last_error.is_null());
         assert_eq!(load_library_w as u32 as usize, load_library_w as usize);
         assert_eq!(return_buffer as u32 as usize, return_buffer as usize);
         assert_eq!(get_last_error as u32 as usize, get_last_error as usize);
@@ -446,14 +442,13 @@ impl LoadLibraryWStub {
         Ok(code)
     }
 
+    #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
     fn build_code_x64(
-        load_library_w: *const c_void,
-        return_buffer: *mut c_void,
-        get_last_error: *const c_void,
+        load_library_w: LoadLibraryWFn,
+        return_buffer: *mut HMODULE,
+        get_last_error: GetLastErrorFn,
     ) -> Result<Vec<u8>, IcedError> {
-        assert!(!load_library_w.is_null());
         assert!(!return_buffer.is_null());
-        assert!(!get_last_error.is_null());
 
         let mut asm = CodeAssembler::new(64)?;
 

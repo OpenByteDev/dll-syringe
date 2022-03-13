@@ -10,7 +10,8 @@ A crate for DLL injection on windows.
 
 ## Usage
 ### Inject & Eject
-The example below will inject and then eject `injection_payload.dll` into a process called "ExampleProcess".
+This crate allows you to inject and eject a DLL into a target process.
+The example below will inject and then eject `injection_payload.dll` into the process called "ExampleProcess".
 
 ```rust no_run
 use dll_syringe::{Syringe, process::OwnedProcess};
@@ -31,17 +32,19 @@ syringe.eject(injected_payload).unwrap();
 ```
 
 ## Calling Remote Procedures
-This example performs the same injection as above, but will call the `add` function exported from the injected module.
+A simple rpc mechanism based in [`bincode`](https://crates.io/crates/bincode) is supported with the "rpc" feature.
+The target procedure must be defined using the [`payload_procedure`] macro (requires the "payload-utils" feature).
 
-The definition of the exported `add` function looks like this:
-```rust no_run
-#[no_mangle]
-pub extern "system" fn add(numbers: *const (f64, f64), result: *mut f64) {
-    unsafe { *result = (*numbers).0 + (*numbers).1 }
+The definition of an exported `add` function could look like this:
+```rust
+dll_syringe::payload_function! {
+    fn add(a: f64, b: f64) -> f64 {
+        a + b
+    }
 }
 ```
 
-The code of the injector/caller will look like this:
+The code of the injector/caller could looks like this:
 ```rust no_run
 use dll_syringe::{Syringe, process::OwnedProcess};
 
@@ -54,20 +57,10 @@ let syringe = Syringe::for_process(target_process);
 // inject the payload into the target process
 let injected_payload = syringe.inject("injection_payload.dll").unwrap();
 
-let result = syringe.get_procedure::<(f64, f64), f64>(injected_payload, "add").unwrap().unwrap().call(&(2.0, 4.0)).unwrap();
+let remote_add = syringe.get_procedure::<fn(f64, f64) -> f64>(injected_payload, "add").unwrap().unwrap();
+let result = remote_add.call(&2.0, &4.0).unwrap();
 println!("{}", result); // prints 6
 
 // eject the payload from the target (optional)
 syringe.eject(injected_payload).unwrap();
-```
-
-Note that currently only functions with a signature of `extern "system" fn(args: *mut A, result: *mut B) -> ()` are supported. As the parameters are `memcpy`'d there can be problems if the injector and payload have different target architectures.
-
-The definition of the exported function above can be simplified using [`dll-syringe-payload-utils`](https://docs.rs/dll-syringe-payload-utils/latest/dll_syringe_payload_utils/):
-```rust
-dll_syringe_payload_utils::remote_procedure! {
-    fn add(a: f64, b: f64) -> f64 {
-        a + b
-    }
-}
 ```

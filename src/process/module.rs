@@ -307,14 +307,15 @@ impl<P: Process> ProcessModule<P> {
         }
 
         let proc_name = CString::new(proc_name.as_ref())?;
-        self.get_local_procedure_address_cstr(&proc_name).map_err(|e| e.into())
+        self.get_local_procedure_address_cstr(&proc_name)
+            .map_err(|e| e.into())
     }
 
     /// Returns a pointer to the procedure with the given name from this module.
     ///
     /// # Note
     /// This function is only supported for modules in the current process.
-    /// 
+    ///
     /// # Safety
     /// The target function must abide by the given function signature.
     pub unsafe fn get_local_procedure<F: FunctionPtr>(
