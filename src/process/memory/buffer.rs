@@ -11,7 +11,7 @@ use winapi::{
     shared::minwindef::DWORD,
     um::{
         memoryapi::{
-            ReadProcessMemory, VirtualAlloc, VirtualAllocEx, VirtualFree, VirtualFreeEx,
+            ReadProcessMemory, VirtualAllocEx, VirtualFreeEx,
             WriteProcessMemory,
         },
         processthreadsapi::FlushInstructionCache,
@@ -89,18 +89,14 @@ impl<'a> ProcessMemoryBuffer<'a> {
         allocation_type: DWORD,
         protection: DWORD,
     ) -> Result<Self, io::Error> {
-        let ptr = if process.is_current() {
-            unsafe { VirtualAlloc(ptr::null_mut(), len, allocation_type, protection) }
-        } else {
-            unsafe {
-                VirtualAllocEx(
-                    process.as_raw_handle(),
-                    ptr::null_mut(),
-                    len,
-                    allocation_type,
-                    protection,
-                )
-            }
+        let ptr = unsafe {
+            VirtualAllocEx(
+                process.as_raw_handle(),
+                ptr::null_mut(),
+                len,
+                allocation_type,
+                protection,
+            )
         };
 
         return if ptr.is_null() {
@@ -160,23 +156,23 @@ impl<'a> ProcessMemoryBuffer<'a> {
         unsafe { self._free() }.map_err(|e| (self, e))
     }
     unsafe fn _free(&mut self) -> Result<(), io::Error> {
-        let result = if self.is_local() {
-            unsafe { VirtualFree(self.as_ptr().cast(), self.len(), MEM_RELEASE) }
-        } else {
-            unsafe {
-                VirtualFreeEx(
-                    self.process.as_raw_handle(),
-                    self.as_ptr().cast(),
-                    self.len(),
-                    MEM_RELEASE,
-                )
-            }
+        let result = unsafe {
+            VirtualFreeEx(
+                self.process.as_raw_handle(),
+                self.as_ptr().cast(),
+                0,
+                MEM_RELEASE,
+            )
         };
 
-        if result == 0 {
+        if result != 0 {
             Ok(())
         } else {
-            Err(io::Error::last_os_error())
+            if !self.process().is_alive() {
+                Ok(())
+            } else {
+                Err(io::Error::last_os_error())
+            }
         }
     }
 
