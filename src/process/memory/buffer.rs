@@ -126,8 +126,8 @@ impl<'a> ProcessMemoryBuffer<'a> {
     /// # Safety
     /// The caller must ensure that the designated region of memory
     /// - is valid
-    /// - was allocated using [`VirtualAlloc`] or [`VirtualAllocEx`]
-    /// - can be deallocated using [`VirtualFree`] or [`VirtualFreeEx`]
+    /// - was allocated using [`VirtualAllocEx`]
+    /// - can be deallocated using [`VirtualFreeEx`]
     /// - can be read using [`ReadProcessMemory`]
     /// - can be written to using [`WriteProcessMemory`]
     /// - will not be deallocated by other code
@@ -235,7 +235,7 @@ impl<'a> ProcessMemorySlice<'a> {
     /// # Safety
     /// The caller must ensure that the designated region of memory
     /// - is valid
-    /// - was allocated using [`VirtualAlloc`] or [`VirtualAllocEx`]
+    /// - was allocated using [`VirtualAllocEx`]
     /// - can be read using [`ReadProcessMemory`]
     /// - can be written to using [`WriteProcessMemory`]
     /// - will live as long as the slice is used
