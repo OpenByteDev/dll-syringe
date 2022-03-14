@@ -191,14 +191,12 @@ impl<'a> ProcessMemoryBuffer<'a> {
 
         if result != 0 {
             Ok(())
+        } else if !self.process().is_alive() {
+            Ok(())
         } else {
-            if !self.process().is_alive() {
-                Ok(())
-            } else {
-                Err(io::Error::last_os_error())
-            }
+            Err(io::Error::last_os_error())
         }
-    }
+}
 
     /// Returns the memory page size of the operating system.
     #[must_use]
