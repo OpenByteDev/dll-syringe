@@ -5,6 +5,7 @@ use std::{
     ffi::CString,
     mem,
     ptr::{self, NonNull},
+    any::TypeId, io
 };
 
 use crate::{
@@ -113,69 +114,6 @@ impl Syringe {
             })
         })
     }
-
-    /*
-    #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
-    fn build_call_procedure_x86<F: FunctionPtr>(
-        procedure: F,
-        return_buffer: *mut F::Output,
-    ) -> Result<Vec<u8>, IcedError> {
-        assert!(!return_buffer.is_null());
-        assert_eq!(
-            procedure.as_ptr() as u32 as usize,
-            procedure.as_ptr() as usize
-        );
-        assert_eq!(return_buffer as u32 as usize, return_buffer as usize);
-
-        let mut asm = CodeAssembler::new(32)?;
-
-        asm.mov(eax, esp + 4)?; // load arg ptr (lpParameter) from stack
-        asm.push(return_buffer as u32)?; // push result ptr onto stack
-        asm.push(eax)?; // push arg ptr onto stack
-        asm.mov(eax, procedure.as_ptr() as u32)?; // load address of target function
-        asm.call(eax)?; // call real_address
-        asm.mov(eax, 0)?; // return 0
-        asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
-
-        let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(
-            code,
-            asm.assemble(0x1111_2222)?,
-            "CallProcedure x86 stub is not location independent"
-        );
-
-        Ok(code)
-    }
-
-    #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
-    fn build_call_procedure_x64<F: FunctionPtr>(
-        procedure: F,
-        return_buffer: *mut F::Output,
-    ) -> Result<Vec<u8>, IcedError> {
-        assert!(!return_buffer.is_null());
-
-        let mut asm = CodeAssembler::new(64)?;
-
-        asm.sub(rsp, 40)?; // Re-align stack to 16 byte boundary +32 shadow space
-        asm.mov(rdx, return_buffer as u64)?; // result ptr
-        asm.mov(rcx, rcx)?; // arg ptr
-        asm.mov(rax, procedure.as_ptr() as u64)?;
-        asm.call(rax)?;
-        asm.mov(rax, 0u64)?; // return 0
-        asm.add(rsp, 40)?; // Re-align stack to 16 byte boundary + shadow space.
-        asm.mov(rax, 0u64)?; // return 0
-        asm.ret()?; // Restore stack ptr. (Callee cleanup)
-
-        let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(
-            code,
-            asm.assemble(0x1111_2222)?,
-            "CallProcedure x64 stub is not location independent"
-        );
-
-        Ok(code)
-    }
-    */
 
     #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
     fn build_get_proc_address_x86(
@@ -301,8 +239,7 @@ where
     for<'r> F::RefArgs<'r>: Serialize,
     F::Output: DeserializeOwned,
 {
-    /// Calls the remote procedure with the given arguments.
-    pub fn call_with_args(&self, args: F::RefArgs<'_>) -> Result<F::Output, RpcError> {
+    fn call_with_args(&self, args: F::RefArgs<'_>) -> Result<F::Output, RpcError> {
         let local_arg_buf = bincode::serialize(&args)?;
 
         // Allocate a buffer in the remote process to hold the argument.
@@ -314,9 +251,9 @@ where
 
         // build the remote procedure stub
         let code = if self.remote_allocator.process().is_x86()? {
-            Self::build_call_procedure_x86(self.ptr, parameter_buf.as_ptr().as_ptr()).unwrap()
+            Self::build_call_stub_x86(self.ptr).unwrap()
         } else {
-            Self::build_call_procedure_x64(self.ptr, parameter_buf.as_ptr().as_ptr()).unwrap()
+            Self::build_call_stub_x64(self.ptr).unwrap()
         };
         let code = self.remote_allocator.alloc_and_copy_buf(code.as_slice())?;
         code.memory().flush_instruction_cache()?;
@@ -371,16 +308,11 @@ where
     }
 
     #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
-    fn build_call_procedure_x86<Fn: FunctionPtr>(
-        procedure: Fn,
-        params_buf: *mut ArgAndResultBufInfo,
-    ) -> Result<Vec<u8>, IcedError> {
-        assert!(!params_buf.is_null());
+    fn build_call_stub_x86(procedure: F) -> Result<Vec<u8>, IcedError> {
         assert_eq!(
             procedure.as_ptr() as u32 as usize,
             procedure.as_ptr() as usize
         );
-        assert_eq!(params_buf as u32 as usize, params_buf as usize);
 
         let mut asm = CodeAssembler::new(32)?;
 
@@ -395,19 +327,14 @@ where
         debug_assert_eq!(
             code,
             asm.assemble(0x1111_2222)?,
-            "CallProcedure x86 stub is not location independent"
+            "call x86 stub is not location independent"
         );
 
         Ok(code)
     }
 
     #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
-    fn build_call_procedure_x64<Fn: FunctionPtr>(
-        procedure: Fn,
-        params_buf: *mut ArgAndResultBufInfo,
-    ) -> Result<Vec<u8>, IcedError> {
-        assert!(!params_buf.is_null());
-
+    fn build_call_stub_x64(procedure: F) -> Result<Vec<u8>, IcedError> {
         let mut asm = CodeAssembler::new(64)?;
 
         asm.sub(rsp, 40)?; // Re-align stack to 16 byte boundary +32 shadow space
@@ -416,14 +343,142 @@ where
         asm.call(rax)?;
         asm.mov(rax, 0u64)?; // return 0
         asm.add(rsp, 40)?; // Re-align stack to 16 byte boundary + shadow space.
-        asm.mov(rax, 0u64)?; // return 0
         asm.ret()?; // Restore stack ptr. (Callee cleanup)
 
         let code = asm.assemble(0x1234_5678)?;
         debug_assert_eq!(
             code,
             asm.assemble(0x1111_2222)?,
-            "CallProcedure x64 stub is not location independent"
+            "call x64 stub is not location independent"
+        );
+
+        Ok(code)
+    }
+}
+
+impl<F> RemoteProcedure<F>
+where
+    F: FunctionPtr,
+{
+    fn call_raw_with_args(&self, args: &[usize], float_mask: u32) -> Result<F::Output, RawRpcError>
+    where
+        F::Output: Copy,
+    {
+        let parameter_buf = self.remote_allocator.alloc_and_copy_buf(args)?;
+        let parameter_buf = unsafe { RemoteBox::<[usize]>::new(parameter_buf) };
+        let result_buf = self.remote_allocator.alloc_uninit::<usize>()?;
+
+        let code = if self.process().is_x86()? {
+            Self::build_call_raw_stub_x86(self.ptr, result_buf.as_ptr().as_ptr(), float_mask).unwrap()
+        } else {
+            Self::build_call_raw_stub_x64(self.ptr, result_buf.as_ptr().as_ptr(), float_mask).unwrap()
+        };
+        let code = self.remote_allocator.alloc_and_copy_buf(code.as_slice())?;
+        code.memory().flush_instruction_cache()?;
+
+        let exit_code = code.process().run_remote_thread(
+            unsafe { mem::transmute(code.as_raw_ptr()) },
+            parameter_buf.as_raw_ptr(),
+        )?;
+        Syringe::remote_exit_code_to_exception(exit_code)?;
+
+        if mem::size_of::<F::Output>() == 0 {
+            Ok(unsafe { mem::zeroed() })
+        } else {
+            let result = unsafe { result_buf.memory().read_struct::<F::Output>(0)? };
+            Ok(result)
+        }
+    }
+
+    #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
+    fn build_call_raw_stub_x86(procedure: F, result_buf: *mut usize, _float_mask: u32) -> Result<Vec<u8>, IcedError> {
+        assert!(!result_buf.is_null());
+        assert_eq!(
+            procedure.as_ptr() as u32 as usize,
+            procedure.as_ptr() as usize
+        );
+        assert_eq!(result_buf as u32 as usize, result_buf as usize);
+
+        let mut asm = CodeAssembler::new(32)?;
+
+        asm.mov(eax, esp + 4)?; // load arg ptr (lpParameter) from stack
+        for i in (0..F::ARITY).rev() {
+            asm.push(dword_ptr(eax + (i * mem::size_of::<usize>())))?;
+        }
+        asm.mov(eax, procedure.as_ptr() as u32)?; // load address of target function
+        asm.call(eax)?; // call real_address
+        asm.mov(dword_ptr(result_buf as u32), eax)?; // write result to result buf
+        asm.mov(eax, 0)?; // return 0
+        asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
+
+        let code = asm.assemble(0x1234_5678)?;
+        debug_assert_eq!(
+            code,
+            asm.assemble(0x1111_2222)?,
+            "call raw x86 stub is not location independent"
+        );
+
+        Ok(code)
+    }
+
+    #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
+    fn build_call_raw_stub_x64(procedure: F, result_buf: *mut usize, float_mask: u32) -> Result<Vec<u8>, IcedError> {
+        let mut asm = CodeAssembler::new(64)?;
+
+        asm.mov(rax, rcx)?; // arg base ptr
+        if F::ARITY > 0 {
+            asm.mov(rcx, qword_ptr(rax + (0 * mem::size_of::<usize>())))?;
+            if float_mask & (1 << 0) != 0 {
+                asm.movq(xmm0, rcx)?;
+            }
+        }
+        if F::ARITY > 1 {
+            asm.mov(rdx, qword_ptr(rax + (1 * mem::size_of::<usize>())))?;
+            if float_mask & (1 << 1) != 0 {
+                asm.movq(xmm1, rdx)?;
+            }
+        }
+        if F::ARITY > 2 {
+            asm.mov(r8, qword_ptr(rax + (2 * mem::size_of::<usize>())))?;
+            if float_mask & (1 << 2) != 0 {
+               asm.movq(xmm2, r8)?;
+            }
+        }
+        if F::ARITY > 3 {
+            asm.mov(r9, qword_ptr(rax + (3 * mem::size_of::<usize>())))?;
+            if float_mask & (1 << 3) != 0 {
+                asm.movq(xmm3, r9)?;
+            }
+        }
+        for i in (4..F::ARITY).rev() {
+            asm.push(qword_ptr(rax + (i * mem::size_of::<usize>())))?;
+        }
+        
+        asm.mov(rax, procedure.as_ptr() as u64)?;
+
+        asm.sub(rsp, 32)?; // push shadow space
+        asm.call(rax)?;
+        asm.add(rsp, 32)?; // pop shadow space
+        
+        // write result to result buf
+        if float_mask & 0x8000_0000u32 != 0 {
+            asm.movq(rax, xmm0)?;
+        } 
+        asm.mov(qword_ptr(result_buf as u64), rax)?; 
+
+        asm.mov(rax, 0u64)?; // return 0
+        
+        if F::ARITY > 4 {
+            asm.add(rsp, ((F::ARITY - 4) * mem::size_of::<usize>()) as i32)?;
+        }
+
+        asm.ret()?; // Restore stack ptr.
+
+        let code = asm.assemble(0x1234_5678)?;
+        debug_assert_eq!(
+            code,
+            asm.assemble(0x1111_2222)?,
+            "call x64 stub is not location independent"
         );
 
         Ok(code)
@@ -454,6 +509,33 @@ impl<A: ?Sized + Copy, R: Copy> RemoteProcedureStub<A, R> {
     }
 }
 
+/*
+// from https://stackoverflow.com/a/60138532/6304917
+/// Are `T` and `U` are the same type?
+const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+    // Helper trait. `VALUE` is false, except for the specialization of the
+    // case where `T == U`.
+    trait TypeEq<U: ?Sized> {
+        const VALUE: bool;
+    }
+
+    // Default implementation.
+    impl<T: ?Sized, U: ?Sized> TypeEq<U> for T {
+        default const VALUE: bool = false;
+    }
+
+    // Specialization for `T == U`.
+    impl<T: ?Sized> TypeEq<T> for T {
+        const VALUE: bool = true;
+    }
+
+    <T as TypeEq<U>>::VALUE
+}
+*/
+fn type_eq<T: ?Sized + 'static, U: ?Sized + 'static>() -> bool {
+    TypeId::of::<T>() == TypeId::of::<U>()
+}
+
 macro_rules! impl_call {
     (@recurse () ($($nm:ident : $ty:ident),*)) => {
         impl_call!(@impl_all ($($nm : $ty),*));
@@ -466,6 +548,7 @@ macro_rules! impl_call {
     (@impl_all ($($nm:ident : $ty:ident),*)) => {
         impl <$($ty,)* Output> RemoteProcedure<fn($($ty),*) -> Output> where $($ty: 'static + Serialize,)* Output: 'static + DeserializeOwned,  {
             /// Calls the remote procedure with the given arguments.
+            /// The arguments and the return value are serialized using [bincode](https://crates.io/crates/bincode).
             #[allow(clippy::too_many_arguments)]
             pub fn call(&self, $($nm: &$ty),*) -> Result<Output, RpcError> {
                 self.call_with_args(($($nm,)*))
@@ -474,12 +557,112 @@ macro_rules! impl_call {
 
         impl <$($ty,)* Output> RemoteProcedure<unsafe fn($($ty),*) -> Output> where $($ty: 'static + Serialize,)* Output: 'static + DeserializeOwned,  {
             /// Calls the remote procedure with the given arguments.
+            /// The arguments and the return value are serialized using [bincode](https://crates.io/crates/bincode).
             ///
             /// # Safety
             /// The caller must ensure whatever the requirements of the underlying remote procedure are.
             #[allow(clippy::too_many_arguments)]
             pub unsafe fn call(&self, $($nm: &$ty),*) -> Result<Output, RpcError> {
                 self.call_with_args(($($nm,)*))
+            }
+        }
+
+        impl <$($ty,)* Output> RemoteProcedure<fn($($ty),*) -> Output> where $($ty : 'static + Copy,)* Output: 'static + Copy  {
+            fn build_args_buf_and_float_mask(process: BorrowedProcess<'_>, $($nm: $ty),*) -> io::Result<([usize; impl_call!(@count ($($ty)*))], u32)> {
+                let target_pointer_size = if process.is_x86()? {
+                    4
+                } else {
+                    8
+                };
+
+                // store arguments as a usize buffer (avoids handling different sized arguments explicitly)
+                let args_buf = [$({
+                    assert!(mem::size_of::<$ty>() <= target_pointer_size, "argument of type {} is too large to fit in an argument", stringify!($ty));
+
+                    let mut buf = [0u8; mem::size_of::<usize>()];
+                    for i in 0..mem::size_of::<$ty>() {
+                        buf[i] = unsafe { *(&$nm as *const $ty as *const u8).add(i) };
+                    }
+                    unsafe { mem::transmute::<[u8; mem::size_of::<usize>()], usize>(buf) }
+                },)*];
+
+                // calculate a mask denoting which arguments are floats
+                let mut float_mask = 0u32;
+                $(float_mask = (float_mask << 1) | if type_eq::<$ty, f32>() || type_eq::<$ty, f64>() { 1 } else { 0 };)*
+                float_mask = float_mask | if type_eq::<Output, f32>() || type_eq::<Output, f64>() { 0x8000_0000u32 } else { 0 };
+
+                // use var to avoid dead_code warning
+                let _ = target_pointer_size;
+
+                Ok((args_buf, float_mask))
+            }
+        }
+
+        impl <$($ty,)* Output> RemoteProcedure<extern "system" fn($($ty),*) -> Output> where $($ty : 'static + Copy,)* Output: 'static + Copy  {
+            /// Calls the remote procedure with the given arguments.
+            /// The arguments and the return value are copied bytewise.
+            #[allow(clippy::too_many_arguments)]
+            pub fn call_raw(&self, $($nm: $ty),*) -> Result<Output, RawRpcError> {
+                let target_pointer_size = if self.process().is_x86()? {
+                    4
+                } else {
+                    8
+                };
+
+                // store arguments as a usize buffer (avoids handling different sized arguments explicitly)
+                let args_buf = [$({
+                    assert!(mem::size_of::<$ty>() <= target_pointer_size, "argument of type {} is too large to fit in an argument", stringify!($ty));
+
+                    let mut buf = [0u8; mem::size_of::<usize>()];
+                    for i in 0..mem::size_of::<$ty>() {
+                        buf[i] = unsafe { *(&$nm as *const $ty as *const u8).add(i) };
+                    }
+                    unsafe { mem::transmute::<[u8; mem::size_of::<usize>()], usize>(buf) }
+                },)*];
+
+                // calculate a mask denoting which arguments are floats
+                let mut float_mask = 0u32;
+                $(float_mask = (float_mask << 1) | if type_eq::<$ty, f32>() || type_eq::<$ty, f64>() { 1 } else { 0 };)*
+                float_mask = float_mask | if type_eq::<Output, f32>() || type_eq::<Output, f64>() { 0x8000_0000u32 } else { 0 };
+
+                // use var to avoid dead_code warning
+                let _ = target_pointer_size;
+
+                self.call_raw_with_args(&args_buf, float_mask)
+            }
+        }
+
+        impl <$($ty,)* Output> RemoteProcedure<extern "C" fn($($ty),*) -> Output> where $($ty : 'static + Copy,)* Output: 'static + Copy  {
+            /// Calls the remote procedure with the given arguments.
+            /// The arguments and the return value are copied bytewise.
+            #[allow(clippy::too_many_arguments)]
+            pub fn call_raw(&self, $($nm: $ty),*) -> Result<Output, RawRpcError> {
+                let target_pointer_size = if self.process().is_x86()? {
+                    4
+                } else {
+                    8
+                };
+
+                // store arguments as a usize buffer (avoids handling different sized arguments explicitly)
+                let args_buf = [$({
+                    assert!(mem::size_of::<$ty>() <= target_pointer_size, "argument of type {} is too large to fit in an argument", stringify!($ty));
+
+                    let mut buf = [0u8; mem::size_of::<usize>()];
+                    for i in 0..mem::size_of::<$ty>() {
+                        buf[i] = unsafe { *(&$nm as *const $ty as *const u8).add(i) };
+                    }
+                    unsafe { mem::transmute::<[u8; mem::size_of::<usize>()], usize>(buf) }
+                },)*];
+
+                // calculate a mask denoting which arguments are floats
+                let mut float_mask = 0u32;
+                $(float_mask = (float_mask << 1) | if type_eq::<$ty, f32>() || type_eq::<$ty, f64>() { 1 } else { 0 };)*
+                float_mask = float_mask | if type_eq::<Output, f32>() || type_eq::<Output, f64>() { 0x8000_0000u32 } else { 0 };
+
+                // use var to avoid dead_code warning
+                let _ = target_pointer_size;
+
+                self.call_raw_with_args(&args_buf, float_mask)
             }
         }
     };

@@ -53,7 +53,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_add = syringe.get_procedure::<fn(u32, u32) -> u32>(module, "add3").unwrap().unwrap();
+        let remote_add = syringe.get_procedure::<fn(u32, u32) -> u32>(module, "add").unwrap().unwrap();
         let add_result = remote_add.call(&42, &10).unwrap();
         assert_eq!(add_result, 52);
     }
@@ -91,5 +91,103 @@ syringe_test! {
             _ => panic!("Expected RpcError::RemoteProcedure"),
         };
         assert_eq!(err_message, String::from("Some error message"));
+    }
+}
+
+syringe_test! {
+    fn call_raw_with_payload_utils_simple(
+        process: OwnedProcess,
+        payload_path: &Path,
+    ) {
+        let syringe = Syringe::for_process(process);
+        let module = syringe.inject(payload_path).unwrap();
+
+        let remote_add = syringe.get_procedure::<extern "system" fn(u32, u32) -> u32>(module, "add_raw").unwrap().unwrap();
+        let add_result = remote_add.call_raw(42, 10).unwrap();
+        assert_eq!(add_result, 52);
+    }
+}
+
+syringe_test! {
+    fn call_raw_with_payload_utils_correct_order(
+        process: OwnedProcess,
+        payload_path: &Path,
+    ) {
+        let syringe = Syringe::for_process(process);
+        let module = syringe.inject(payload_path).unwrap();
+
+        let remote_sub = syringe.get_procedure::<extern "system" fn(u32, u32) -> u32>(module, "sub_raw").unwrap().unwrap();
+        let sub_result = remote_sub.call_raw(42, 10).unwrap();
+        assert_eq!(sub_result, 32);
+    }
+}
+
+syringe_test! {
+    fn call_raw_with_payload_utils_small_args(
+        process: OwnedProcess,
+        payload_path: &Path,
+    ) {
+        let syringe = Syringe::for_process(process);
+        let module = syringe.inject(payload_path).unwrap();
+
+        let remote_add = syringe.get_procedure::<extern "system" fn(u16, u8) -> u16>(module, "add_smol_raw").unwrap().unwrap();
+        let add_result = remote_add.call_raw(42, 10).unwrap();
+        assert_eq!(add_result, 52);
+    }
+}
+
+syringe_test! {
+    fn call_raw_with_payload_utils_many_args(
+        process: OwnedProcess,
+        payload_path: &Path,
+    ) {
+        let syringe = Syringe::for_process(process);
+        let module = syringe.inject(payload_path).unwrap();
+
+        let remote_sum = syringe.get_procedure::<extern "system" fn(u32, u32, u32, u32, u32) -> u32>(module, "sum_5").unwrap().unwrap();
+        let sum_result = remote_sum.call_raw(1, 2, 3, 4, 5).unwrap();
+        assert_eq!(sum_result, 15);
+    }
+}
+
+syringe_test! {
+    fn call_raw_with_payload_utils_many_args2(
+        process: OwnedProcess,
+        payload_path: &Path,
+    ) {
+        let syringe = Syringe::for_process(process);
+        let module = syringe.inject(payload_path).unwrap();
+
+        let remote_sum = syringe.get_procedure::<extern "system" fn(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32) -> u32>(module, "sum_10").unwrap().unwrap();
+        let sum_result = remote_sum.call_raw(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).unwrap();
+        assert_eq!(sum_result, 55);
+    }
+}
+
+syringe_test! {
+    fn call_raw_with_payload_utils_float_args_and_result(
+        process: OwnedProcess,
+        payload_path: &Path,
+    ) {
+        let syringe = Syringe::for_process(process);
+        let module = syringe.inject(payload_path).unwrap();
+
+        let remote_sub = syringe.get_procedure::<extern "system" fn(f32, f32) -> f32>(module, "sub_float_raw").unwrap().unwrap();
+        let sub_result = remote_sub.call_raw(1.2, 0.2).unwrap();
+        assert_eq!(sub_result, 1.0);
+    }
+}
+
+syringe_test! {
+    fn call_raw_with_payload_utils_simple_cdecl(
+        process: OwnedProcess,
+        payload_path: &Path,
+    ) {
+        let syringe = Syringe::for_process(process);
+        let module = syringe.inject(payload_path).unwrap();
+
+        let remote_add = syringe.get_procedure::<extern "C" fn(u32, u32) -> u32>(module, "add_raw").unwrap().unwrap();
+        let add_result = remote_add.call_raw(42, 10).unwrap();
+        assert_eq!(add_result, 52);
     }
 }

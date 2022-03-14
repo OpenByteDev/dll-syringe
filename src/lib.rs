@@ -7,7 +7,8 @@
     io_safety,
     linked_list_cursors,
     vec_into_raw_parts,
-    generic_associated_types
+    generic_associated_types,
+    concat_idents
 )]
 #![warn(
     unsafe_op_in_unsafe_fn,

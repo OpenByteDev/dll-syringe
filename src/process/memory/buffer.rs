@@ -10,10 +10,7 @@ use std::{
 use winapi::{
     shared::minwindef::DWORD,
     um::{
-        memoryapi::{
-            ReadProcessMemory, VirtualAllocEx, VirtualFreeEx,
-            WriteProcessMemory,
-        },
+        memoryapi::{ReadProcessMemory, VirtualAllocEx, VirtualFreeEx, WriteProcessMemory},
         processthreadsapi::FlushInstructionCache,
         sysinfoapi::GetSystemInfo,
         winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PAGE_READWRITE},
@@ -196,7 +193,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
         } else {
             Err(io::Error::last_os_error())
         }
-}
+    }
 
     /// Returns the memory page size of the operating system.
     #[must_use]
