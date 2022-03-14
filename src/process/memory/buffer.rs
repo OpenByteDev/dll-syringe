@@ -186,9 +186,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
             )
         };
 
-        if result != 0 {
-            Ok(())
-        } else if !self.process().is_alive() {
+        if result != 0 || !self.process().is_alive() {
             Ok(())
         } else {
             Err(io::Error::last_os_error())
