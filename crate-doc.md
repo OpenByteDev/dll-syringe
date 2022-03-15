@@ -34,7 +34,7 @@ syringe.eject(injected_payload).unwrap();
 ## Remote Procedure Calls (RPC)
 This crate supports two mechanisms for rpc (both require feature `rpc`).
 
-|                  | `get_payload_procedure`        | `get_raw_procedure` |
+|                  | `RemotePayloadProcedure`        | `RemoteRawProcedure` |
 | ---------------- | ------------------------------ | ------------------------------------------ |
 | Feature | `rpc-payload` | `rpc-raw` |
 | Argument and Return Requirements | `Serialize + DeserializeOwned` | `Copy`, Argument size has to be smaller than `usize` in target process |
@@ -74,8 +74,8 @@ println!("{}", result); // prints 6
 syringe.eject(injected_payload).unwrap();
 ```
 
-### RemotePayloadProcedure
-A rpc mechanism based on dynamically generated assembly code.
+### RemoteRawProcedure
+This mechanism is based on dynamically generated assembly code.
 The target procedure can be any exported function as long as it uses either the `system` or `C` calling convention.
 This means that even Win32 functions can be called directly.
 
