@@ -4,12 +4,13 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::any::type_name;
 
 use crate::{
-    error::{RpcError, SyringeError},
+    error::SyringeError,
     function::{FunctionPtr, RawFunctionPtr},
     process::{
         memory::{ProcessMemoryBuffer, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, Process,
     },
+    rpc::error::PayloadRpcError,
     ArgAndResultBufInfo, Syringe,
 };
 
@@ -78,7 +79,7 @@ where
     for<'r> F::RefArgs<'r>: Serialize,
     F::Output: DeserializeOwned,
 {
-    fn call_with_args(&self, args: F::RefArgs<'_>) -> Result<F::Output, RpcError> {
+    fn call_with_args(&self, args: F::RefArgs<'_>) -> Result<F::Output, PayloadRpcError> {
         let local_arg_buf = bincode::serialize(&args)?;
 
         // Allocate a buffer in the remote process to hold the argument.
@@ -138,7 +139,7 @@ where
         };
 
         if result_buf_info.is_error {
-            Err(RpcError::RemoteProcedure(unsafe {
+            Err(PayloadRpcError::RemoteProcedure(unsafe {
                 String::from_utf8_unchecked(local_result_buf)
             }))
         } else {
@@ -214,7 +215,7 @@ macro_rules! impl_call {
             /// Calls the remote procedure with the given arguments.
             /// The arguments and the return value are serialized using [bincode](https://crates.io/crates/bincode).
             #[allow(clippy::too_many_arguments)]
-            pub fn call(&self, $($nm: &$ty),*) -> Result<Output, RpcError> {
+            pub fn call(&self, $($nm: &$ty),*) -> Result<Output, PayloadRpcError> {
                 self.call_with_args(($($nm,)*))
             }
         }
@@ -226,7 +227,7 @@ macro_rules! impl_call {
             /// # Safety
             /// The caller must ensure whatever the requirements of the underlying remote procedure are.
             #[allow(clippy::too_many_arguments)]
-            pub unsafe fn call(&self, $($nm: &$ty),*) -> Result<Output, RpcError> {
+            pub unsafe fn call(&self, $($nm: &$ty),*) -> Result<Output, PayloadRpcError> {
                 self.call_with_args(($($nm,)*))
             }
         }

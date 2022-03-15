@@ -1,6 +1,6 @@
 #![cfg(feature = "rpc")]
 
-use dll_syringe::{error::RpcError, process::Process, Syringe};
+use dll_syringe::{process::Process, rpc::PayloadRpcError, Syringe};
 use std::time::Duration;
 
 #[allow(unused)]
@@ -85,9 +85,9 @@ syringe_test! {
         let result = remote_does_panic.call();
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(matches!(err, RpcError::RemoteProcedure(_)));
+        assert!(matches!(err, PayloadRpcError::RemoteProcedure(_)));
         let err_message = match err {
-            RpcError::RemoteProcedure(e) => e.to_string(),
+            PayloadRpcError::RemoteProcedure(e) => e.to_string(),
             _ => panic!("Expected RpcError::RemoteProcedure"),
         };
         assert_eq!(err_message, String::from("Some error message"));

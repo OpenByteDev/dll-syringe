@@ -6,12 +6,13 @@ use std::{
 };
 
 use crate::{
-    error::{RawRpcError, SyringeError},
+    error::SyringeError,
     function::{Abi, FunctionPtr, RawFunctionPtr},
     process::{
         memory::{RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, Process,
     },
+    rpc::error::RawRpcError,
     Syringe,
 };
 

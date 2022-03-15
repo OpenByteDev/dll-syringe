@@ -7,12 +7,13 @@ use std::{
 };
 
 use crate::{
-    error::{RawRpcError, SyringeError},
+    error::SyringeError,
     function::{FunctionPtr, RawFunctionPtr},
     process::{
         memory::{RemoteAllocation, RemoteBox},
         BorrowedProcessModule, Process,
     },
+    rpc::error::RawRpcError,
     GetProcAddressFn, Syringe,
 };
 

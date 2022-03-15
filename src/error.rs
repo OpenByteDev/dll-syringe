@@ -49,88 +49,6 @@ pub enum GetLocalProcedureAddressError {
     UnsupportedRemoteTarget,
 }
 
-/// Error enum for errors during syringe operations like injection and ejection.
-#[derive(Debug, Error)]
-#[cfg(feature = "syringe")]
-#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
-pub enum SyringeError {
-    /// Variant representing an illegal interior nul value.
-    #[error("interior nul found")]
-    Nul(#[from] widestring::NulError<u16>),
-    /// Variant representing an io error.
-    #[error("io error: {}", _0)]
-    Io(io::Error),
-    /// Variant representing an unsupported target process.
-    #[error("unsupported target process")]
-    UnsupportedTarget,
-    /// Variant representing an io error inside the target process.
-    #[error("remote io error: {}", _0)]
-    RemoteIo(io::Error),
-    /// Variant representing an unhandled exception inside the target process.
-    #[error("remote exception: {}", _0)]
-    RemoteException(ExceptionCode),
-    /// Variant representing an inaccessible target process.
-    /// This can occur if it crashed or was terminated.
-    #[error("inaccessible target process")]
-    ProcessInaccessible,
-    /// Variant representing an error while loading an pe file.
-    #[cfg(target_arch = "x86_64")]
-    #[cfg(feature = "into-x86-from-x64")]
-    #[error("failed to load pe file: {}", _0)]
-    Goblin(#[from] goblin::error::Error),
-}
-
-#[cfg(feature = "syringe")]
-impl From<io::Error> for SyringeError {
-    fn from(err: io::Error) -> Self {
-        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
-            || err.kind() == io::ErrorKind::PermissionDenied
-        {
-            Self::ProcessInaccessible
-        } else {
-            Self::Io(err)
-        }
-    }
-}
-
-#[cfg(feature = "syringe")]
-impl From<ExceptionCode> for SyringeError {
-    fn from(err: ExceptionCode) -> Self {
-        Self::RemoteException(err)
-    }
-}
-
-#[cfg(feature = "syringe")]
-impl From<IoOrNulError> for SyringeError {
-    fn from(err: IoOrNulError) -> Self {
-        match err {
-            IoOrNulError::Nul(e) => e.into(),
-            IoOrNulError::Io(e) => e.into(),
-        }
-    }
-}
-
-#[cfg(feature = "syringe")]
-impl From<ExceptionOrIoError> for SyringeError {
-    fn from(err: ExceptionOrIoError) -> Self {
-        match err {
-            ExceptionOrIoError::Io(e) => Self::RemoteIo(e),
-            ExceptionOrIoError::Exception(e) => Self::RemoteException(e),
-        }
-    }
-}
-
-#[cfg(feature = "rpc")]
-impl From<RawRpcError> for SyringeError {
-    fn from(err: RawRpcError) -> Self {
-        match err {
-            RawRpcError::Io(err) => Self::Io(err),
-            RawRpcError::RemoteException(code) => Self::RemoteException(code),
-            RawRpcError::ProcessInaccessible => Self::ProcessInaccessible,
-        }
-    }
-}
-
 #[derive(
     Debug, TryFromPrimitive, IntoPrimitive, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash,
 )]
@@ -237,6 +155,77 @@ impl Display for ExceptionCode {
     }
 }
 
+/// Error enum for errors during syringe operations like injection and ejection.
+#[derive(Debug, Error)]
+#[cfg(feature = "syringe")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
+pub enum SyringeError {
+    /// Variant representing an illegal interior nul value.
+    #[error("interior nul found")]
+    Nul(#[from] widestring::NulError<u16>),
+    /// Variant representing an io error.
+    #[error("io error: {}", _0)]
+    Io(io::Error),
+    /// Variant representing an unsupported target process.
+    #[error("unsupported target process")]
+    UnsupportedTarget,
+    /// Variant representing an io error inside the target process.
+    #[error("remote io error: {}", _0)]
+    RemoteIo(io::Error),
+    /// Variant representing an unhandled exception inside the target process.
+    #[error("remote exception: {}", _0)]
+    RemoteException(ExceptionCode),
+    /// Variant representing an inaccessible target process.
+    /// This can occur if it crashed or was terminated.
+    #[error("inaccessible target process")]
+    ProcessInaccessible,
+    /// Variant representing an error while loading an pe file.
+    #[cfg(target_arch = "x86_64")]
+    #[cfg(feature = "into-x86-from-x64")]
+    #[error("failed to load pe file: {}", _0)]
+    Goblin(#[from] goblin::error::Error),
+}
+
+#[cfg(feature = "syringe")]
+impl From<io::Error> for SyringeError {
+    fn from(err: io::Error) -> Self {
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+            || err.kind() == io::ErrorKind::PermissionDenied
+        {
+            Self::ProcessInaccessible
+        } else {
+            Self::Io(err)
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<ExceptionCode> for SyringeError {
+    fn from(err: ExceptionCode) -> Self {
+        Self::RemoteException(err)
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<IoOrNulError> for SyringeError {
+    fn from(err: IoOrNulError) -> Self {
+        match err {
+            IoOrNulError::Nul(e) => e.into(),
+            IoOrNulError::Io(e) => e.into(),
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<ExceptionOrIoError> for SyringeError {
+    fn from(err: ExceptionOrIoError) -> Self {
+        match err {
+            ExceptionOrIoError::Io(e) => Self::RemoteIo(e),
+            ExceptionOrIoError::Exception(e) => Self::RemoteException(e),
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 #[cfg(feature = "syringe")]
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
@@ -248,91 +237,4 @@ pub enum ExceptionOrIoError {
     /// Variant representing an unhandled exception.
     #[error("remote exception: {}", _0)]
     Exception(ExceptionCode),
-}
-
-#[derive(Debug, Error)]
-#[cfg(feature = "rpc")]
-#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
-/// An enum repsenting possible errors during remote procedure calls without serialization, deserialization or remote panics.
-pub enum RawRpcError {
-    /// Variant representing an io error.
-    #[error("io error: {}", _0)]
-    Io(io::Error),
-    /// Variant representing an unhandled exception inside the target process.
-    #[error("remote exception: {}", _0)]
-    RemoteException(ExceptionCode),
-    /// Variant representing an inaccessible target process.
-    /// This can occur if it crashed or was terminated.
-    #[error("inaccessible target process")]
-    ProcessInaccessible,
-}
-
-#[cfg(feature = "rpc")]
-impl From<io::Error> for RawRpcError {
-    fn from(err: io::Error) -> Self {
-        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
-            || err.kind() == io::ErrorKind::PermissionDenied
-        {
-            Self::ProcessInaccessible
-        } else {
-            Self::Io(err)
-        }
-    }
-}
-
-#[cfg(feature = "rpc")]
-impl From<ExceptionCode> for RawRpcError {
-    fn from(err: ExceptionCode) -> Self {
-        Self::RemoteException(err)
-    }
-}
-
-#[derive(Debug, Error)]
-#[cfg(feature = "rpc")]
-#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
-/// An enum repsenting possible errors during remote procedure calls.
-pub enum RpcError {
-    /// Variant representing an io error.
-    #[error("io error: {}", _0)]
-    Io(io::Error),
-    /// Variant representing a windows api error inside the target process.
-    #[error("remote io error: {}", _0)]
-    RemoteIo(io::Error),
-    /// Variant representing an unhandled exception inside the target process.
-    #[error("remote exception: {}", _0)]
-    RemoteException(ExceptionCode),
-    /// Variant representing an inaccessible target process.
-    /// This can occur if it crashed or was terminated.
-    #[error("inaccessible target process")]
-    ProcessInaccessible,
-    /// Variant representing an error in the remote procedure.
-    #[error("remote procedure error: {}", _0)]
-    RemoteProcedure(String),
-    /// Variant representing an error while serializing or deserializing.
-    #[error("serde error: {}", _0)]
-    Serde(#[from] Box<bincode::ErrorKind>),
-}
-
-#[cfg(feature = "rpc")]
-impl From<io::Error> for RpcError {
-    fn from(err: io::Error) -> Self {
-        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
-            || err.kind() == io::ErrorKind::PermissionDenied
-        {
-            Self::ProcessInaccessible
-        } else {
-            Self::Io(err)
-        }
-    }
-}
-
-#[cfg(feature = "rpc")]
-impl From<RawRpcError> for RpcError {
-    fn from(err: RawRpcError) -> Self {
-        match err {
-            RawRpcError::Io(err) => Self::Io(err),
-            RawRpcError::RemoteException(code) => Self::RemoteException(code),
-            RawRpcError::ProcessInaccessible => Self::ProcessInaccessible,
-        }
-    }
 }
