@@ -131,6 +131,7 @@ impl<T: ?Sized> RemoteBox<T> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn process(&self) -> BorrowedProcess<'_> {
         self.allocation.process()
     }

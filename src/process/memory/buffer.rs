@@ -137,6 +137,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
     }
 
     /// Constructs a new buffer from the given raw parts.
+    #[must_use]
     pub fn into_raw_parts(self) -> (*mut u8, usize, BorrowedProcess<'a>) {
         let parts = (self.ptr, self.len, self.process);
         self.leak();
@@ -155,6 +156,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
     }
 
     /// Leaks the buffer and returns a [`ProcessMemorySlice`] spanning this buffer.
+    #[allow(clippy::must_use_candidate)]
     pub fn leak(self) -> ProcessMemorySlice<'a> {
         let this = ManuallyDrop::new(self);
         this.0
