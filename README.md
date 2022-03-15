@@ -82,7 +82,7 @@ println!("{}", result); // prints 6
 syringe.eject(injected_payload).unwrap();
 ```
 
-### RemotePayloadProcedure
+### RemoteRawProcedure
 This mechanism is based on dynamically generated assembly code.
 The target procedure can be any exported function as long as it uses either the `system` or `C` calling convention.
 This means that even Win32 functions can be called directly.
