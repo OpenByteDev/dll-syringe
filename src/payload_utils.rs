@@ -13,6 +13,7 @@ use crate::{
     ArgAndResultBufInfo,
 };
 
+/// A macro for defining an exported function that can be used with [`RemotePayloadProcedure`](crate::rpc::RemotePayloadProcedure).
 #[macro_export]
 macro_rules! payload_procedure {
     ($(pub)? fn $fn:ident ( $($name:ident : $type:ty),* )

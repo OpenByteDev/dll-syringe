@@ -45,9 +45,8 @@ pub mod process;
 
 #[cfg(feature = "rpc-core")]
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-core")))]
-mod rpc;
-#[cfg(feature = "rpc-core")]
-pub use rpc::*;
+/// Module containing traits and structs regarding remote procedures.
+pub mod rpc;
 
 pub(crate) mod utils;
 

@@ -1,17 +1,19 @@
 use iced_x86::{code_asm::*, IcedError};
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::{any::type_name, mem};
+use std::any::type_name;
 
 use crate::{
-    error::{RawRpcError, RpcError, SyringeError},
+    error::{RpcError, SyringeError},
     function::{FunctionPtr, RawFunctionPtr},
     process::{
-        memory::{ProcessMemoryBuffer, RemoteAllocation, RemoteBox, RemoteBoxAllocator},
+        memory::{ProcessMemoryBuffer, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, Process,
     },
     ArgAndResultBufInfo, Syringe,
 };
+
+use super::RemoteProcedureStub;
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
 impl Syringe {
@@ -192,30 +194,6 @@ where
         );
 
         Ok(code)
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct RemoteProcedureStub<A: ?Sized + Copy, R: Copy> {
-    pub code: RemoteAllocation,
-    pub parameter: RemoteBox<A>,
-    pub result: RemoteBox<R>,
-}
-
-impl<A: ?Sized + Copy, R: Copy> RemoteProcedureStub<A, R> {
-    pub fn call(&self, args: &A) -> Result<R, RawRpcError> {
-        self.parameter.write(args)?;
-        let exit_code = self.code.process().run_remote_thread(
-            unsafe { mem::transmute(self.code.as_raw_ptr()) },
-            self.parameter.as_raw_ptr(),
-        )?;
-        Syringe::remote_exit_code_to_exception(exit_code)?;
-
-        if mem::size_of::<R>() == 0 {
-            Ok(unsafe { mem::zeroed() })
-        } else {
-            Ok(self.result.read()?)
-        }
     }
 }
 
