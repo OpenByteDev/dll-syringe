@@ -155,6 +155,17 @@ impl Display for ExceptionCode {
     }
 }
 
+#[derive(Debug, Error)]
+/// An error representing either an unhandled exception or an io error.
+pub enum ExceptionOrIoError {
+    /// Variant representing an io error.
+    #[error("remote io error: {}", _0)]
+    Io(io::Error),
+    /// Variant representing an unhandled exception.
+    #[error("remote exception: {}", _0)]
+    Exception(ExceptionCode),
+}
+
 /// Error enum for errors during syringe operations like injection and ejection.
 #[derive(Debug, Error)]
 #[cfg(feature = "syringe")]
@@ -224,17 +235,4 @@ impl From<ExceptionOrIoError> for SyringeError {
             ExceptionOrIoError::Exception(e) => Self::RemoteException(e),
         }
     }
-}
-
-#[derive(Debug, Error)]
-#[cfg(feature = "syringe")]
-#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
-/// An error representing either an unhandled exception or an io error.
-pub enum ExceptionOrIoError {
-    /// Variant representing an io error.
-    #[error("remote io error: {}", _0)]
-    Io(io::Error),
-    /// Variant representing an unhandled exception.
-    #[error("remote exception: {}", _0)]
-    Exception(ExceptionCode),
 }

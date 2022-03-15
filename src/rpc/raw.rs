@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     error::SyringeError,
-    function::{Abi, FunctionPtr, RawFunctionPtr},
+    function::{Abi, FunctionPtr},
     process::{
         memory::{RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, Process,
@@ -15,6 +15,8 @@ use crate::{
     rpc::error::RawRpcError,
     Syringe,
 };
+
+use super::RemoteProcedure;
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
 impl Syringe {
@@ -67,20 +69,20 @@ where
             remote_allocator,
         }
     }
+}
 
+impl<F> RemoteProcedure<F> for RemoteRawProcedure<F>
+where
+    F: FunctionPtr,
+{
     /// Returns the process that this remote procedure is from.
-    pub fn process(&self) -> BorrowedProcess<'_> {
+    fn process(&self) -> BorrowedProcess<'_> {
         self.remote_allocator.process()
     }
 
     /// Returns the underlying pointer to the remote procedure.
-    pub fn as_ptr(&self) -> F {
+    fn as_ptr(&self) -> F {
         self.ptr
-    }
-
-    /// Returns the raw underlying pointer to the remote procedure.
-    pub fn as_raw_ptr(&self) -> RawFunctionPtr {
-        self.ptr.as_ptr()
     }
 }
 

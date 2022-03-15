@@ -5,7 +5,7 @@ use std::any::type_name;
 
 use crate::{
     error::SyringeError,
-    function::{FunctionPtr, RawFunctionPtr},
+    function::FunctionPtr,
     process::{
         memory::{ProcessMemoryBuffer, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, Process,
@@ -14,7 +14,7 @@ use crate::{
     ArgAndResultBufInfo, Syringe,
 };
 
-use super::RemoteProcedureStub;
+use super::{RemoteProcedure, RemoteProcedureStub};
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
 impl Syringe {
@@ -54,27 +54,30 @@ pub struct RemotePayloadProcedure<F> {
     remote_allocator: RemoteBoxAllocator,
 }
 
-impl<F: FunctionPtr> RemotePayloadProcedure<F> {
+impl<F> RemotePayloadProcedure<F>
+where
+    F: FunctionPtr,
+{
     fn new(ptr: F, remote_allocator: RemoteBoxAllocator) -> Self {
         Self {
             ptr,
             remote_allocator,
         }
     }
+}
 
+impl<F> RemoteProcedure<F> for RemotePayloadProcedure<F>
+where
+    F: FunctionPtr,
+{
     /// Returns the process that this remote procedure is from.
-    pub fn process(&self) -> BorrowedProcess<'_> {
+    fn process(&self) -> BorrowedProcess<'_> {
         self.remote_allocator.process()
     }
 
     /// Returns the underlying pointer to the remote procedure.
-    pub fn as_ptr(&self) -> F {
+    fn as_ptr(&self) -> F {
         self.ptr
-    }
-
-    /// Returns the raw underlying pointer to the remote procedure.
-    pub fn as_raw_ptr(&self) -> RawFunctionPtr {
-        self.ptr.as_ptr()
     }
 }
 

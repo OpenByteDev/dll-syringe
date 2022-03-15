@@ -11,7 +11,7 @@ use crate::{
     function::{FunctionPtr, RawFunctionPtr},
     process::{
         memory::{RemoteAllocation, RemoteBox},
-        BorrowedProcessModule, Process,
+        BorrowedProcess, BorrowedProcessModule, Process,
     },
     rpc::error::RawRpcError,
     GetProcAddressFn, Syringe,
@@ -165,6 +165,20 @@ impl Syringe {
         );
 
         Ok(code)
+    }
+}
+
+/// A remote procedure in a different process.
+pub trait RemoteProcedure<F: FunctionPtr> {
+    /// Returns the process that this remote procedure is from.
+    fn process(&self) -> BorrowedProcess<'_>;
+
+    /// Returns the underlying pointer to the remote procedure.
+    fn as_ptr(&self) -> F;
+
+    /// Returns the raw underlying pointer to the remote procedure.
+    fn as_raw_ptr(&self) -> RawFunctionPtr {
+        self.as_ptr().as_ptr()
     }
 }
 
