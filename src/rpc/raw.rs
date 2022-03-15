@@ -19,9 +19,17 @@ use crate::{
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
 impl Syringe {
     /// Loads an exported function from the given module from the target process.
+    /// Only exported functions with a calling convention of `C` or `system` are supported.
+    ///
+    /// Loads an exported function from the given module from the target process.
+    ///
+    /// # Note
     /// The function does not have to be from an injected module.
     /// If the module is not loaded in the target process `Ok(None)` is returned.
-    pub fn get_raw_procedure<F: RawRpcFunctionPtr>(
+    ///
+    /// # Safety
+    /// The target function must abide by the given signature.
+    pub unsafe fn get_raw_procedure<F: RawRpcFunctionPtr>(
         &self,
         module: BorrowedProcessModule<'_>,
         name: &str,

@@ -19,9 +19,14 @@ use super::RemoteProcedureStub;
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
 impl Syringe {
     /// Loads an exported function from the given module from the target process.
+    ///
+    /// # Note
     /// The function does not have to be from an injected module.
     /// If the module is not loaded in the target process `Ok(None)` is returned.
-    pub fn get_payload_procedure<F: PayloadRpcFunctionPtr>(
+    ///
+    /// # Safety
+    /// The target function must abide by the given signature and has to be declared using the [`payload_procedure!`](crate::payload_procedure) macro.
+    pub unsafe fn get_payload_procedure<F: PayloadRpcFunctionPtr>(
         &self,
         module: BorrowedProcessModule<'_>,
         name: &str,

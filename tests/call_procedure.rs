@@ -53,7 +53,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_add = syringe.get_payload_procedure::<fn(u32, u32) -> u32>(module, "add").unwrap().unwrap();
+        let remote_add = unsafe { syringe.get_payload_procedure::<fn(u32, u32) -> u32>(module, "add") }.unwrap().unwrap();
         let add_result = remote_add.call(&42, &10).unwrap();
         assert_eq!(add_result, 52);
     }
@@ -67,7 +67,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_sum = syringe.get_payload_procedure::<fn(Vec<u64>) -> u64>(module, "sum").unwrap().unwrap();
+        let remote_sum = unsafe { syringe.get_payload_procedure::<fn(Vec<u64>) -> u64>(module, "sum") }.unwrap().unwrap();
         let sum_result = remote_sum.call(&vec![1, 2, 3, 4, 5, 6, 7, 8, 9]).unwrap();
         assert_eq!(sum_result, 45);
     }
@@ -81,7 +81,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_does_panic = syringe.get_payload_procedure::<fn()>(module, "does_panic").unwrap().unwrap();
+        let remote_does_panic = unsafe { syringe.get_payload_procedure::<fn()>(module, "does_panic") }.unwrap().unwrap();
         let result = remote_does_panic.call();
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -102,7 +102,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_add = syringe.get_raw_procedure::<extern "system" fn(u32, u32) -> u32>(module, "add_raw").unwrap().unwrap();
+        let remote_add = unsafe { syringe.get_raw_procedure::<extern "system" fn(u32, u32) -> u32>(module, "add_raw") }.unwrap().unwrap();
         let add_result = remote_add.call(42, 10).unwrap();
         assert_eq!(add_result, 52);
     }
@@ -116,7 +116,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_sub = syringe.get_raw_procedure::<extern "system" fn(u32, u32) -> u32>(module, "sub_raw").unwrap().unwrap();
+        let remote_sub = unsafe { syringe.get_raw_procedure::<extern "system" fn(u32, u32) -> u32>(module, "sub_raw") }.unwrap().unwrap();
         let sub_result = remote_sub.call(42, 10).unwrap();
         assert_eq!(sub_result, 32);
     }
@@ -130,7 +130,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_add = syringe.get_raw_procedure::<extern "system" fn(u16, u8) -> u16>(module, "add_smol_raw").unwrap().unwrap();
+        let remote_add = unsafe { syringe.get_raw_procedure::<extern "system" fn(u16, u8) -> u16>(module, "add_smol_raw") }.unwrap().unwrap();
         let add_result = remote_add.call(42, 10).unwrap();
         assert_eq!(add_result, 52);
     }
@@ -144,7 +144,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_sum = syringe.get_raw_procedure::<extern "system" fn(u32, u32, u32, u32, u32) -> u32>(module, "sum_5_raw").unwrap().unwrap();
+        let remote_sum = unsafe { syringe.get_raw_procedure::<extern "system" fn(u32, u32, u32, u32, u32) -> u32>(module, "sum_5_raw") }.unwrap().unwrap();
         let sum_result = remote_sum.call(1, 2, 3, 4, 5).unwrap();
         assert_eq!(sum_result, 15);
     }
@@ -158,7 +158,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_sum = syringe.get_raw_procedure::<extern "system" fn(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32) -> u32>(module, "sum_10_raw").unwrap().unwrap();
+        let remote_sum = unsafe { syringe.get_raw_procedure::<extern "system" fn(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32) -> u32>(module, "sum_10_raw") }.unwrap().unwrap();
         let sum_result = remote_sum.call(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).unwrap();
         assert_eq!(sum_result, 55);
     }
@@ -172,7 +172,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_sub = syringe.get_raw_procedure::<extern "system" fn(f32, f32) -> f32>(module, "sub_float_raw").unwrap().unwrap();
+        let remote_sub = unsafe { syringe.get_raw_procedure::<extern "system" fn(f32, f32) -> f32>(module, "sub_float_raw") }.unwrap().unwrap();
         let sub_result = remote_sub.call(1.2, 0.2).unwrap();
         assert_eq!(sub_result, 1.0);
     }
@@ -186,7 +186,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_add = syringe.get_raw_procedure::<extern "C" fn(u32, u32) -> u32>(module, "add_raw_c").unwrap().unwrap();
+        let remote_add = unsafe { syringe.get_raw_procedure::<extern "C" fn(u32, u32) -> u32>(module, "add_raw_c") }.unwrap().unwrap();
         let add_result = remote_add.call(42, 10).unwrap();
         assert_eq!(add_result, 52);
     }
@@ -200,7 +200,7 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
 
-        let remote_sum = syringe.get_raw_procedure::<extern "C" fn(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32) -> u32>(module, "sum_10_raw_c").unwrap().unwrap();
+        let remote_sum = unsafe { syringe.get_raw_procedure::<extern "C" fn(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32) -> u32>(module, "sum_10_raw_c") }.unwrap().unwrap();
         let sum_result = remote_sum.call(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).unwrap();
         assert_eq!(sum_result, 55);
     }
