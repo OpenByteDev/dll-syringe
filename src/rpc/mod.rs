@@ -1,6 +1,4 @@
-#[cfg(feature = "rpc-core")]
 mod rpc_core;
-#[cfg(feature = "rpc-core")]
 pub(crate) use rpc_core::*;
 
 mod error;
