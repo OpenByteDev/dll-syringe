@@ -55,7 +55,7 @@ The target procedure must be defined using the `payload_function!` macro (requir
 The definition of an exported `add` function could look like this:
 ```rust
 dll_syringe::payload_function! {
-    fn add(a: f64, b: f64) -> f64) {
+    fn add(a: f64, b: f64) -> f64 {
         a + b
     }
 }
@@ -90,7 +90,7 @@ This means that even Win32 functions can be called directly.
 The definition of an exported `add` function could look like this:
 ```rust
 #[no_mangle]
-extern "system" fn add(a: f64, b: f64) -> f64) {
+extern "system" fn add(a: f64, b: f64) -> f64 {
     a + b
 }
 ```
