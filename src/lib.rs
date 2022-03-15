@@ -43,10 +43,10 @@ pub use syringe::*;
 /// Module containing process abstractions and utilities.
 pub mod process;
 
-#[cfg(feature = "rpc")]
-#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
+#[cfg(feature = "rpc-core")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-core")))]
 mod rpc;
-#[cfg(feature = "rpc")]
+#[cfg(feature = "rpc-core")]
 pub use rpc::*;
 
 pub(crate) mod utils;

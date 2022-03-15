@@ -33,6 +33,11 @@ pub extern "system" fn add_raw(a: u32, b: u32) -> u32 {
 }
 
 #[no_mangle]
+pub extern "C" fn add_raw_c(a: u32, b: u32) -> u32 {
+    a + b
+}
+
+#[no_mangle]
 pub extern "system" fn sub_raw(a: u32, b: u32) -> u32 {
     a - b
 }
@@ -43,12 +48,12 @@ pub extern "system" fn add_smol_raw(a: u16, b: u8) -> u16 {
 }
 
 #[no_mangle]
-pub extern "system" fn sum_5(a1: u32, a2: u32, a3: u32, a4: u32, a5: u32) -> u32 {
+pub extern "system" fn sum_5_raw(a1: u32, a2: u32, a3: u32, a4: u32, a5: u32) -> u32 {
     a1 + a2 + a3 + a4 + a5
 }
 
 #[no_mangle]
-pub extern "system" fn sum_10(
+pub extern "system" fn sum_10_raw(
     a1: u32,
     a2: u32,
     a3: u32,
@@ -71,4 +76,20 @@ pub extern "system" fn sub_float_raw(a: f32, b: f32) -> f32 {
 #[no_mangle]
 pub extern "C" fn sub_float_raw_c(a: f32, b: f32) -> f32 {
     a - b
+}
+
+#[no_mangle]
+pub extern "C" fn sum_10_raw_c(
+    a1: u32,
+    a2: u32,
+    a3: u32,
+    a4: u32,
+    a5: u32,
+    a6: u32,
+    a7: u32,
+    a8: u32,
+    a9: u32,
+    a10: u32,
+) -> u32 {
+    a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10
 }

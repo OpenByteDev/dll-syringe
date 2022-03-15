@@ -89,7 +89,7 @@ pub struct Syringe {
     pub(crate) inject_help_data: OnceCell<InjectHelpData>,
     pub(crate) remote_allocator: RemoteBoxAllocator,
     load_library_w_stub: OnceCell<LoadLibraryWStub>,
-    #[cfg(feature = "rpc")]
+    #[cfg(feature = "rpc-core")]
     pub(crate) get_proc_address_stub:
         OnceCell<crate::RemoteProcedureStub<crate::GetProcAddressParams, FARPROC>>,
 }
@@ -102,7 +102,7 @@ impl Syringe {
             remote_allocator: RemoteBoxAllocator::new(process),
             inject_help_data: OnceCell::new(),
             load_library_w_stub: OnceCell::new(),
-            #[cfg(feature = "rpc")]
+            #[cfg(feature = "rpc-core")]
             get_proc_address_stub: OnceCell::new(),
         }
     }
