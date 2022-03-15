@@ -42,7 +42,7 @@ This crate supports two mechanisms for rpc (both require feature `rpc`).
 
 ### RemotePayloadProcedure
 A rpc mechanism based on [`bincode`](https://crates.io/crates/bincode).
-The target procedure must be defined using the `payload_function!` macro (requires the `rpc-payload-utils` feature).
+The target procedure must be defined using the `payload_function!` macro (requires the `payload-utils` feature).
 
 The definition of an exported `add` function could look like this:
 ```rust
