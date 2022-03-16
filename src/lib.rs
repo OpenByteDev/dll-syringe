@@ -60,7 +60,7 @@ pub mod function;
 #[doc(hidden)]
 pub mod payload_utils;
 
-#[cfg(any(feature = "payload-utils", feature = "rpc"))]
+#[cfg(any(feature = "payload-utils", feature = "rpc-payload"))]
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub(crate) struct ArgAndResultBufInfo {

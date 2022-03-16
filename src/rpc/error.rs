@@ -6,7 +6,8 @@ use winapi::shared::winerror::ERROR_PARTIAL_COPY;
 use crate::error::{ExceptionCode, SyringeError};
 
 #[derive(Debug, Error)]
-#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
+#[cfg(feature = "rpc-raw")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
 /// An enum repsenting possible errors during remote procedure calls without serialization, deserialization or remote panics.
 pub enum RawRpcError {
     /// Variant representing an io error.
@@ -21,6 +22,7 @@ pub enum RawRpcError {
     ProcessInaccessible,
 }
 
+#[cfg(feature = "rpc-raw")]
 impl From<io::Error> for RawRpcError {
     fn from(err: io::Error) -> Self {
         if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
@@ -33,6 +35,7 @@ impl From<io::Error> for RawRpcError {
     }
 }
 
+#[cfg(feature = "rpc-raw")]
 impl From<ExceptionCode> for RawRpcError {
     fn from(err: ExceptionCode) -> Self {
         Self::RemoteException(err)
@@ -51,7 +54,8 @@ impl From<RawRpcError> for SyringeError {
 }
 
 #[derive(Debug, Error)]
-#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc")))]
+#[cfg(feature = "rpc-payload")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
 /// An enum repsenting possible errors during remote procedure calls.
 pub enum PayloadRpcError {
     /// Variant representing an io error.
@@ -72,6 +76,7 @@ pub enum PayloadRpcError {
     Serde(#[from] Box<bincode::ErrorKind>),
 }
 
+#[cfg(feature = "rpc-payload")]
 impl From<io::Error> for PayloadRpcError {
     fn from(err: io::Error) -> Self {
         if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
@@ -84,6 +89,7 @@ impl From<io::Error> for PayloadRpcError {
     }
 }
 
+#[cfg(all(feature = "rpc-payload", feature = "rpc-raw"))]
 impl From<RawRpcError> for PayloadRpcError {
     fn from(err: RawRpcError) -> Self {
         match err {
