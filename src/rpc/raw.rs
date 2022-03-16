@@ -2,21 +2,21 @@ use iced_x86::{code_asm::*, IcedError};
 
 use std::{
     any::{self, type_name, TypeId},
-    io, mem,
+    io,
+    lazy::OnceCell,
+    mem,
 };
 
 use crate::{
     error::SyringeError,
     function::{Abi, FunctionPtr},
     process::{
-        memory::{RemoteBox, RemoteBoxAllocator},
+        memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, Process,
     },
-    rpc::error::RawRpcError,
+    rpc::{error::RawRpcError, RemoteProcedure},
     Syringe,
 };
-
-use super::RemoteProcedure;
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
 impl Syringe {
@@ -57,6 +57,14 @@ pub trait RawRpcFunctionPtr: FunctionPtr {}
 pub struct RemoteRawProcedure<F> {
     ptr: F,
     remote_allocator: RemoteBoxAllocator,
+    stub: OnceCell<RemoteRawProcedureStub>,
+}
+
+#[derive(Debug)]
+pub(crate) struct RemoteRawProcedureStub {
+    pub code: RemoteAllocation,
+    pub parameter: RemoteAllocation,
+    pub result: RemoteBox<usize>,
 }
 
 impl<F> RemoteRawProcedure<F>
@@ -67,6 +75,7 @@ where
         Self {
             ptr,
             remote_allocator,
+            stub: OnceCell::new(),
         }
     }
 }
@@ -90,38 +99,45 @@ impl<F> RemoteRawProcedure<F>
 where
     F: RawRpcFunctionPtr,
 {
-    fn call_with_args_buf_and_float_mask(
-        &self,
-        args: &[usize],
-        float_mask: u32,
-    ) -> Result<F::Output, RawRpcError>
-    where
-        F::Output: Copy,
-    {
-        let parameter_buf = self.remote_allocator.alloc_and_copy_buf(args)?;
-        let parameter_buf = unsafe { RemoteBox::<[usize]>::new(parameter_buf) };
-        let result_buf = self.remote_allocator.alloc_uninit::<usize>()?;
+    fn call_with_args(&self, args: &[usize]) -> Result<F::Output, RawRpcError> {
+        let stub = self.build_call_stub()?;
 
-        let code = if self.process().is_x86()? {
-            Self::build_call_stub_x86(self.ptr, result_buf.as_ptr().as_ptr(), float_mask).unwrap()
-        } else {
-            Self::build_call_stub_x64(self.ptr, result_buf.as_ptr().as_ptr(), float_mask).unwrap()
-        };
-        let code = self.remote_allocator.alloc_and_copy_buf(code.as_slice())?;
-        code.memory().flush_instruction_cache()?;
+        stub.parameter.memory().write_struct(0, args)?;
 
-        let exit_code = code.process().run_remote_thread(
-            unsafe { mem::transmute(code.as_raw_ptr()) },
-            parameter_buf.as_raw_ptr(),
+        let exit_code = stub.code.process().run_remote_thread(
+            unsafe { mem::transmute(stub.code.as_raw_ptr()) },
+            stub.parameter.as_raw_ptr(),
         )?;
         Syringe::remote_exit_code_to_exception(exit_code)?;
 
         if mem::size_of::<F::Output>() == 0 {
             Ok(unsafe { mem::zeroed() })
         } else {
-            let result = unsafe { result_buf.memory().read_struct::<F::Output>(0)? };
+            let result = unsafe { stub.result.memory().read_struct::<F::Output>(0)? };
             Ok(result)
         }
+    }
+
+    fn build_call_stub(&self) -> Result<&RemoteRawProcedureStub, io::Error> {
+        self.stub.get_or_try_init(|| {
+            let parameter = self.remote_allocator.alloc_buf::<usize>(F::ARITY)?;
+            let result = self.remote_allocator.alloc_uninit::<usize>()?;
+
+            let float_mask = <F::NonExtern>::build_float_mask();
+            let code = if self.process().is_x86()? {
+                Self::build_call_stub_x86(self.ptr, result.as_ptr().as_ptr(), float_mask).unwrap()
+            } else {
+                Self::build_call_stub_x64(self.ptr, result.as_ptr().as_ptr(), float_mask).unwrap()
+            };
+            let code = self.remote_allocator.alloc_and_copy_buf(code.as_slice())?;
+            code.memory().flush_instruction_cache()?;
+
+            Ok(RemoteRawProcedureStub {
+                code,
+                parameter,
+                result,
+            })
+        })
     }
 
     #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
@@ -248,6 +264,18 @@ fn type_eq<T: ?Sized + 'static, U: ?Sized + 'static>() -> bool {
     TypeId::of::<T>() == TypeId::of::<U>()
 }
 
+/// Helper trait for building a mask of which arguments and results are passed in floating point registers.
+trait BuildFloatMask {
+    fn build_float_mask() -> u32;
+}
+
+impl<F: FunctionPtr> BuildFloatMask for F {
+    default fn build_float_mask() -> u32 {
+        // This default implementation will never be called as there exists a specialization for every valid function pointer (defined in the macro below).
+        unreachable!()
+    }
+}
+
 macro_rules! impl_call {
     (@recurse () ($($nm:ident : $ty:ident),*)) => {
         impl_call!(@impl_all ($($nm : $ty),*));
@@ -265,7 +293,7 @@ macro_rules! impl_call {
 
         impl <$($ty,)* Output> RemoteRawProcedure<fn($($ty),*) -> Output> where $($ty : 'static + Copy,)* Output: 'static + Copy  {
             #[allow(clippy::too_many_arguments)]
-            fn build_args_buf_and_float_mask(process: BorrowedProcess<'_>, $($nm: $ty),*) -> io::Result<([usize; impl_call!(@count ($($ty)*))], u32)> {
+            fn build_args_buf(process: BorrowedProcess<'_>, $($nm: $ty),*) -> io::Result<[usize; impl_call!(@count ($($ty)*))]> {
                 let target_pointer_size = if process.is_x86()? {
                     4
                 } else {
@@ -289,15 +317,21 @@ macro_rules! impl_call {
                     unsafe { mem::transmute::<[u8; mem::size_of::<usize>()], usize>(buf) }
                 },)*];
 
+                // use var to avoid dead_code warning
+                let _ = target_pointer_size;
+
+                Ok(args_buf)
+            }
+        }
+
+        impl <$($ty,)* Output> BuildFloatMask for fn($($ty),*) -> Output where $($ty : 'static,)* Output: 'static {
+            fn build_float_mask() -> u32 {
                 // calculate a mask denoting which arguments are floats
                 let mut float_mask = 0u32;
                 $(float_mask = (float_mask << 1) | if type_eq::<$ty, f32>() || type_eq::<$ty, f64>() { 1 } else { 0 };)*
                 float_mask |= if type_eq::<Output, f32>() || type_eq::<Output, f64>() { 0x8000_0000u32 } else { 0 };
 
-                // use var to avoid dead_code warning
-                let _ = target_pointer_size;
-
-                Ok((args_buf, float_mask))
+                float_mask
             }
         }
 
@@ -306,8 +340,8 @@ macro_rules! impl_call {
             /// The arguments and the return value are copied bytewise.
             #[allow(clippy::too_many_arguments)]
             pub fn call(&self, $($nm: $ty),*) -> Result<Output, RawRpcError> {
-                let (args_buf, float_mask) = RemoteRawProcedure::<fn($($ty),*) -> Output>::build_args_buf_and_float_mask(self.process(), $($nm),*)?;
-                self.call_with_args_buf_and_float_mask(&args_buf, float_mask)
+                let args_buf = RemoteRawProcedure::<fn($($ty),*) -> Output>::build_args_buf(self.process(), $($nm),*)?;
+                self.call_with_args(&args_buf)
             }
         }
         impl <$($ty,)* Output> RemoteRawProcedure<extern "C" fn($($ty),*) -> Output> where $($ty : 'static + Copy,)* Output: 'static + Copy  {
@@ -315,8 +349,8 @@ macro_rules! impl_call {
             /// The arguments and the return value are copied bytewise.
             #[allow(clippy::too_many_arguments)]
             pub fn call(&self, $($nm: $ty),*) -> Result<Output, RawRpcError> {
-                let (args_buf, float_mask) = RemoteRawProcedure::<fn($($ty),*) -> Output>::build_args_buf_and_float_mask(self.process(), $($nm),*)?;
-                self.call_with_args_buf_and_float_mask(&args_buf, float_mask)
+                let args_buf = RemoteRawProcedure::<fn($($ty),*) -> Output>::build_args_buf(self.process(), $($nm),*)?;
+                self.call_with_args(&args_buf)
             }
         }
         impl <$($ty,)* Output> RemoteRawProcedure<unsafe extern "system" fn($($ty),*) -> Output> where $($ty : 'static + Copy,)* Output: 'static + Copy  {
@@ -327,8 +361,8 @@ macro_rules! impl_call {
             /// The caller must ensure whatever the requirements of the underlying remote procedure are.
             #[allow(clippy::too_many_arguments)]
             pub unsafe fn call(&self, $($nm: $ty),*) -> Result<Output, RawRpcError> {
-                let (args_buf, float_mask) = RemoteRawProcedure::<fn($($ty),*) -> Output>::build_args_buf_and_float_mask(self.process(), $($nm),*)?;
-                self.call_with_args_buf_and_float_mask(&args_buf, float_mask)
+                let args_buf = RemoteRawProcedure::<fn($($ty),*) -> Output>::build_args_buf(self.process(), $($nm),*)?;
+                self.call_with_args(&args_buf)
             }
         }
         impl <$($ty,)* Output> RemoteRawProcedure<unsafe extern "C" fn($($ty),*) -> Output> where $($ty : 'static + Copy,)* Output: 'static + Copy  {
@@ -339,8 +373,8 @@ macro_rules! impl_call {
             /// The caller must ensure whatever the requirements of the underlying remote procedure are.
             #[allow(clippy::too_many_arguments)]
             pub unsafe fn call(&self, $($nm: $ty),*) -> Result<Output, RawRpcError> {
-                let (args_buf, float_mask) = RemoteRawProcedure::<fn($($ty),*) -> Output>::build_args_buf_and_float_mask(self.process(), $($nm),*)?;
-                self.call_with_args_buf_and_float_mask(&args_buf, float_mask)
+                let args_buf = RemoteRawProcedure::<fn($($ty),*) -> Output>::build_args_buf(self.process(), $($nm),*)?;
+                self.call_with_args(&args_buf)
             }
         }
     };

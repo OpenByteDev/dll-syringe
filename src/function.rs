@@ -21,11 +21,11 @@ pub unsafe trait FunctionPtr: Sized + Copy + Send + Sync + 'static {
     /// The return type.
     type Output;
 
+    /// The non-extern version of the function pointer.
+    type NonExtern: FunctionPtr;
+
     /// The function's arity (number of arguments).
     const ARITY: usize;
-
-    /// Is this function unsafe.
-    const UNSAFE: bool;
 
     /// The ABI of this function.
     const ABI: Abi;
@@ -169,9 +169,9 @@ macro_rules! impl_fn {
             type Args = ($($ty,)*);
             type RefArgs<'a> = ($(&'a $ty,)*);
             type Output = Ret;
+            type NonExtern = fn($($ty),*) -> Ret;
 
             const ARITY: ::core::primitive::usize = impl_fn!(@count ($($ty)*));
-            const UNSAFE: ::core::primitive::bool = $is_unsafe;
             const ABI: crate::function::Abi = match call_conv_from_str($call_conv) {
                 Some(c) => c,
                 None => panic!(concat!("invalid or unknown abi: ", $call_conv)),

@@ -48,6 +48,10 @@ impl RemoteBoxAllocator {
         b.write(value)?;
         Ok(b)
     }
+    pub fn alloc_buf<T: Copy>(&self, len: usize) -> Result<RemoteAllocation, io::Error> {
+        let allocation = self.alloc_raw(len * mem::size_of::<T>())?;
+        Ok(allocation)
+    }
     pub fn alloc_and_copy_buf<T: Copy>(&self, buf: &[T]) -> Result<RemoteAllocation, io::Error> {
         let bytes = unsafe {
             slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len() * mem::size_of::<T>())
