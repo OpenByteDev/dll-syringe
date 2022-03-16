@@ -48,7 +48,7 @@ This crate supports two mechanisms for rpc. Both only work one-way for calling e
 | Argument and Return Requirements | `Serialize + DeserializeOwned` | `Copy`, Argument size has to be smaller than `usize` in target process |
 | Function Definition       | Using macro `payload_procedure!` | Any `extern "system"` or `extern "C"` with `#[no_mangle]` |
 
-### RemoteRawProcedure
+### RemotePayloadProcedure
 A rpc mechanism based on [`bincode`](https://crates.io/crates/bincode).
 The target procedure must be defined using the `payload_function!` macro (requires the `payload-utils` feature).
 
