@@ -32,7 +32,7 @@ syringe.eject(injected_payload).unwrap();
 ```
 
 ## Remote Procedure Calls (RPC)
-This crate supports two mechanisms for rpc (both require feature `rpc`).
+This crate supports two mechanisms for rpc. Both only work one-way for calling exported functions in the target process and are only intended for one-time initialization usage. For extended communication a dedicated rpc library should be used.
 
 |                  | `RemotePayloadProcedure`        | `RemoteRawProcedure` |
 | ---------------- | ------------------------------ | ------------------------------------------ |

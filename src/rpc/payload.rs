@@ -18,6 +18,7 @@ use super::{RemoteProcedure, RemoteProcedureStub};
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
 impl Syringe {
+    #[allow(rustc::broken_intra_doc_links)]
     /// Loads an exported function from the given module from the target process.
     ///
     /// # Note
