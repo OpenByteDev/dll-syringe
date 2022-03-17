@@ -1,20 +1,17 @@
-use iced_x86::{code_asm::*, IcedError};
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::any::type_name;
+use std::{any::type_name, marker::PhantomData, fmt};
 
 use crate::{
     error::SyringeError,
-    function::FunctionPtr,
+    function::{FunctionPtr, RawFunctionPtr},
     process::{
         memory::{ProcessMemoryBuffer, RemoteBoxAllocator},
-        BorrowedProcess, BorrowedProcessModule, Process,
+        BorrowedProcess, BorrowedProcessModule,
     },
-    rpc::error::PayloadRpcError,
+    rpc::{RemoteRawProcedure, Truncate, error::PayloadRpcError},
     ArgAndResultBufInfo, Syringe,
 };
-
-use super::{RemoteProcedure, RemoteProcedureStub};
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
 impl Syringe {
@@ -34,7 +31,7 @@ impl Syringe {
     ) -> Result<Option<RemotePayloadProcedure<F>>, SyringeError> {
         match self.get_procedure_address(module, name) {
             Ok(Some(procedure)) => Ok(Some(RemotePayloadProcedure::new(
-                unsafe { F::from_ptr(procedure) },
+                unsafe { RealPayloadRpcFunctionPtr::from_ptr(procedure) },
                 self.remote_allocator.clone(),
             ))),
             Ok(None) => Ok(None),
@@ -47,12 +44,15 @@ impl Syringe {
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
 pub trait PayloadRpcFunctionPtr: FunctionPtr {}
 
+type RealPayloadRpcFunctionPtr = extern "system" fn(Truncate<*mut ArgAndResultBufInfo>);
+
 /// A struct representing a procedure from a module of a remote process.
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
-#[derive(Debug)]
 pub struct RemotePayloadProcedure<F> {
-    ptr: F,
+    ptr: RealPayloadRpcFunctionPtr,
     remote_allocator: RemoteBoxAllocator,
+    phantom: PhantomData<fn() -> F>,
+}
 
 impl <F> fmt::Debug for RemotePayloadProcedure<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -68,10 +68,11 @@ impl<F> RemotePayloadProcedure<F>
 where
     F: FunctionPtr,
 {
-    fn new(ptr: F, remote_allocator: RemoteBoxAllocator) -> Self {
+    pub(crate) fn new(ptr: RealPayloadRpcFunctionPtr, remote_allocator: RemoteBoxAllocator) -> Self {
         Self {
             ptr,
             remote_allocator,
+            phantom: PhantomData
         }
     }
 
@@ -95,36 +96,27 @@ where
     fn call_with_args(&self, args: F::RefArgs<'_>) -> Result<F::Output, PayloadRpcError> {
         let local_arg_buf = bincode::serialize(&args)?;
 
+        let stub = RemoteRawProcedure::new(
+            self.ptr,
+            self.remote_allocator.clone(),
+        );
+
         // Allocate a buffer in the remote process to hold the argument.
         let remote_arg_buf = self.remote_allocator.alloc_raw(local_arg_buf.len())?;
         remote_arg_buf.write_bytes(local_arg_buf.as_ref())?;
+
         let parameter_buf = self
             .remote_allocator
-            .alloc_uninit::<ArgAndResultBufInfo>()?;
-
-        // build the remote procedure stub
-        let code = if self.remote_allocator.process().is_x86()? {
-            Self::build_call_stub_x86(self.ptr).unwrap()
-        } else {
-            Self::build_call_stub_x64(self.ptr).unwrap()
-        };
-        let code = self.remote_allocator.alloc_and_copy_buf(code.as_slice())?;
-        code.memory().flush_instruction_cache()?;
-
-        let stub = RemoteProcedureStub {
-            code,
-            parameter: parameter_buf,
-            result: self.remote_allocator.alloc_uninit::<()>()?,
-        };
+            .alloc_and_copy(&ArgAndResultBufInfo {
+                data: remote_arg_buf.as_ptr().as_ptr() as u64,
+                len: remote_arg_buf.len() as u64,
+                is_error: false,
+            })?;
 
         // Call the remote procedure stub.
-        stub.call(&ArgAndResultBufInfo {
-            data: remote_arg_buf.as_ptr().as_ptr() as u64,
-            len: remote_arg_buf.len() as u64,
-            is_error: false,
-        })?;
+        stub.call(Truncate(parameter_buf.as_ptr().as_ptr()))?;
 
-        let result_buf_info = stub.parameter.read()?;
+        let result_buf_info = parameter_buf.read()?;
 
         // Prepare local result buffer
         let mut local_result_buf = local_arg_buf;
@@ -158,56 +150,6 @@ where
         } else {
             Ok(bincode::deserialize(&local_result_buf)?)
         }
-    }
-
-    #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
-    fn build_call_stub_x86(procedure: F) -> Result<Vec<u8>, IcedError> {
-        assert_eq!(
-            procedure.as_ptr() as u32 as usize,
-            procedure.as_ptr() as usize
-        );
-
-        let mut asm = CodeAssembler::new(32)?;
-
-        asm.mov(eax, esp + 4)?; // load arg ptr (lpParameter) from stack
-        asm.push(eax)?; // push arg ptr onto stack
-        asm.mov(eax, procedure.as_ptr() as u32)?; // load address of target function
-        asm.call(eax)?; // call real_address
-        asm.mov(eax, 0)?; // return 0
-        asm.ret_1(4)?; // Restore stack ptr. (Callee cleanup)
-
-        let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(
-            code,
-            asm.assemble(0x1111_2222)?,
-            "{} call x86 stub is not location independent",
-            type_name::<RemotePayloadProcedure<F>>()
-        );
-
-        Ok(code)
-    }
-
-    #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
-    fn build_call_stub_x64(procedure: F) -> Result<Vec<u8>, IcedError> {
-        let mut asm = CodeAssembler::new(64)?;
-
-        asm.sub(rsp, 40)?; // Re-align stack to 16 byte boundary +32 shadow space
-        asm.mov(rcx, rcx)?; // arg ptr
-        asm.mov(rax, procedure.as_ptr() as u64)?;
-        asm.call(rax)?;
-        asm.mov(rax, 0u64)?; // return 0
-        asm.add(rsp, 40)?; // Re-align stack to 16 byte boundary + shadow space.
-        asm.ret()?; // Restore stack ptr. (Callee cleanup)
-
-        let code = asm.assemble(0x1234_5678)?;
-        debug_assert_eq!(
-            code,
-            asm.assemble(0x1111_2222)?,
-            "{} call x64 stub is not location independent",
-            type_name::<RemotePayloadProcedure<F>>()
-        );
-
-        Ok(code)
     }
 }
 
