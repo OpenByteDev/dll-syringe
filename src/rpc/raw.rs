@@ -199,6 +199,7 @@ where
     ) -> Result<Vec<u8>, IcedError> {
         let mut asm = CodeAssembler::new(64)?;
 
+        asm.sub(rsp, 8)?; // align stack to 16 bytes
         asm.mov(rax, rcx)?; // arg base ptr
         if F::ARITY > 0 {
             asm.mov(rcx, qword_ptr(rax + (0 * mem::size_of::<usize>())))?;
@@ -246,6 +247,7 @@ where
             asm.add(rsp, ((F::ARITY - 4) * mem::size_of::<usize>()) as i32)?;
         }
 
+        asm.add(rsp, 8)?; // remove stack alignment
         asm.ret()?; // Restore stack ptr.
 
         let code = asm.assemble(0x1234_5678)?;
