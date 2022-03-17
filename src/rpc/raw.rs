@@ -8,11 +8,11 @@ use std::{
 };
 
 use crate::{
-    error::SyringeError,
+    error::{SyringeError},
     function::{Abi, FunctionPtr, RawFunctionPtr},
     process::{
         memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
-        BorrowedProcess, BorrowedProcessModule, Process,
+        BorrowedProcess, BorrowedProcessModule, ModuleHandle, Process, ProcessModule,
     },
     rpc::error::RawRpcError,
     Syringe,
@@ -40,6 +40,7 @@ impl Syringe {
             Ok(Some(procedure)) => Ok(Some(RemoteRawProcedure::new(
                 unsafe { F::from_ptr(procedure) },
                 self.remote_allocator.clone(),
+                module.handle(),
             ))),
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -58,6 +59,7 @@ pub struct RemoteRawProcedure<F> {
     ptr: F,
     remote_allocator: RemoteBoxAllocator,
     stub: OnceCell<RemoteRawProcedureStub>,
+    module_handle: ModuleHandle,
 }
 
 #[derive(Debug)]
@@ -71,11 +73,16 @@ impl<F> RemoteRawProcedure<F>
 where
     F: FunctionPtr,
 {
-    pub(crate) fn new(ptr: F, remote_allocator: RemoteBoxAllocator) -> Self {
+    pub(crate) fn new(
+        ptr: F,
+        remote_allocator: RemoteBoxAllocator,
+        module_handle: ModuleHandle,
+    ) -> Self {
         Self {
             ptr,
             remote_allocator,
             stub: OnceCell::new(),
+            module_handle,
         }
     }
 
@@ -103,6 +110,13 @@ where
     F: RawRpcFunctionPtr,
 {
     fn call_with_args(&self, args: &[usize]) -> Result<F::Output, RawRpcError> {
+        if !self.process().is_alive() {
+            return Err(RawRpcError::ProcessInaccessible);
+        }
+        if !unsafe { ProcessModule::new_unchecked(self.module_handle, self.process()) }.guess_is_loaded() {
+            return Err(RawRpcError::ModuleInaccessible);
+        }
+
         let stub = self.build_call_stub()?;
 
         stub.parameter.memory().write_struct(0, args)?;
@@ -116,7 +130,14 @@ where
         if mem::size_of::<F::Output>() == 0 {
             Ok(unsafe { mem::zeroed() })
         } else {
-            let result = unsafe { stub.result.memory().read_struct::<F::Output>(0)? };
+            let offset = if cfg!(target_endian = "little") {
+                0
+            } else if cfg!(target_endian = "big") {
+                mem::size_of::<usize>() - mem::size_of::<F::Output>()
+            } else {
+                unreachable!()
+            };
+            let result = unsafe { stub.result.memory().read_struct::<F::Output>(offset) }?;
             Ok(result)
         }
     }

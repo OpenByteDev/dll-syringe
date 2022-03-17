@@ -190,6 +190,10 @@ pub enum SyringeError {
     /// This can occur if it crashed or was terminated.
     #[error("inaccessible target process")]
     ProcessInaccessible,
+    /// Variant representing an inaccessible target module.
+    /// This can occur if the target module was ejected or unloaded.
+    #[error("inaccessible target module")]
+    ModuleInaccessible,
     /// Variant representing an error while loading an pe file.
     #[cfg(target_arch = "x86_64")]
     #[cfg(feature = "into-x86-from-x64")]

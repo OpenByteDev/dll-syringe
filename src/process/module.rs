@@ -1,6 +1,7 @@
 use std::{
     ffi::{CStr, CString, OsString},
     io,
+    mem::{self, MaybeUninit},
     path::{Path, PathBuf},
     ptr::NonNull,
 };
@@ -20,7 +21,9 @@ use winapi::{
     },
     um::{
         libloaderapi::{GetModuleFileNameW, GetModuleHandleW, GetProcAddress},
+        memoryapi::VirtualQueryEx,
         psapi::{GetModuleBaseNameW, GetModuleFileNameExW},
+        winnt::{MEMORY_BASIC_INFORMATION, PAGE_NOACCESS},
     },
 };
 
@@ -335,6 +338,37 @@ impl<P: Process> ProcessModule<P> {
             Ok(fn_ptr.as_ptr())
         } else {
             Err(io::Error::last_os_error())
+        }
+    }
+
+    /// Returns whether this module is still loaded in the respective process.
+    /// If the operation fails, the module is considered to be unloaded.
+    pub fn guess_is_loaded(&self) -> bool {
+        self.try_guess_is_loaded().unwrap_or(false)
+    }
+
+    /// Returns whether this module is still loaded in the respective process.
+    pub fn try_guess_is_loaded(&self) -> Result<bool, io::Error> {
+        if !self.process().is_alive() {
+            return Ok(false);
+        }
+
+        let mut module_info = MaybeUninit::uninit();
+        let raw_module = self.handle.as_ptr().cast();
+        let result = unsafe {
+            VirtualQueryEx(
+                self.process.as_raw_handle(),
+                raw_module,
+                module_info.as_mut_ptr(),
+                mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+            )
+        };
+
+        if result == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            let module_info = unsafe { module_info.assume_init() };
+            Ok(module_info.BaseAddress == raw_module && module_info.Protect != PAGE_NOACCESS)
         }
     }
 }

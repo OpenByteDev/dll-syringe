@@ -1,12 +1,13 @@
-use dll_syringe::{process::Process, rpc::PayloadRpcError, Syringe};
-use std::time::Duration;
+#![cfg(feature = "rpc-core")]
+
+use dll_syringe::{process::Process, Syringe};
 
 #[allow(unused)]
 mod common;
 
-#[cfg(feature = "rpc-core")]
 mod core {
     pub use super::*;
+    use std::time::Duration;
 
     process_test! {
         fn get_procedure_address_of_win32_fn(
@@ -51,6 +52,7 @@ mod core {
 #[cfg(feature = "rpc-payload")]
 mod payload {
     pub use super::*;
+    use dll_syringe::rpc::PayloadRpcError;
 
     syringe_test! {
         fn call_simple(
@@ -105,6 +107,7 @@ mod payload {
 #[cfg(feature = "rpc-raw")]
 mod raw {
     pub use super::*;
+    use dll_syringe::rpc::RawRpcError;
 
     syringe_test! {
         fn call_simple(
@@ -215,6 +218,47 @@ mod raw {
             let remote_sum = unsafe { syringe.get_raw_procedure::<extern "C" fn(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32) -> u32>(module, "sum_10_raw_c") }.unwrap().unwrap();
             let sum_result = remote_sum.call(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).unwrap();
             assert_eq!(sum_result, 55);
+        }
+    }
+
+    syringe_test! {
+        fn call_after_eject_fails_with_inaccessible_module(
+            process: OwnedProcess,
+            payload_path: &Path,
+        ) {
+            let syringe = Syringe::for_process(process);
+            let module = syringe.inject(payload_path).unwrap();
+            let remote_add = unsafe { syringe.get_raw_procedure::<extern "C" fn(u32, u32) -> u32>(module, "add_raw_c") }.unwrap().unwrap();
+            syringe.eject(module).unwrap();
+            let add_err = remote_add.call(42, 10).unwrap_err();
+            assert!(matches!(add_err, RawRpcError::ModuleInaccessible));
+        }
+    }
+
+    syringe_test! {
+        fn call_after_kill_fails_with_inaccessible_process(
+            process: OwnedProcess,
+            payload_path: &Path,
+        ) {
+            let syringe = Syringe::for_process(process);
+            let module = syringe.inject(payload_path).unwrap();
+            let remote_add = unsafe { syringe.get_raw_procedure::<extern "C" fn(u32, u32) -> u32>(module, "add_raw_c") }.unwrap().unwrap();
+            syringe.process().kill().unwrap();
+            let add_err = remote_add.call(42, 10).unwrap_err();
+            assert!(matches!(add_err, RawRpcError::ProcessInaccessible), "{:?}", add_err);
+        }
+    }
+
+    syringe_test! {
+        fn call_crash_fails_with_access_violation(
+            process: OwnedProcess,
+            payload_path: &Path,
+        ) {
+            let syringe = Syringe::for_process(process);
+            let module = syringe.inject(payload_path).unwrap();
+            let remote_add = unsafe { syringe.get_raw_procedure::<extern "C" fn()>(module, "crash") }.unwrap().unwrap();
+            let add_err = remote_add.call().unwrap_err();
+            assert!(matches!(add_err, RawRpcError::RemoteException(dll_syringe::error::ExceptionCode::AccessViolation)), "{:?}", add_err);
         }
     }
 }

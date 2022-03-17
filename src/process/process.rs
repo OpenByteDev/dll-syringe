@@ -108,6 +108,10 @@ pub trait Process: AsHandle + AsRawHandle {
     /// If the operation to determine the status fails, this function assumes that the process has exited.
     #[must_use]
     fn is_alive(&self) -> bool {
+        if self.is_current() {
+            return true;
+        }
+        
         let mut exit_code = MaybeUninit::uninit();
         let result = unsafe { GetExitCodeProcess(self.as_raw_handle(), exit_code.as_mut_ptr()) };
         result != FALSE && unsafe { exit_code.assume_init() } == STILL_ACTIVE

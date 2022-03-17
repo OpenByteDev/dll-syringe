@@ -93,3 +93,10 @@ pub extern "C" fn sum_10_raw_c(
 ) -> u32 {
     a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10
 }
+
+#[no_mangle]
+pub extern "C" fn crash() {
+    let ptr = std::ptr::null_mut::<u32>();
+    let a = unsafe { *ptr };
+    std::mem::drop(a);
+}

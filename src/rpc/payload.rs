@@ -7,7 +7,7 @@ use crate::{
     function::{FunctionPtr, RawFunctionPtr},
     process::{
         memory::{ProcessMemoryBuffer, RemoteBoxAllocator},
-        BorrowedProcess, BorrowedProcessModule,
+        BorrowedProcess, BorrowedProcessModule, ModuleHandle,
     },
     rpc::{error::PayloadRpcError, RemoteRawProcedure, Truncate},
     ArgAndResultBufInfo, Syringe,
@@ -33,6 +33,7 @@ impl Syringe {
             Ok(Some(procedure)) => Ok(Some(RemotePayloadProcedure::new(
                 unsafe { RealPayloadRpcFunctionPtr::from_ptr(procedure) },
                 self.remote_allocator.clone(),
+                module.handle()
             ))),
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -49,8 +50,9 @@ type RealPayloadRpcFunctionPtr = extern "system" fn(Truncate<*mut ArgAndResultBu
 /// A struct representing a procedure from a module of a remote process.
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
 pub struct RemotePayloadProcedure<F> {
-    ptr: RealPayloadRpcFunctionPtr,
+    ptr:  RealPayloadRpcFunctionPtr,
     remote_allocator: RemoteBoxAllocator,
+    module_handle: ModuleHandle,
     phantom: PhantomData<fn() -> F>,
 }
 
@@ -71,11 +73,13 @@ where
     pub(crate) fn new(
         ptr: RealPayloadRpcFunctionPtr,
         remote_allocator: RemoteBoxAllocator,
+        module_handle: ModuleHandle
     ) -> Self {
         Self {
             ptr,
             remote_allocator,
             phantom: PhantomData,
+            module_handle
         }
     }
 
@@ -101,7 +105,8 @@ where
     fn call_with_args(&self, args: F::RefArgs<'_>) -> Result<F::Output, PayloadRpcError> {
         let local_arg_buf = bincode::serialize(&args)?;
 
-        let stub = RemoteRawProcedure::new(self.ptr, self.remote_allocator.clone());
+        let stub =
+            RemoteRawProcedure::new(self.ptr, self.remote_allocator.clone(), self.module_handle);
 
         // Allocate a buffer in the remote process to hold the argument.
         let remote_arg_buf = self.remote_allocator.alloc_raw(local_arg_buf.len())?;

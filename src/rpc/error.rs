@@ -20,6 +20,10 @@ pub enum RawRpcError {
     /// This can occur if it crashed or was terminated.
     #[error("inaccessible target process")]
     ProcessInaccessible,
+    /// Variant representing an inaccessible target module.
+    /// This can occur if the target module was ejected or unloaded.
+    #[error("inaccessible target module")]
+    ModuleInaccessible,
 }
 
 #[cfg(feature = "rpc-raw")]
@@ -49,6 +53,7 @@ impl From<RawRpcError> for SyringeError {
             RawRpcError::Io(err) => Self::Io(err),
             RawRpcError::RemoteException(code) => Self::RemoteException(code),
             RawRpcError::ProcessInaccessible => Self::ProcessInaccessible,
+            RawRpcError::ModuleInaccessible => Self::ModuleInaccessible,
         }
     }
 }
@@ -68,6 +73,10 @@ pub enum PayloadRpcError {
     /// This can occur if it crashed or was terminated.
     #[error("inaccessible target process")]
     ProcessInaccessible,
+    /// Variant representing an inaccessible target module.
+    /// This can occur if the target module was ejected or unloaded.
+    #[error("inaccessible target module")]
+    ModuleInaccessible,
     /// Variant representing an error in the remote procedure.
     #[error("remote procedure error: {}", _0)]
     RemoteProcedure(String),
@@ -96,6 +105,7 @@ impl From<RawRpcError> for PayloadRpcError {
             RawRpcError::Io(err) => Self::Io(err),
             RawRpcError::RemoteException(code) => Self::RemoteException(code),
             RawRpcError::ProcessInaccessible => Self::ProcessInaccessible,
+            RawRpcError::ModuleInaccessible => Self::ModuleInaccessible,
         }
     }
 }
