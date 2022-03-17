@@ -53,6 +53,15 @@ pub trait PayloadRpcFunctionPtr: FunctionPtr {}
 pub struct RemotePayloadProcedure<F> {
     ptr: F,
     remote_allocator: RemoteBoxAllocator,
+
+impl <F> fmt::Debug for RemotePayloadProcedure<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct(type_name::<RemotePayloadProcedure<F>>())
+            .field("ptr", &self.ptr.as_ptr())
+            .field("remote_allocator", &self.remote_allocator)
+            .field("phantom", &self.phantom)
+            .finish()
+    }
 }
 
 impl<F> RemotePayloadProcedure<F>
@@ -65,20 +74,15 @@ where
             remote_allocator,
         }
     }
-}
 
-impl<F> RemoteProcedure<F> for RemotePayloadProcedure<F>
-where
-    F: FunctionPtr,
-{
     /// Returns the process that this remote procedure is from.
-    fn process(&self) -> BorrowedProcess<'_> {
+    pub fn process(&self) -> BorrowedProcess<'_> {
         self.remote_allocator.process()
     }
 
-    /// Returns the underlying pointer to the remote procedure.
-    fn as_ptr(&self) -> F {
-        self.ptr
+    /// Returns the raw underlying pointer to the remote procedure.
+    pub fn as_raw_ptr(&self) -> RawFunctionPtr {
+        self.ptr.as_ptr()
     }
 }
 

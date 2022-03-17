@@ -1,20 +1,22 @@
 use iced_x86::{code_asm::*, IcedError};
 
 use std::{
-    any::{self, type_name, TypeId},
+    any::{self, TypeId},
     io,
     lazy::OnceCell,
     mem,
+    slice,
+    cmp
 };
 
 use crate::{
     error::SyringeError,
-    function::{Abi, FunctionPtr},
+    function::{Abi, FunctionPtr, RawFunctionPtr},
     process::{
         memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, Process,
     },
-    rpc::{error::RawRpcError, RemoteProcedure},
+    rpc::error::RawRpcError,
     Syringe,
 };
 
@@ -71,27 +73,27 @@ impl<F> RemoteRawProcedure<F>
 where
     F: FunctionPtr,
 {
-    fn new(ptr: F, remote_allocator: RemoteBoxAllocator) -> Self {
+    pub(crate) fn new(ptr: F, remote_allocator: RemoteBoxAllocator) -> Self {
         Self {
             ptr,
             remote_allocator,
             stub: OnceCell::new(),
         }
     }
-}
 
-impl<F> RemoteProcedure<F> for RemoteRawProcedure<F>
-where
-    F: FunctionPtr,
-{
     /// Returns the process that this remote procedure is from.
-    fn process(&self) -> BorrowedProcess<'_> {
+    pub fn process(&self) -> BorrowedProcess<'_> {
         self.remote_allocator.process()
     }
 
     /// Returns the underlying pointer to the remote procedure.
-    fn as_ptr(&self) -> F {
+    pub fn as_ptr(&self) -> F {
         self.ptr
+    }
+
+    /// Returns the raw underlying pointer to the remote procedure.
+    pub fn as_raw_ptr(&self) -> RawFunctionPtr {
+        self.as_ptr().as_ptr()
     }
 }
 
@@ -180,7 +182,7 @@ where
             code,
             asm.assemble(0x1111_2222)?,
             "{} call x86 stub is not location independent",
-            type_name::<RemoteRawProcedure<F>>()
+            any::type_name::<RemoteRawProcedure<F>>()
         );
 
         Ok(code)
@@ -255,7 +257,7 @@ where
             code,
             asm.assemble(0x1111_2222)?,
             "{} call x64 stub is not location independent",
-            type_name::<RemoteRawProcedure<F>>()
+            any::type_name::<RemoteRawProcedure<F>>()
         );
 
         Ok(code)
@@ -268,11 +270,16 @@ fn type_eq<T: ?Sized + 'static, U: ?Sized + 'static>() -> bool {
 
 /// Helper trait for building a mask of which arguments and results are passed in floating point registers.
 trait BuildFloatMask {
+    /// Returns a mask of which arguments and results are passed in floating point registers.
+    /// The LST bit represents the first argument, the second bit represents the second argument, etc.
+    /// The HST bit represents the return value.
+    /// If a bit is set, the corresponding argument or result is passed in a floating point register.
     fn build_float_mask() -> u32;
 }
 
 #[derive(shrinkwraprs::Shrinkwrap, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
+/// A transparent wrapper that when used as a parameter of a [`RemoteRawProcedure`] will be truncated without an error according to system endianess.
 pub struct Truncate<T>(pub T);
 
 impl<F: FunctionPtr> BuildFloatMask for F {
