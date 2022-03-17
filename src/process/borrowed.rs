@@ -26,11 +26,9 @@ use winapi::{
 };
 
 use crate::{
-    process::{ModuleHandle, OwnedProcess, ProcessModule},
+    process::{ModuleHandle, OwnedProcess, Process, ProcessModule},
     utils::{retry_faillable_until_some_with_timeout, ArrayOrVecSlice, UninitArrayBuf},
 };
-
-use super::Process;
 
 /// A struct representing a running process.
 /// This struct does **NOT** own the underlying process handle (see also [`OwnedProcess`] for an owned version).

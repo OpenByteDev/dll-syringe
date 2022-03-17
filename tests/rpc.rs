@@ -48,7 +48,6 @@ mod core {
     }
 }
 
-
 #[cfg(feature = "rpc-payload")]
 mod payload {
     pub use super::*;
@@ -102,7 +101,6 @@ mod payload {
         }
     }
 }
-
 
 #[cfg(feature = "rpc-raw")]
 mod raw {

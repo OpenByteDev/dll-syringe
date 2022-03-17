@@ -8,7 +8,7 @@ use std::{
 use crate::{
     error::{GetLocalProcedureAddressError, IoOrNulError},
     function::{FunctionPtr, RawFunctionPtr},
-    process::BorrowedProcess,
+    process::{BorrowedProcess, OwnedProcess, Process},
     utils::{win_fill_path_buf_helper, FillPathBufResult},
 };
 use path_absolutize::Absolutize;
@@ -23,8 +23,6 @@ use winapi::{
         psapi::{GetModuleBaseNameW, GetModuleFileNameExW},
     },
 };
-
-use super::{OwnedProcess, Process};
 
 /// A handle to a process module.
 ///

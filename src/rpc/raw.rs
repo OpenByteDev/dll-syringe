@@ -2,11 +2,9 @@ use iced_x86::{code_asm::*, IcedError};
 
 use std::{
     any::{self, TypeId},
-    io,
+    cmp, io,
     lazy::OnceCell,
-    mem,
-    slice,
-    cmp
+    mem, slice,
 };
 
 use crate::{
@@ -82,16 +80,19 @@ where
     }
 
     /// Returns the process that this remote procedure is from.
+    #[must_use]
     pub fn process(&self) -> BorrowedProcess<'_> {
         self.remote_allocator.process()
     }
 
     /// Returns the underlying pointer to the remote procedure.
+    #[must_use]
     pub fn as_ptr(&self) -> F {
         self.ptr
     }
 
     /// Returns the raw underlying pointer to the remote procedure.
+    #[must_use]
     pub fn as_raw_ptr(&self) -> RawFunctionPtr {
         self.as_ptr().as_ptr()
     }
