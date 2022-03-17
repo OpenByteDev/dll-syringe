@@ -324,6 +324,8 @@ macro_rules! impl_call {
                     let truncated_arg_len = cmp::min(mem::size_of::<$ty>(), target_pointer_size);
                     if cfg!(target_endian = "little") {
                         buf[..truncated_arg_len].copy_from_slice(&arg_bytes[..truncated_arg_len]);
+                    } else if cfg!(target_endian = "big") {
+                        buf[(mem::size_of::<usize>() - truncated_arg_len)..].copy_from_slice(&arg_bytes[(arg_bytes.len() - truncated_arg_len)..]);
                     } else {
                         unreachable!();
                     }
