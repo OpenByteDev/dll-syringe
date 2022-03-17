@@ -2,13 +2,13 @@ use iced_x86::{code_asm::*, IcedError};
 
 use std::{
     any::{self, TypeId},
-    cmp, io,
+    cmp, fmt, io,
     lazy::OnceCell,
     mem, slice,
 };
 
 use crate::{
-    error::{SyringeError},
+    error::SyringeError,
     function::{Abi, FunctionPtr, RawFunctionPtr},
     process::{
         memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
@@ -54,12 +54,22 @@ pub trait RawRpcFunctionPtr: FunctionPtr {}
 
 /// A struct representing a procedure from a module of a remote process.
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
-#[derive(Debug)]
 pub struct RemoteRawProcedure<F> {
     ptr: F,
-    remote_allocator: RemoteBoxAllocator,
+    pub(crate) remote_allocator: RemoteBoxAllocator,
     stub: OnceCell<RemoteRawProcedureStub>,
     module_handle: ModuleHandle,
+}
+
+impl<F: FunctionPtr> fmt::Debug for RemoteRawProcedure<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RemoteRawProcedure")
+            .field("ptr", &self.ptr.as_ptr())
+            .field("remote_allocator", &self.remote_allocator)
+            .field("stub", &self.stub)
+            .field("module_handle", &self.module_handle)
+            .finish()
+    }
 }
 
 #[derive(Debug)]
@@ -113,7 +123,9 @@ where
         if !self.process().is_alive() {
             return Err(RawRpcError::ProcessInaccessible);
         }
-        if !unsafe { ProcessModule::new_unchecked(self.module_handle, self.process()) }.guess_is_loaded() {
+        if !unsafe { ProcessModule::new_unchecked(self.module_handle, self.process()) }
+            .guess_is_loaded()
+        {
             return Err(RawRpcError::ModuleInaccessible);
         }
 

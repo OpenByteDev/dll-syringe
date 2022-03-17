@@ -1,6 +1,6 @@
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::{any::type_name, fmt, marker::PhantomData};
+use std::marker::PhantomData;
 
 use crate::{
     error::SyringeError,
@@ -33,7 +33,7 @@ impl Syringe {
             Ok(Some(procedure)) => Ok(Some(RemotePayloadProcedure::new(
                 unsafe { RealPayloadRpcFunctionPtr::from_ptr(procedure) },
                 self.remote_allocator.clone(),
-                module.handle()
+                module.handle(),
             ))),
             Ok(None) => Ok(None),
             Err(e) => Err(e),
@@ -49,21 +49,10 @@ type RealPayloadRpcFunctionPtr = extern "system" fn(Truncate<*mut ArgAndResultBu
 
 /// A struct representing a procedure from a module of a remote process.
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
+#[derive(Debug)]
 pub struct RemotePayloadProcedure<F> {
-    ptr:  RealPayloadRpcFunctionPtr,
-    remote_allocator: RemoteBoxAllocator,
-    module_handle: ModuleHandle,
+    f: RemoteRawProcedure<RealPayloadRpcFunctionPtr>,
     phantom: PhantomData<fn() -> F>,
-}
-
-impl<F> fmt::Debug for RemotePayloadProcedure<F> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct(type_name::<RemotePayloadProcedure<F>>())
-            .field("ptr", &self.ptr.as_ptr())
-            .field("remote_allocator", &self.remote_allocator)
-            .field("phantom", &self.phantom)
-            .finish()
-    }
 }
 
 impl<F> RemotePayloadProcedure<F>
@@ -73,26 +62,24 @@ where
     pub(crate) fn new(
         ptr: RealPayloadRpcFunctionPtr,
         remote_allocator: RemoteBoxAllocator,
-        module_handle: ModuleHandle
+        module_handle: ModuleHandle,
     ) -> Self {
         Self {
-            ptr,
-            remote_allocator,
+            f: RemoteRawProcedure::new(ptr, remote_allocator, module_handle),
             phantom: PhantomData,
-            module_handle
         }
     }
 
     /// Returns the process that this remote procedure is from.
     #[must_use]
     pub fn process(&self) -> BorrowedProcess<'_> {
-        self.remote_allocator.process()
+        self.f.process()
     }
 
     /// Returns the raw underlying pointer to the remote procedure.
     #[must_use]
     pub fn as_raw_ptr(&self) -> RawFunctionPtr {
-        self.ptr.as_ptr()
+        self.f.as_raw_ptr()
     }
 }
 
@@ -105,21 +92,21 @@ where
     fn call_with_args(&self, args: F::RefArgs<'_>) -> Result<F::Output, PayloadRpcError> {
         let local_arg_buf = bincode::serialize(&args)?;
 
-        let stub =
-            RemoteRawProcedure::new(self.ptr, self.remote_allocator.clone(), self.module_handle);
-
         // Allocate a buffer in the remote process to hold the argument.
-        let remote_arg_buf = self.remote_allocator.alloc_raw(local_arg_buf.len())?;
+        let remote_arg_buf = self.f.remote_allocator.alloc_raw(local_arg_buf.len())?;
         remote_arg_buf.write_bytes(local_arg_buf.as_ref())?;
 
-        let parameter_buf = self.remote_allocator.alloc_and_copy(&ArgAndResultBufInfo {
-            data: remote_arg_buf.as_ptr().as_ptr() as u64,
-            len: remote_arg_buf.len() as u64,
-            is_error: false,
-        })?;
+        let parameter_buf = self
+            .f
+            .remote_allocator
+            .alloc_and_copy(&ArgAndResultBufInfo {
+                data: remote_arg_buf.as_ptr().as_ptr() as u64,
+                len: remote_arg_buf.len() as u64,
+                is_error: false,
+            })?;
 
         // Call the remote procedure stub.
-        stub.call(Truncate(parameter_buf.as_ptr().as_ptr()))?;
+        self.f.call(Truncate(parameter_buf.as_ptr().as_ptr()))?;
 
         let result_buf_info = parameter_buf.read()?;
 
