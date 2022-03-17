@@ -269,6 +269,10 @@ trait BuildFloatMask {
     fn build_float_mask() -> u32;
 }
 
+#[derive(shrinkwraprs::Shrinkwrap, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct Truncate<T>(pub T);
+
 impl<F: FunctionPtr> BuildFloatMask for F {
     default fn build_float_mask() -> u32 {
         // This default implementation will never be called as there exists a specialization for every valid function pointer (defined in the macro below).
@@ -295,15 +299,20 @@ macro_rules! impl_call {
             #[allow(clippy::too_many_arguments)]
             fn build_args_buf(process: BorrowedProcess<'_>, $($nm: $ty),*) -> io::Result<[usize; impl_call!(@count ($($ty)*))]> {
                 let target_pointer_size = if process.is_x86()? {
-                    4
+                    mem::size_of::<u32>()
                 } else {
-                    8
+                    mem::size_of::<u64>()
                 };
+
+                let truncate_prefix = any::type_name::<Truncate<()>>();
+                let truncate_prefix = &truncate_prefix[..(truncate_prefix.len() - "()>".len())];
 
                 // store arguments as a usize buffer (avoids handling different sized arguments explicitly)
                 let args_buf = [$({
+                    let is_truncate = any::type_name::<$ty>().starts_with(truncate_prefix);
+
                     assert!(
-                        mem::size_of::<$ty>() <= target_pointer_size,
+                        is_truncate || mem::size_of::<$ty>() <= target_pointer_size,
                         "Argument of type {} ({} bit) is too large to fit an a word in the target process ({} bit)",
                         any::type_name::<$ty>(),
                         mem::size_of::<$ty>() * 8,
@@ -311,14 +320,19 @@ macro_rules! impl_call {
                     );
 
                     let mut buf = [0u8; mem::size_of::<usize>()];
-                    for i in 0..mem::size_of::<$ty>() {
-                        buf[i] = unsafe { *(&$nm as *const $ty as *const u8).add(i) };
+                    let arg_bytes = unsafe { slice::from_raw_parts(&$nm as *const $ty as *const u8, mem::size_of::<$ty>()) };
+                    let truncated_arg_len = cmp::min(mem::size_of::<$ty>(), target_pointer_size);
+                    if cfg!(target_endian = "little") {
+                        buf[..truncated_arg_len].copy_from_slice(&arg_bytes[..truncated_arg_len]);
+                    } else {
+                        unreachable!();
                     }
                     unsafe { mem::transmute::<[u8; mem::size_of::<usize>()], usize>(buf) }
                 },)*];
 
-                // use var to avoid dead_code warning
+                // use vars to avoid dead_code warning
                 let _ = target_pointer_size;
+                let _ = truncate_prefix;
 
                 Ok(args_buf)
             }
