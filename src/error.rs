@@ -20,7 +20,9 @@ use winapi::um::{
 };
 
 #[cfg(feature = "doc-cfg")]
+#[allow(unused_imports)] // used in docs
 use crate::Syringe;
+
 #[cfg(feature = "syringe")]
 use winapi::shared::winerror::ERROR_PARTIAL_COPY;
 
