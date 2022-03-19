@@ -1,4 +1,9 @@
-use std::{error::Error, path::PathBuf, process::Command, str::FromStr};
+use std::{
+    error::Error,
+    path::PathBuf,
+    process::{Command, Stdio},
+    str::FromStr,
+};
 
 use platforms::target::Arch;
 
@@ -67,11 +72,21 @@ pub fn build_helper_crate(
         .canonicalize()?;
 
     let mut command = Command::new("cargo");
-    command.arg("build");
+    command
+        .arg("build")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
     if let Some(target) = target {
         command.arg("--target").arg(target);
     }
-    command.current_dir(&payload_crate_path).spawn()?.wait()?;
+    let exit_code = command.current_dir(&payload_crate_path).spawn()?.wait()?;
+    assert!(
+        exit_code.success(),
+        "Failed to build helper crate {} for target {}",
+        crate_name,
+        target.unwrap_or("default")
+    );
 
     let mut payload_artifact_path = payload_crate_path;
     payload_artifact_path.push("target");
