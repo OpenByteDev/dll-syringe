@@ -312,6 +312,7 @@ trait BuildFloatMask {
 }
 
 #[derive(shrinkwraprs::Shrinkwrap, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
 #[repr(transparent)]
 /// A transparent wrapper that when used as a parameter of a [`RemoteRawProcedure`] will be truncated without an error according to system endianess.
 pub struct Truncate<T>(pub T);
