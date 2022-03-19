@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    error::SyringeError,
+    error::LoadProcedureError,
     function::{FunctionPtr, RawFunctionPtr},
     process::{
         memory::{RemoteAllocation, RemoteBox},
@@ -20,15 +20,15 @@ use crate::{
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-core")))]
 impl Syringe {
     /// Load the address of the given function from the given module in the remote process.
-    /// If the module is not loaded in the target process `Ok(None)` is returned.
     pub fn get_procedure_address(
         &self,
         module: BorrowedProcessModule<'_>,
         name: impl AsRef<str>,
-    ) -> Result<Option<RawFunctionPtr>, SyringeError> {
-        if module.process() != &self.remote_allocator.process() {
-            return Ok(None);
-        }
+    ) -> Result<Option<RawFunctionPtr>, LoadProcedureError> {
+        assert!(
+            module.process() == &self.process(),
+            "trying to get a procedure from a module from a different process"
+        );
 
         let stub = self.build_get_proc_address_stub()?;
         let name = name.as_ref();
@@ -54,7 +54,8 @@ impl Syringe {
 
     fn build_get_proc_address_stub(
         &self,
-    ) -> Result<&RemoteProcedureStub<GetProcAddressParams, RawFunctionPtr>, SyringeError> {
+    ) -> Result<&RemoteProcedureStub<GetProcAddressParams, RawFunctionPtr>, LoadProcedureError>
+    {
         self.get_proc_address_stub.get_or_try_init(|| {
             let inject_data = self.inject_help_data.get_or_try_init(|| {
                 Self::load_inject_help_data_for_process(self.remote_allocator.process())

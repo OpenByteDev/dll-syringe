@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    error::SyringeError,
+    error::LoadProcedureError,
     function::{Abi, FunctionPtr, RawFunctionPtr},
     process::{
         memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
@@ -35,7 +35,7 @@ impl Syringe {
         &self,
         module: BorrowedProcessModule<'_>,
         name: &str,
-    ) -> Result<Option<RemoteRawProcedure<F>>, SyringeError> {
+    ) -> Result<Option<RemoteRawProcedure<F>>, LoadProcedureError> {
         match self.get_procedure_address(module, name) {
             Ok(Some(procedure)) => Ok(Some(RemoteRawProcedure::new(
                 unsafe { F::from_ptr(procedure) },

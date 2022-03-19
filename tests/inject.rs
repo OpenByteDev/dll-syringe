@@ -1,6 +1,6 @@
 #![cfg(feature = "syringe")]
 
-use dll_syringe::{error::SyringeError, process::Process, Syringe};
+use dll_syringe::{error::InjectError, process::Process, Syringe};
 
 #[allow(unused)]
 mod common;
@@ -23,9 +23,9 @@ process_test! {
         let result = syringe.inject("invalid path");
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(matches!(err, SyringeError::RemoteIo(_)));
+        assert!(matches!(err, InjectError::RemoteIo(_)));
         let io_err = match err {
-            SyringeError::RemoteIo(io_err) => io_err,
+            InjectError::RemoteIo(io_err) => io_err,
             _ => unreachable!(),
         };
         assert_eq!(io_err.raw_os_error(), Some(126));
@@ -43,6 +43,6 @@ syringe_test! {
         let result = syringe.inject(payload_path);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(matches!(err, SyringeError::ProcessInaccessible));
+        assert!(matches!(err, InjectError::ProcessInaccessible));
     }
 }

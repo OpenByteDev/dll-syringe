@@ -3,7 +3,7 @@ use std::io;
 use thiserror::Error;
 use winapi::shared::winerror::ERROR_PARTIAL_COPY;
 
-use crate::error::{ExceptionCode, SyringeError};
+use crate::error::ExceptionCode;
 
 #[derive(Debug, Error)]
 #[cfg(feature = "rpc-core")]
@@ -46,19 +46,6 @@ impl From<io::Error> for RawRpcError {
 impl From<ExceptionCode> for RawRpcError {
     fn from(err: ExceptionCode) -> Self {
         Self::RemoteException(err)
-    }
-}
-
-#[cfg(feature = "rpc-core")]
-#[cfg_attr(all(feature = "rpc-core", not(feature = "rpc-raw")), doc(hidden))]
-impl From<RawRpcError> for SyringeError {
-    fn from(err: RawRpcError) -> Self {
-        match err {
-            RawRpcError::Io(err) => Self::Io(err),
-            RawRpcError::RemoteException(code) => Self::RemoteException(code),
-            RawRpcError::ProcessInaccessible => Self::ProcessInaccessible,
-            RawRpcError::ModuleInaccessible => Self::ModuleInaccessible,
-        }
     }
 }
 

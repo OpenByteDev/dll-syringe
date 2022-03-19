@@ -11,7 +11,8 @@ use winapi::shared::{
 };
 
 use crate::{
-    error::{ExceptionCode, ExceptionOrIoError, SyringeError},
+    error::{EjectError, ExceptionCode, ExceptionOrIoError, InjectError, LoadInjectHelpDataError},
+    function::RawFunctionPtr,
     process::{
         memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, ModuleHandle, OwnedProcess, Process, ProcessModule,
@@ -91,7 +92,7 @@ pub struct Syringe {
     load_library_w_stub: OnceCell<LoadLibraryWStub>,
     #[cfg(feature = "rpc-core")]
     pub(crate) get_proc_address_stub:
-        OnceCell<crate::rpc::RemoteProcedureStub<crate::rpc::GetProcAddressParams, FARPROC>>,
+        OnceCell<crate::rpc::RemoteProcedureStub<crate::rpc::GetProcAddressParams, RawFunctionPtr>>,
 }
 
 impl Syringe {
@@ -121,7 +122,7 @@ impl Syringe {
     pub fn inject(
         &self,
         payload_path: impl AsRef<Path>,
-    ) -> Result<BorrowedProcessModule<'_>, SyringeError> {
+    ) -> Result<BorrowedProcessModule<'_>, InjectError> {
         let load_library_w = self.load_library_w_stub.get_or_try_init(|| {
             let inject_data = self
                 .inject_help_data
@@ -158,7 +159,7 @@ impl Syringe {
     pub fn find_or_inject(
         &self,
         payload_path: impl AsRef<Path>,
-    ) -> Result<BorrowedProcessModule<'_>, SyringeError> {
+    ) -> Result<BorrowedProcessModule<'_>, InjectError> {
         let payload_path = payload_path.as_ref();
         match self.process().find_module_by_path(payload_path) {
             Ok(Some(module)) => Ok(module),
@@ -171,7 +172,7 @@ impl Syringe {
     ///
     /// # Panics
     /// This method panics if the given module was not loaded in the target process.
-    pub fn eject(&self, module: BorrowedProcessModule<'_>) -> Result<(), SyringeError> {
+    pub fn eject(&self, module: BorrowedProcessModule<'_>) -> Result<(), EjectError> {
         assert!(
             module.process() == &self.process(),
             "trying to eject a module from a different process"
@@ -181,6 +182,10 @@ impl Syringe {
             .inject_help_data
             .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process()))?;
 
+        if !module.guess_is_loaded() {
+            return Err(EjectError::ModuleInaccessible);
+        }
+
         let exit_code = self.process().run_remote_thread(
             unsafe { mem::transmute(inject_data.get_free_library_fn_ptr()) },
             module.handle(),
@@ -189,13 +194,13 @@ impl Syringe {
         let free_library_result = exit_code as BOOL;
 
         if free_library_result == FALSE {
-            return Err(SyringeError::RemoteIo(io::Error::new(
+            return Err(EjectError::RemoteIo(io::Error::new(
                 io::ErrorKind::Other,
                 "failed to eject module from process",
             )));
         }
         if let Ok(exception) = ExceptionCode::try_from_primitive(exit_code) {
-            return Err(SyringeError::RemoteException(exception));
+            return Err(EjectError::RemoteException(exception));
         }
 
         debug_assert!(
@@ -212,7 +217,7 @@ impl Syringe {
 
     pub(crate) fn load_inject_help_data_for_process(
         process: BorrowedProcess<'_>,
-    ) -> Result<InjectHelpData, SyringeError> {
+    ) -> Result<InjectHelpData, LoadInjectHelpDataError> {
         let is_target_x64 = process.is_x64()?;
         let is_self_x64 = cfg!(target_arch = "x86_64");
 
@@ -220,7 +225,7 @@ impl Syringe {
             (true, true) | (false, false) => Self::load_inject_help_data_for_current_target(),
             #[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
             (false, true) => Self::_load_inject_help_data_for_process(process),
-            _ => Err(SyringeError::UnsupportedTarget),
+            _ => Err(LoadInjectHelpDataError::UnsupportedTarget),
         }
     }
 
@@ -251,7 +256,8 @@ impl Syringe {
         }
     }
 
-    fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, SyringeError> {
+    fn load_inject_help_data_for_current_target() -> Result<InjectHelpData, LoadInjectHelpDataError>
+    {
         let kernel32_module =
             BorrowedProcessModule::find_local_by_name_or_abs_path_wstr(u16cstr!("kernel32.dll"))?
                 .unwrap();
@@ -282,7 +288,7 @@ impl Syringe {
     #[cfg(feature = "into-x86-from-x64")]
     fn _load_inject_help_data_for_process(
         process: BorrowedProcess<'_>,
-    ) -> Result<InjectHelpData, SyringeError> {
+    ) -> Result<InjectHelpData, LoadInjectHelpDataError> {
         // get kernel32 handle of target process (may fail if target process is currently starting and has not loaded kernel32 yet)
         let kernel32_module = process
             .wait_for_module_by_name("kernel32.dll", Duration::from_secs(1))?
@@ -361,7 +367,7 @@ impl LoadLibraryWStub {
     fn build(
         inject_data: &InjectHelpData,
         remote_allocator: &RemoteBoxAllocator,
-    ) -> Result<Self, SyringeError> {
+    ) -> Result<Self, InjectError> {
         let result = remote_allocator.alloc_uninit::<ModuleHandle>()?;
 
         let code = if remote_allocator.process().is_x86()? {
@@ -384,7 +390,7 @@ impl LoadLibraryWStub {
         Ok(Self { code, result })
     }
 
-    fn call(&self, remote_wide_module_path: *mut u16) -> Result<ModuleHandle, SyringeError> {
+    fn call(&self, remote_wide_module_path: *mut u16) -> Result<ModuleHandle, InjectError> {
         // creating a thread that will call LoadLibraryW with a pointer to payload_path as argument
         let exit_code = self.code.process().run_remote_thread(
             unsafe { mem::transmute(self.code.as_raw_ptr()) },

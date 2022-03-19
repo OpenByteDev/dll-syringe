@@ -19,6 +19,8 @@ use winapi::um::{
     winnt::STATUS_UNWIND_CONSOLIDATE,
 };
 
+#[cfg(feature = "doc-cfg")]
+use crate::Syringe;
 #[cfg(feature = "syringe")]
 use winapi::shared::winerror::ERROR_PARTIAL_COPY;
 
@@ -166,14 +168,45 @@ pub enum ExceptionOrIoError {
     Exception(ExceptionCode),
 }
 
-/// Error enum for errors during syringe operations like injection and ejection.
+/// Error enum for errors during [Syringe::load_inject_help_data_for_process].
 #[derive(Debug, Error)]
 #[cfg(feature = "syringe")]
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
-pub enum SyringeError {
-    /// Variant representing an illegal interior nul value.
-    #[error("interior nul found")]
-    Nul(#[from] widestring::NulError<u16>),
+pub(crate) enum LoadInjectHelpDataError {
+    /// Variant representing an io error.
+    #[error("io error: {}", _0)]
+    Io(#[from] io::Error),
+    /// Variant representing an unsupported target process.
+    #[error("unsupported target process")]
+    UnsupportedTarget,
+    /// Variant representing an error while loading an pe file.
+    #[cfg(target_arch = "x86_64")]
+    #[cfg(feature = "into-x86-from-x64")]
+    #[error("failed to load pe file: {}", _0)]
+    Goblin(#[from] goblin::error::Error),
+}
+
+#[cfg(feature = "syringe")]
+impl From<LoadInjectHelpDataError> for InjectError {
+    fn from(err: LoadInjectHelpDataError) -> Self {
+        match err {
+            LoadInjectHelpDataError::Io(e) => Self::Io(e),
+            LoadInjectHelpDataError::UnsupportedTarget => Self::UnsupportedTarget,
+            #[cfg(target_arch = "x86_64")]
+            #[cfg(feature = "into-x86-from-x64")]
+            LoadInjectHelpDataError::Goblin(e) => Self::Goblin(e),
+        }
+    }
+}
+
+/// Error enum for errors during [Syringe::inject].
+#[derive(Debug, Error)]
+#[cfg(feature = "syringe")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
+pub enum InjectError {
+    /// Variant representing an illegal interior nul value in the module path.
+    #[error("module path contains illegal interior nul")]
+    IllegalPath(#[from] widestring::NulError<u16>),
     /// Variant representing an io error.
     #[error("io error: {}", _0)]
     Io(io::Error),
@@ -186,6 +219,233 @@ pub enum SyringeError {
     /// Variant representing an unhandled exception inside the target process.
     #[error("remote exception: {}", _0)]
     RemoteException(ExceptionCode),
+    /// Variant representing an inaccessible target process.
+    /// This can occur if it crashed or was terminated.
+    #[error("inaccessible target process")]
+    ProcessInaccessible,
+    /// Variant representing an error while loading an pe file.
+    #[cfg(target_arch = "x86_64")]
+    #[cfg(feature = "into-x86-from-x64")]
+    #[error("failed to load pe file: {}", _0)]
+    Goblin(#[from] goblin::error::Error),
+}
+
+#[cfg(feature = "syringe")]
+impl From<io::Error> for InjectError {
+    fn from(err: io::Error) -> Self {
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+            || err.kind() == io::ErrorKind::PermissionDenied
+        {
+            Self::ProcessInaccessible
+        } else {
+            Self::Io(err)
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<ExceptionCode> for InjectError {
+    fn from(err: ExceptionCode) -> Self {
+        Self::RemoteException(err)
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<IoOrNulError> for InjectError {
+    fn from(err: IoOrNulError) -> Self {
+        match err {
+            IoOrNulError::Nul(e) => e.into(),
+            IoOrNulError::Io(e) => e.into(),
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<ExceptionOrIoError> for InjectError {
+    fn from(err: ExceptionOrIoError) -> Self {
+        match err {
+            ExceptionOrIoError::Io(e) => Self::RemoteIo(e),
+            ExceptionOrIoError::Exception(e) => Self::RemoteException(e),
+        }
+    }
+}
+
+/// Error enum for errors during [Syringe::eject].
+#[derive(Debug, Error)]
+#[cfg(feature = "syringe")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
+pub enum EjectError {
+    /// Variant representing an io error.
+    #[error("io error: {}", _0)]
+    Io(io::Error),
+    /// Variant representing an unsupported target process.
+    #[error("unsupported target process")]
+    UnsupportedTarget,
+    /// Variant representing an io error inside the target process.
+    #[error("remote io error: {}", _0)]
+    RemoteIo(io::Error),
+    /// Variant representing an unhandled exception inside the target process.
+    #[error("remote exception: {}", _0)]
+    RemoteException(ExceptionCode),
+    /// Variant representing an inaccessible target process.
+    /// This can occur if it crashed or was terminated.
+    #[error("inaccessible target process")]
+    ProcessInaccessible,
+    /// Variant representing an inaccessible target module.
+    /// This can occur if the target module was ejected or unloaded.
+    #[error("inaccessible target module")]
+    ModuleInaccessible,
+    /// Variant representing an error while loading an pe file.
+    #[cfg(target_arch = "x86_64")]
+    #[cfg(feature = "into-x86-from-x64")]
+    #[error("failed to load pe file: {}", _0)]
+    Goblin(#[from] goblin::error::Error),
+}
+
+#[cfg(feature = "syringe")]
+impl From<LoadInjectHelpDataError> for EjectError {
+    fn from(err: LoadInjectHelpDataError) -> Self {
+        match err {
+            LoadInjectHelpDataError::Io(e) => Self::Io(e),
+            LoadInjectHelpDataError::UnsupportedTarget => Self::UnsupportedTarget,
+            #[cfg(target_arch = "x86_64")]
+            #[cfg(feature = "into-x86-from-x64")]
+            LoadInjectHelpDataError::Goblin(e) => Self::Goblin(e),
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<io::Error> for EjectError {
+    fn from(err: io::Error) -> Self {
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+            || err.kind() == io::ErrorKind::PermissionDenied
+        {
+            Self::ProcessInaccessible
+        } else {
+            Self::Io(err)
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<ExceptionCode> for EjectError {
+    fn from(err: ExceptionCode) -> Self {
+        Self::RemoteException(err)
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<ExceptionOrIoError> for EjectError {
+    fn from(err: ExceptionOrIoError) -> Self {
+        match err {
+            ExceptionOrIoError::Io(e) => Self::RemoteIo(e),
+            ExceptionOrIoError::Exception(e) => Self::RemoteException(e),
+        }
+    }
+}
+
+/// Error enum for errors during procedure loading.
+#[derive(Debug, Error)]
+#[cfg(feature = "syringe")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
+pub enum LoadProcedureError {
+    /// Variant representing an io error.
+    #[error("io error: {}", _0)]
+    Io(io::Error),
+    /// Variant representing an unsupported target process.
+    #[error("unsupported target process")]
+    UnsupportedTarget,
+    /// Variant representing an io error inside the target process.
+    #[error("remote io error: {}", _0)]
+    RemoteIo(io::Error),
+    /// Variant representing an unhandled exception inside the target process.
+    #[error("remote exception: {}", _0)]
+    RemoteException(ExceptionCode),
+    /// Variant representing an inaccessible target process.
+    /// This can occur if it crashed or was terminated.
+    #[error("inaccessible target process")]
+    ProcessInaccessible,
+    /// Variant representing an inaccessible target module.
+    /// This can occur if the target module was ejected or unloaded.
+    #[error("inaccessible target module")]
+    ModuleInaccessible,
+    /// Variant representing an error while loading an pe file.
+    #[cfg(target_arch = "x86_64")]
+    #[cfg(feature = "into-x86-from-x64")]
+    #[error("failed to load pe file: {}", _0)]
+    Goblin(#[from] goblin::error::Error),
+}
+
+#[cfg(feature = "syringe")]
+impl From<LoadInjectHelpDataError> for LoadProcedureError {
+    fn from(err: LoadInjectHelpDataError) -> Self {
+        match err {
+            LoadInjectHelpDataError::Io(e) => Self::Io(e),
+            LoadInjectHelpDataError::UnsupportedTarget => Self::UnsupportedTarget,
+            #[cfg(target_arch = "x86_64")]
+            #[cfg(feature = "into-x86-from-x64")]
+            LoadInjectHelpDataError::Goblin(e) => Self::Goblin(e),
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<io::Error> for LoadProcedureError {
+    fn from(err: io::Error) -> Self {
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+            || err.kind() == io::ErrorKind::PermissionDenied
+        {
+            Self::ProcessInaccessible
+        } else {
+            Self::Io(err)
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<ExceptionCode> for LoadProcedureError {
+    fn from(err: ExceptionCode) -> Self {
+        Self::RemoteException(err)
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<ExceptionOrIoError> for LoadProcedureError {
+    fn from(err: ExceptionOrIoError) -> Self {
+        match err {
+            ExceptionOrIoError::Io(e) => Self::RemoteIo(e),
+            ExceptionOrIoError::Exception(e) => Self::RemoteException(e),
+        }
+    }
+}
+
+/// Error enum encompassing all errors during syringe operations.
+#[derive(Debug, Error)]
+#[cfg(feature = "syringe")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
+pub enum SyringeError {
+    /// Variant representing an illegal interior nul value in the module path.
+    #[error("module path contains illegal interior nul")]
+    IllegalPath(#[from] widestring::NulError<u16>),
+    /// Variant representing an io error.
+    #[error("io error: {}", _0)]
+    Io(io::Error),
+    /// Variant representing an unsupported target process.
+    #[error("unsupported target process")]
+    UnsupportedTarget,
+    /// Variant representing an io error inside the target process.
+    #[error("remote io error: {}", _0)]
+    RemoteIo(io::Error),
+    /// Variant representing an unhandled exception inside the target process.
+    #[error("remote exception: {}", _0)]
+    RemoteException(ExceptionCode),
+    /// Variant representing an error or panic inside a remote payload procedure.
+    #[error("remote payload error: {}", _0)]
+    RemotePayloadProcedure(String),
+    /// Variant representing an error while serializing or deserializing.
+    #[error("serde error: {}", _0)]
+    Serde(Box<bincode::ErrorKind>),
     /// Variant representing an inaccessible target process.
     /// This can occur if it crashed or was terminated.
     #[error("inaccessible target process")]
@@ -239,4 +499,108 @@ impl From<ExceptionOrIoError> for SyringeError {
             ExceptionOrIoError::Exception(e) => Self::RemoteException(e),
         }
     }
+}
+
+#[cfg(feature = "syringe")]
+impl From<InjectError> for SyringeError {
+    fn from(err: InjectError) -> Self {
+        match err {
+            InjectError::IllegalPath(e) => Self::IllegalPath(e),
+            InjectError::Io(e) => Self::Io(e),
+            InjectError::UnsupportedTarget => Self::UnsupportedTarget,
+            InjectError::RemoteIo(e) => Self::RemoteIo(e),
+            InjectError::RemoteException(e) => Self::RemoteException(e),
+            InjectError::ProcessInaccessible => Self::ProcessInaccessible,
+            #[cfg(target_arch = "x86_64")]
+            #[cfg(feature = "into-x86-from-x64")]
+            InjectError::Goblin(e) => Self::Goblin(e),
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<EjectError> for SyringeError {
+    fn from(err: EjectError) -> Self {
+        match err {
+            EjectError::Io(e) => Self::Io(e),
+            EjectError::UnsupportedTarget => Self::UnsupportedTarget,
+            EjectError::RemoteIo(e) => Self::RemoteIo(e),
+            EjectError::RemoteException(e) => Self::RemoteException(e),
+            EjectError::ProcessInaccessible => Self::ProcessInaccessible,
+            EjectError::ModuleInaccessible => Self::ModuleInaccessible,
+            #[cfg(target_arch = "x86_64")]
+            #[cfg(feature = "into-x86-from-x64")]
+            EjectError::Goblin(e) => Self::Goblin(e),
+        }
+    }
+}
+
+#[cfg(feature = "syringe")]
+impl From<LoadProcedureError> for SyringeError {
+    fn from(err: LoadProcedureError) -> Self {
+        match err {
+            LoadProcedureError::Io(e) => Self::Io(e),
+            LoadProcedureError::UnsupportedTarget => Self::UnsupportedTarget,
+            LoadProcedureError::RemoteIo(e) => Self::RemoteIo(e),
+            LoadProcedureError::RemoteException(e) => Self::RemoteException(e),
+            LoadProcedureError::ProcessInaccessible => Self::ProcessInaccessible,
+            LoadProcedureError::ModuleInaccessible => Self::ModuleInaccessible,
+            #[cfg(target_arch = "x86_64")]
+            #[cfg(feature = "into-x86-from-x64")]
+            LoadProcedureError::Goblin(e) => Self::Goblin(e),
+        }
+    }
+}
+
+#[cfg(feature = "rpc-core")]
+#[cfg_attr(all(feature = "rpc-core", not(feature = "rpc-raw")), doc(hidden))]
+impl From<crate::rpc::RawRpcError> for SyringeError {
+    fn from(err: crate::rpc::RawRpcError) -> Self {
+        match err {
+            crate::rpc::RawRpcError::Io(err) => Self::Io(err),
+            crate::rpc::RawRpcError::RemoteException(code) => Self::RemoteException(code),
+            crate::rpc::RawRpcError::ProcessInaccessible => Self::ProcessInaccessible,
+            crate::rpc::RawRpcError::ModuleInaccessible => Self::ModuleInaccessible,
+        }
+    }
+}
+
+#[cfg(feature = "rpc-payload")]
+#[cfg_attr(all(feature = "rpc-core", not(feature = "rpc-raw")), doc(hidden))]
+impl From<crate::rpc::PayloadRpcError> for SyringeError {
+    fn from(err: crate::rpc::PayloadRpcError) -> Self {
+        match err {
+            crate::rpc::PayloadRpcError::Io(e) => Self::Io(e),
+            crate::rpc::PayloadRpcError::RemoteException(e) => Self::RemoteException(e),
+            crate::rpc::PayloadRpcError::ProcessInaccessible => Self::ProcessInaccessible,
+            crate::rpc::PayloadRpcError::ModuleInaccessible => Self::ModuleInaccessible,
+            crate::rpc::PayloadRpcError::RemoteProcedure(e) => Self::RemotePayloadProcedure(e),
+            crate::rpc::PayloadRpcError::Serde(e) => Self::Serde(e),
+        }
+    }
+}
+
+/// Error enum encompassing all errors during syringe operations in a nested format.
+#[derive(Debug, Error)]
+#[cfg(feature = "syringe")]
+#[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
+pub enum SyringeOperationError {
+    /// Variant representing an error while injecting a module.
+    #[error("inject error: {}", _0)]
+    Inject(#[from] InjectError),
+    /// Variant representing an error while ejecting a module.
+    #[error("eject error: {}", _0)]
+    Eject(#[from] EjectError),
+    /// Variant representing an error while using payload rpc.
+    #[cfg(feature = "rpc-payload")]
+    #[error("payload rpc error: {}", _0)]
+    PayloadProcedureCall(#[from] crate::rpc::PayloadRpcError),
+    /// Variant representing an error while using raw rpc.
+    #[cfg(feature = "rpc-raw")]
+    #[error("raw rpc error: {}", _0)]
+    RawProcedureCall(#[from] crate::rpc::RawRpcError),
+    /// Variant representing an error while using rpc.
+    #[cfg(feature = "rpc-core")]
+    #[error("procedure load error: {}", _0)]
+    ProcedureLoad(#[from] LoadProcedureError),
 }

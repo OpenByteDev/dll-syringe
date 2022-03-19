@@ -3,7 +3,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::marker::PhantomData;
 
 use crate::{
-    error::SyringeError,
+    error::LoadProcedureError,
     function::{FunctionPtr, RawFunctionPtr},
     process::{
         memory::{ProcessMemoryBuffer, RemoteBoxAllocator},
@@ -29,7 +29,7 @@ impl Syringe {
         &self,
         module: BorrowedProcessModule<'_>,
         name: &str,
-    ) -> Result<Option<RemotePayloadProcedure<F>>, SyringeError> {
+    ) -> Result<Option<RemotePayloadProcedure<F>>, LoadProcedureError> {
         match self.get_procedure_address(module, name) {
             Ok(Some(procedure)) => Ok(Some(RemotePayloadProcedure::new(
                 unsafe { RealPayloadRpcFunctionPtr::from_ptr(procedure) },
