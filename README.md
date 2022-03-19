@@ -50,11 +50,11 @@ This crate supports two mechanisms for rpc. Both only work one-way for calling e
 
 ### RemotePayloadProcedure
 A rpc mechanism based on [`bincode`](https://crates.io/crates/bincode).
-The target procedure must be defined using the `payload_function!` macro (requires the `payload-utils` feature).
+The target procedure must be defined using the `payload_procedure!` macro (requires the `payload-utils` feature).
 
 The definition of an exported `add` function could look like this:
 ```rust
-dll_syringe::payload_function! {
+dll_syringe::payload_procedure! {
     fn add(a: f64, b: f64) -> f64 {
         a + b
     }
