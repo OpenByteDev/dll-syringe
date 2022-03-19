@@ -6,7 +6,8 @@ use winapi::shared::winerror::ERROR_PARTIAL_COPY;
 use crate::error::{ExceptionCode, SyringeError};
 
 #[derive(Debug, Error)]
-#[cfg(feature = "rpc-raw")]
+#[cfg(feature = "rpc-core")]
+#[cfg_attr(all(feature = "rpc-core", not(feature = "rpc-raw")), doc(hidden))]
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
 /// An enum repsenting possible errors during remote procedure calls without serialization, deserialization or remote panics.
 pub enum RawRpcError {
@@ -26,7 +27,8 @@ pub enum RawRpcError {
     ModuleInaccessible,
 }
 
-#[cfg(feature = "rpc-raw")]
+#[cfg(feature = "rpc-core")]
+#[cfg_attr(all(feature = "rpc-core", not(feature = "rpc-raw")), doc(hidden))]
 impl From<io::Error> for RawRpcError {
     fn from(err: io::Error) -> Self {
         if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
@@ -39,14 +41,16 @@ impl From<io::Error> for RawRpcError {
     }
 }
 
-#[cfg(feature = "rpc-raw")]
+#[cfg(feature = "rpc-core")]
+#[cfg_attr(all(feature = "rpc-core", not(feature = "rpc-raw")), doc(hidden))]
 impl From<ExceptionCode> for RawRpcError {
     fn from(err: ExceptionCode) -> Self {
         Self::RemoteException(err)
     }
 }
 
-#[cfg(feature = "rpc-raw")]
+#[cfg(feature = "rpc-core")]
+#[cfg_attr(all(feature = "rpc-core", not(feature = "rpc-raw")), doc(hidden))]
 impl From<RawRpcError> for SyringeError {
     fn from(err: RawRpcError) -> Self {
         match err {

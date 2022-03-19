@@ -24,7 +24,6 @@ impl<'a> DynamicMultiBufferAllocator<'a> {
         }
     }
 
-    #[allow(dead_code)]
     pub fn process(&self) -> BorrowedProcess<'_> {
         self.process.borrowed()
     }
@@ -38,7 +37,6 @@ impl<'a> DynamicMultiBufferAllocator<'a> {
         Ok(self.pages.last_mut().unwrap())
     }
 
-    #[allow(dead_code)]
     pub fn count_allocated_bytes(&self) -> usize {
         self.pages
             .iter()
@@ -97,12 +95,10 @@ impl<'a> FixedBufferAllocator<'a> {
         Self { mem, free_list }
     }
 
-    #[allow(dead_code)]
     pub const fn memory(&self) -> &ProcessMemoryBuffer<'a> {
         &self.mem
     }
 
-    #[allow(dead_code)]
     pub fn process(&self) -> BorrowedProcess<'a> {
         self.memory().process()
     }
@@ -211,7 +207,6 @@ pub struct Allocation {
 }
 
 impl Allocation {
-    #[allow(dead_code)]
     pub const fn as_ptr(&self) -> NonNull<u8> {
         unsafe { NonNull::new_unchecked(self.as_raw_ptr()) }
     }

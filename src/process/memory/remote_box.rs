@@ -37,12 +37,10 @@ impl RemoteBoxAllocator {
         let allocation = self.alloc_raw(mem::size_of::<T>())?;
         Ok(unsafe { RemoteBox::new(allocation) })
     }
-    #[allow(dead_code)]
     pub fn alloc_uninit_for<T: Copy>(&self, value: &T) -> Result<RemoteBox<T>, io::Error> {
         let allocation = self.alloc_raw(mem::size_of_val(value))?;
         Ok(unsafe { RemoteBox::new(allocation) })
     }
-    #[allow(dead_code)]
     pub fn alloc_and_copy<T: Copy>(&self, value: &T) -> Result<RemoteBox<T>, io::Error> {
         let b = self.alloc_uninit_for(value)?;
         b.write(value)?;
@@ -135,7 +133,6 @@ impl<T: ?Sized> RemoteBox<T> {
         }
     }
 
-    #[allow(dead_code)]
     pub fn process(&self) -> BorrowedProcess<'_> {
         self.allocation.process()
     }
@@ -160,7 +157,6 @@ impl<'a, T: Sized + Copy> RemoteBox<T> {
         unsafe { self.allocation.memory().read_struct(0) }
     }
 
-    #[allow(dead_code)]
     pub const fn as_ptr(&self) -> NonNull<T> {
         self.allocation.as_ptr().cast()
     }
