@@ -53,6 +53,7 @@ pub(crate) mod utils;
 /// Module containing the error enums used in this crate.
 pub mod error;
 
+#[cfg(feature = "rpc-core")]
 /// Module containing traits and types for working with function pointers.
 pub mod function;
 
