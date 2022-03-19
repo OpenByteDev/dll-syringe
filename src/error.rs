@@ -440,12 +440,6 @@ pub enum SyringeError {
     /// Variant representing an unhandled exception inside the target process.
     #[error("remote exception: {}", _0)]
     RemoteException(ExceptionCode),
-    /// Variant representing an error or panic inside a remote payload procedure.
-    #[error("remote payload error: {}", _0)]
-    RemotePayloadProcedure(String),
-    /// Variant representing an error while serializing or deserializing.
-    #[error("serde error: {}", _0)]
-    Serde(Box<bincode::ErrorKind>),
     /// Variant representing an inaccessible target process.
     /// This can occur if it crashed or was terminated.
     #[error("inaccessible target process")]
@@ -454,6 +448,14 @@ pub enum SyringeError {
     /// This can occur if the target module was ejected or unloaded.
     #[error("inaccessible target module")]
     ModuleInaccessible,
+    /// Variant representing an error while serializing or deserializing.
+    #[cfg(feature = "rpc-payload")]
+    #[error("serde error: {}", _0)]
+    Serde(Box<bincode::ErrorKind>),
+    /// Variant representing an error or panic inside a remote payload procedure.
+    #[cfg(feature = "rpc-payload")]
+    #[error("remote payload error: {}", _0)]
+    RemotePayloadProcedure(String),
     /// Variant representing an error while loading an pe file.
     #[cfg(target_arch = "x86_64")]
     #[cfg(feature = "into-x86-from-x64")]
@@ -535,7 +537,7 @@ impl From<EjectError> for SyringeError {
     }
 }
 
-#[cfg(feature = "syringe")]
+#[cfg(feature = "rpc-core")]
 impl From<LoadProcedureError> for SyringeError {
     fn from(err: LoadProcedureError) -> Self {
         match err {

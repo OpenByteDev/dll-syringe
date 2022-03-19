@@ -12,7 +12,6 @@ use winapi::shared::{
 
 use crate::{
     error::{EjectError, ExceptionCode, ExceptionOrIoError, InjectError, LoadInjectHelpDataError},
-    function::RawFunctionPtr,
     process::{
         memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, ModuleHandle, OwnedProcess, Process, ProcessModule,
@@ -28,7 +27,10 @@ use {
 };
 
 #[cfg(feature = "rpc-core")]
-use winapi::shared::{minwindef::FARPROC, ntdef::LPCSTR};
+use {
+    crate::function::RawFunctionPtr,
+    winapi::shared::{minwindef::FARPROC, ntdef::LPCSTR}
+};
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
