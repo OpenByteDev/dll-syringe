@@ -175,10 +175,14 @@ pub enum ExceptionOrIoError {
 pub(crate) enum LoadInjectHelpDataError {
     /// Variant representing an io error.
     #[error("io error: {}", _0)]
-    Io(#[from] io::Error),
+    Io(io::Error),
     /// Variant representing an unsupported target process.
     #[error("unsupported target process")]
     UnsupportedTarget,
+    /// Variant representing an inaccessible target process.
+    /// This can occur if it crashed or was terminated.
+    #[error("inaccessible target process")]
+    ProcessInaccessible,
     /// Variant representing an error while loading an pe file.
     #[cfg(target_arch = "x86_64")]
     #[cfg(feature = "into-x86-from-x64")]
@@ -187,14 +191,14 @@ pub(crate) enum LoadInjectHelpDataError {
 }
 
 #[cfg(feature = "syringe")]
-impl From<LoadInjectHelpDataError> for InjectError {
-    fn from(err: LoadInjectHelpDataError) -> Self {
-        match err {
-            LoadInjectHelpDataError::Io(e) => Self::Io(e),
-            LoadInjectHelpDataError::UnsupportedTarget => Self::UnsupportedTarget,
-            #[cfg(target_arch = "x86_64")]
-            #[cfg(feature = "into-x86-from-x64")]
-            LoadInjectHelpDataError::Goblin(e) => Self::Goblin(e),
+impl From<io::Error> for LoadInjectHelpDataError {
+    fn from(err: io::Error) -> Self {
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+            || err.kind() == io::ErrorKind::PermissionDenied
+        {
+            Self::ProcessInaccessible
+        } else {
+            Self::Io(err)
         }
     }
 }
@@ -270,6 +274,20 @@ impl From<ExceptionOrIoError> for InjectError {
     }
 }
 
+#[cfg(feature = "syringe")]
+impl From<LoadInjectHelpDataError> for InjectError {
+    fn from(err: LoadInjectHelpDataError) -> Self {
+        match err {
+            LoadInjectHelpDataError::Io(e) => Self::Io(e),
+            LoadInjectHelpDataError::UnsupportedTarget => Self::UnsupportedTarget,
+            LoadInjectHelpDataError::ProcessInaccessible => Self::ProcessInaccessible,
+            #[cfg(target_arch = "x86_64")]
+            #[cfg(feature = "into-x86-from-x64")]
+            LoadInjectHelpDataError::Goblin(e) => Self::Goblin(e),
+        }
+    }
+}
+
 /// Error enum for errors during [Syringe::eject].
 #[derive(Debug, Error)]
 #[cfg(feature = "syringe")]
@@ -308,6 +326,7 @@ impl From<LoadInjectHelpDataError> for EjectError {
         match err {
             LoadInjectHelpDataError::Io(e) => Self::Io(e),
             LoadInjectHelpDataError::UnsupportedTarget => Self::UnsupportedTarget,
+            LoadInjectHelpDataError::ProcessInaccessible => Self::ProcessInaccessible,
             #[cfg(target_arch = "x86_64")]
             #[cfg(feature = "into-x86-from-x64")]
             LoadInjectHelpDataError::Goblin(e) => Self::Goblin(e),
@@ -383,6 +402,7 @@ impl From<LoadInjectHelpDataError> for LoadProcedureError {
         match err {
             LoadInjectHelpDataError::Io(e) => Self::Io(e),
             LoadInjectHelpDataError::UnsupportedTarget => Self::UnsupportedTarget,
+            LoadInjectHelpDataError::ProcessInaccessible => Self::ProcessInaccessible,
             #[cfg(target_arch = "x86_64")]
             #[cfg(feature = "into-x86-from-x64")]
             LoadInjectHelpDataError::Goblin(e) => Self::Goblin(e),

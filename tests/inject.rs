@@ -33,7 +33,7 @@ process_test! {
 }
 
 syringe_test! {
-    fn inject_with_crashed_process_fails_with_io(
+    fn inject_with_crashed_process_fails_with_process_inaccessible(
         process: OwnedProcess,
         payload_path: &Path,
     ) {
@@ -43,6 +43,6 @@ syringe_test! {
         let result = syringe.inject(payload_path);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(matches!(err, InjectError::ProcessInaccessible));
+        assert!(matches!(err, InjectError::ProcessInaccessible), "{:?}", err);
     }
 }

@@ -29,7 +29,7 @@ use {
 #[cfg(feature = "rpc-core")]
 use {
     crate::function::RawFunctionPtr,
-    winapi::shared::{minwindef::FARPROC, ntdef::LPCSTR}
+    winapi::shared::{minwindef::FARPROC, ntdef::LPCSTR},
 };
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
@@ -185,7 +185,11 @@ impl Syringe {
             .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process()))?;
 
         if !module.guess_is_loaded() {
-            return Err(EjectError::ModuleInaccessible);
+            if self.process().is_alive() {
+                return Err(EjectError::ModuleInaccessible);
+            } else {
+                return Err(EjectError::ProcessInaccessible);
+            }
         }
 
         let exit_code = self.process().run_remote_thread(

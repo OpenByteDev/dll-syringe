@@ -1,6 +1,6 @@
 #![cfg(feature = "syringe")]
 
-use dll_syringe::Syringe;
+use dll_syringe::{Syringe, process::Process, error::EjectError};
 
 #[allow(unused)]
 mod common;
@@ -13,5 +13,22 @@ syringe_test! {
         let syringe = Syringe::for_process(process);
         let module = syringe.inject(payload_path).unwrap();
         syringe.eject(module).unwrap();
+    }
+}
+
+syringe_test! {
+    fn eject_with_crashed_process_fails_with_process_inaccessible(
+        process: OwnedProcess,
+        payload_path: &Path,
+    ) {
+        let syringe = Syringe::for_process(process);
+        let module = syringe.inject(payload_path).unwrap();
+
+        syringe.process().kill().unwrap();
+
+        let result = syringe.eject(module);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, EjectError::ProcessInaccessible), "{:?}", err);
     }
 }
