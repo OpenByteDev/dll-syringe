@@ -19,10 +19,6 @@ use winapi::um::{
     winnt::STATUS_UNWIND_CONSOLIDATE,
 };
 
-#[cfg(feature = "doc-cfg")]
-#[allow(unused_imports)] // used in docs
-use crate::Syringe;
-
 #[cfg(feature = "syringe")]
 use winapi::shared::winerror::ERROR_PARTIAL_COPY;
 
@@ -170,7 +166,7 @@ pub enum ExceptionOrIoError {
     Exception(ExceptionCode),
 }
 
-/// Error enum for errors during [Syringe::load_inject_help_data_for_process].
+/// Error enum for errors during [`Syringe::load_inject_help_data_for_process`](crate::Syringe::load_inject_help_data_for_process).
 #[derive(Debug, Error)]
 #[cfg(feature = "syringe")]
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
@@ -205,7 +201,7 @@ impl From<io::Error> for LoadInjectHelpDataError {
     }
 }
 
-/// Error enum for errors during [Syringe::inject].
+/// Error enum for errors during [`Syringe::inject`](crate::Syringe::inject).
 #[derive(Debug, Error)]
 #[cfg(feature = "syringe")]
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
@@ -290,7 +286,7 @@ impl From<LoadInjectHelpDataError> for InjectError {
     }
 }
 
-/// Error enum for errors during [Syringe::eject].
+/// Error enum for errors during [`Syringe::eject`](crate::Syringe::eject).
 #[derive(Debug, Error)]
 #[cfg(feature = "syringe")]
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
@@ -442,7 +438,7 @@ impl From<ExceptionOrIoError> for LoadProcedureError {
     }
 }
 
-/// Error enum encompassing all errors during syringe operations.
+/// Error enum encompassing all errors during [`Syringe`](crate::Syringe) operations.
 #[derive(Debug, Error)]
 #[cfg(feature = "syringe")]
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "syringe")))]
