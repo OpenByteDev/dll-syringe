@@ -10,6 +10,7 @@ use crate::{
         BorrowedProcess, BorrowedProcessModule, ModuleHandle,
     },
     rpc::{error::PayloadRpcError, RemoteRawProcedure, Truncate},
+    utils::ArrayOrVecBuf,
     ArgAndResultBufInfo, Syringe,
 };
 
@@ -90,11 +91,14 @@ where
     F::Output: DeserializeOwned,
 {
     fn call_with_args(&self, args: F::RefArgs<'_>) -> Result<F::Output, PayloadRpcError> {
-        let local_arg_buf = bincode::serialize(&args)?;
+        let arg_bytes = bincode::serialized_size(&args)? as usize;
+        let mut local_arg_buf = ArrayOrVecBuf::<_, 512>::with_capacity(arg_bytes);
+        bincode::serialize_into(local_arg_buf.spare_writer(), &args)?;
+        unsafe { local_arg_buf.set_len(arg_bytes) };
 
         // Allocate a buffer in the remote process to hold the argument.
         let remote_arg_buf = self.f.remote_allocator.alloc_raw(local_arg_buf.len())?;
-        remote_arg_buf.write_bytes(local_arg_buf.as_ref())?;
+        remote_arg_buf.write_bytes(&local_arg_buf)?;
 
         let parameter_buf = self
             .f
@@ -112,17 +116,16 @@ where
 
         // Prepare local result buffer
         let mut local_result_buf = local_arg_buf;
+        local_result_buf.clear();
         let result_buf_len = result_buf_info.len as usize;
-        if result_buf_len > local_result_buf.len() {
-            local_result_buf.reserve(result_buf_len - local_result_buf.len());
-        }
+        local_result_buf.ensure_capacity(result_buf_len);
         unsafe { local_result_buf.set_len(result_buf_len) };
 
         // Copy remote buffer into local one.
         if result_buf_info.data == remote_arg_buf.as_ptr().as_ptr() as u64 {
             // The result is in the same buffer as the arguments.
             // We can just read the result from the buffer.
-            remote_arg_buf.read_bytes(local_result_buf.as_mut())?;
+            remote_arg_buf.read_bytes(&mut local_result_buf)?;
         } else {
             // The result is in a different buffer.
             let result_memory = unsafe {
@@ -137,7 +140,7 @@ where
 
         if result_buf_info.is_error {
             Err(PayloadRpcError::RemoteProcedure(unsafe {
-                String::from_utf8_unchecked(local_result_buf)
+                String::from_utf8_unchecked(local_result_buf.into_vec())
             }))
         } else {
             Ok(bincode::deserialize(&local_result_buf)?)

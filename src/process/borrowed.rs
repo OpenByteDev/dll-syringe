@@ -27,7 +27,7 @@ use winapi::{
 
 use crate::{
     process::{ModuleHandle, OwnedProcess, Process, ProcessModule},
-    utils::{retry_faillable_until_some_with_timeout, ArrayOrVecSlice, UninitArrayBuf},
+    utils::{retry_faillable_until_some_with_timeout, ArrayOrVecBuf},
 };
 
 /// A struct representing a running process.
@@ -225,9 +225,9 @@ impl<'a> BorrowedProcess<'a> {
     /// If the process is currently starting up and has not yet loaded all its modules, the returned list may be incomplete.
     /// This can be worked around by repeatedly calling this method.
     pub fn module_handles(&self) -> Result<impl ExactSizeIterator<Item = ModuleHandle>, io::Error> {
-        let mut module_buf = UninitArrayBuf::<ModuleHandle, 1024>::new();
+        let mut module_buf = ArrayOrVecBuf::<ModuleHandle, 1024>::new_uninit_array();
         const HANDLE_SIZE: u32 = mem::size_of::<HMODULE>() as _;
-        let mut module_buf_byte_size = HANDLE_SIZE * module_buf.len() as u32;
+        let mut module_buf_byte_size = HANDLE_SIZE * module_buf.capacity() as u32;
         let mut bytes_needed_new = MaybeUninit::uninit();
         loop {
             let result = unsafe {
@@ -255,8 +255,8 @@ impl<'a> BorrowedProcess<'a> {
         let modules = if bytes_needed <= module_buf_byte_size {
             // buffer size was sufficient
             let module_buf_len = (bytes_needed / HANDLE_SIZE) as usize;
-            let module_buf_init = unsafe { module_buf.assume_init_all() };
-            ArrayOrVecSlice::from_array(module_buf_init, 0..module_buf_len)
+            unsafe { module_buf.set_len(module_buf_len) };
+            module_buf
         } else {
             // buffer size was not sufficient
             let mut module_buf_vec = Vec::new();
@@ -269,13 +269,15 @@ impl<'a> BorrowedProcess<'a> {
                 module_buf_byte_size =
                     cmp::max(bytes_needed, module_buf_byte_size.saturating_mul(2));
                 let mut module_buf_len = (module_buf_byte_size / HANDLE_SIZE) as usize;
-                module_buf_vec.resize(module_buf_len, MaybeUninit::uninit());
+                if module_buf_len > module_buf_vec.capacity() {
+                    module_buf_vec.reserve(module_buf_len - module_buf_vec.capacity());
+                }
 
                 let mut bytes_needed_new = MaybeUninit::uninit();
                 let result = unsafe {
                     EnumProcessModulesEx(
                         self.as_raw_handle(),
-                        module_buf_vec[0].as_mut_ptr(),
+                        module_buf_vec.as_mut_ptr(),
                         module_buf_byte_size,
                         bytes_needed_new.as_mut_ptr(),
                         LIST_MODULES_ALL,
@@ -288,9 +290,8 @@ impl<'a> BorrowedProcess<'a> {
 
                 if bytes_needed <= module_buf_byte_size {
                     module_buf_len = (bytes_needed / HANDLE_SIZE) as usize;
-                    break unsafe {
-                        ArrayOrVecSlice::from_vec_assume_init(module_buf_vec, 0..module_buf_len)
-                    };
+                    unsafe { module_buf_vec.set_len(module_buf_len) };
+                    break ArrayOrVecBuf::from_vec(module_buf_vec);
                 }
             }
         };

@@ -1,159 +1,155 @@
 use std::{
     mem::MaybeUninit,
-    ops::{Deref, Range, RangeBounds},
+    ops::{Deref, DerefMut},
+    vec,
 };
 
-use crate::utils;
+use super::{ArrayBuf, ArrayBufIter};
 
 #[derive(Debug)]
-pub(crate) enum ArrayOrVec<T, const SIZE: usize> {
-    Array([T; SIZE]),
+pub(crate) enum ArrayOrVecBuf<T, const SIZE: usize> {
+    Array(ArrayBuf<T, SIZE>),
     Vec(Vec<T>),
 }
 
-impl<T, const SIZE: usize> AsRef<[T]> for ArrayOrVec<T, SIZE> {
-    fn as_ref(&self) -> &[T] {
-        match self {
-            ArrayOrVec::Array(ref array) => array.as_ref(),
-            ArrayOrVec::Vec(ref vec) => vec.as_ref(),
-        }
-    }
-}
-
-impl<T, const SIZE: usize> Deref for ArrayOrVec<T, SIZE> {
-    type Target = [T];
-
-    fn deref(&self) -> &[T] {
-        self.as_ref()
-    }
-}
-
-impl<T, const SIZE: usize> Default for ArrayOrVec<T, SIZE> {
+impl<T, const SIZE: usize> Default for ArrayOrVecBuf<T, SIZE> {
     fn default() -> Self {
         Self::Vec(Vec::new())
     }
 }
 
-impl<T, const SIZE: usize> From<[T; SIZE]> for ArrayOrVec<T, SIZE> {
-    fn from(array: [T; SIZE]) -> Self {
-        Self::Array(array)
+impl<T, const SIZE: usize> ArrayOrVecBuf<T, SIZE> {
+    pub fn with_capacity(capacity: usize) -> Self {
+        if capacity <= SIZE {
+            Self::new_uninit_array()
+        } else {
+            Self::Vec(Vec::with_capacity(capacity))
+        }
     }
-}
 
-impl<T, const SIZE: usize> From<Vec<T>> for ArrayOrVec<T, SIZE> {
-    fn from(vec: Vec<T>) -> Self {
+    pub fn new_uninit_array() -> Self {
+        Self::from_partial_init_array(MaybeUninit::uninit_array(), 0)
+    }
+
+    pub fn from_array(array: [T; SIZE]) -> Self {
+        Self::Array(ArrayBuf::from_array(array))
+    }
+
+    pub fn from_partial_init_array(array: [MaybeUninit<T>; SIZE], len: usize) -> Self {
+        Self::Array(ArrayBuf::from_partial_init_array(array, len))
+    }
+
+    pub fn from_vec(vec: Vec<T>) -> Self {
         Self::Vec(vec)
     }
-}
 
-impl<'a, T, const SIZE: usize> From<&'a ArrayOrVec<T, SIZE>> for &'a [T] {
-    fn from(array_or_vec: &'a ArrayOrVec<T, SIZE>) -> Self {
-        array_or_vec.as_ref()
-    }
-}
-
-pub(crate) enum ArrayOrVecIter<T, const SIZE: usize> {
-    Array(<[T; SIZE] as IntoIterator>::IntoIter),
-    Vec(<Vec<T> as IntoIterator>::IntoIter),
-}
-
-impl<T, const SIZE: usize> IntoIterator for ArrayOrVec<T, SIZE> {
-    type Item = T;
-    type IntoIter = ArrayOrVecIter<T, SIZE>;
-
-    fn into_iter(self) -> Self::IntoIter {
+    pub fn len(&self) -> usize {
         match self {
-            ArrayOrVec::Array(array) => ArrayOrVecIter::Array(array.into_iter()),
-            ArrayOrVec::Vec(vec) => ArrayOrVecIter::Vec(vec.into_iter()),
+            ArrayOrVecBuf::Array(array) => array.len(),
+            ArrayOrVecBuf::Vec(vec) => vec.len(),
         }
     }
-}
 
-impl<T, const SIZE: usize> Iterator for ArrayOrVecIter<T, SIZE> {
-    type Item = T;
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
+    pub fn capacity(&self) -> usize {
         match self {
-            ArrayOrVecIter::Array(iter) => iter.next(),
-            ArrayOrVecIter::Vec(iter) => iter.next(),
+            ArrayOrVecBuf::Array(array) => array.capacity(),
+            ArrayOrVecBuf::Vec(vec) => vec.capacity(),
         }
     }
-}
 
-impl<T, const SIZE: usize> DoubleEndedIterator for ArrayOrVecIter<T, SIZE> {
-    fn next_back(&mut self) -> Option<Self::Item> {
+    pub unsafe fn set_len(&mut self, new_len: usize) {
         match self {
-            ArrayOrVecIter::Array(iter) => iter.next_back(),
-            ArrayOrVecIter::Vec(iter) => iter.next_back(),
+            ArrayOrVecBuf::Array(array) => unsafe { array.set_len(new_len) },
+            ArrayOrVecBuf::Vec(vec) => unsafe { vec.set_len(new_len) },
         }
     }
-}
 
-impl<T, const SIZE: usize> ExactSizeIterator for ArrayOrVecIter<T, SIZE> {
-    fn len(&self) -> usize {
+    pub fn clear(&mut self) {
         match self {
-            ArrayOrVecIter::Array(iter) => iter.len(),
-            ArrayOrVecIter::Vec(iter) => iter.len(),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct ArrayOrVecSlice<T, const SIZE: usize> {
-    data: ArrayOrVec<T, SIZE>,
-    range: Range<usize>,
-}
-
-impl<T, const SIZE: usize> ArrayOrVecSlice<T, SIZE> {
-    pub fn from_array(array: [T; SIZE], range: impl RangeBounds<usize>) -> Self {
-        Self {
-            range: utils::range_from_bounds(0, array.len(), &range),
-            data: ArrayOrVec::Array(array),
+            ArrayOrVecBuf::Array(array) => array.clear(),
+            ArrayOrVecBuf::Vec(vec) => vec.clear(),
         }
     }
 
-    #[allow(dead_code)]
-    pub unsafe fn from_array_assume_init(
-        array: [MaybeUninit<T>; SIZE],
-        range: impl RangeBounds<usize>,
-    ) -> Self {
-        Self::from_array(unsafe { MaybeUninit::array_assume_init(array) }, range)
-    }
-
-    pub fn from_vec(vec: Vec<T>, range: impl RangeBounds<usize>) -> Self {
-        Self {
-            range: utils::range_from_bounds(0, vec.len(), &range),
-            data: ArrayOrVec::Vec(vec),
-        }
-    }
-
-    pub unsafe fn from_vec_assume_init(
-        vec: Vec<MaybeUninit<T>>,
-        range: impl RangeBounds<usize>,
-    ) -> Self {
-        let (ptr, length, capacity) = vec.into_raw_parts();
-        Self::from_vec(
-            unsafe { Vec::from_raw_parts(ptr.cast(), length, capacity) },
-            range,
-        )
-    }
-
-    #[allow(dead_code)]
     pub fn as_slice(&self) -> &[T] {
-        match self.data {
-            ArrayOrVec::Array(ref array) => &array[self.range.start..self.range.end],
-            ArrayOrVec::Vec(ref vec) => &vec[self.range.start..self.range.end],
+        match self {
+            ArrayOrVecBuf::Array(array) => array.as_slice(),
+            ArrayOrVecBuf::Vec(vec) => vec.as_slice(),
+        }
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        match self {
+            ArrayOrVecBuf::Array(array) => array.as_mut_slice(),
+            ArrayOrVecBuf::Vec(vec) => vec.as_mut_slice(),
+        }
+    }
+
+    pub fn spare_capacity_mut(&mut self) -> &mut [MaybeUninit<T>] {
+        match self {
+            ArrayOrVecBuf::Array(array) => array.spare_capacity_mut(),
+            ArrayOrVecBuf::Vec(vec) => vec.spare_capacity_mut(),
+        }
+    }
+
+    pub fn into_vec(self) -> Vec<T>
+    where
+        T: Copy,
+    {
+        match self {
+            Self::Array(array) => array.to_vec(),
+            Self::Vec(vec) => vec,
+        }
+    }
+
+    pub fn ensure_capacity(&mut self, capacity: usize)
+    where
+        T: Copy,
+    {
+        match self {
+            ArrayOrVecBuf::Array { .. } => {
+                if SIZE >= capacity {
+                    return;
+                }
+
+                let mut vec = Vec::with_capacity(capacity);
+                vec.copy_from_slice(self.as_slice());
+                *self = Self::Vec(vec);
+            }
+            ArrayOrVecBuf::Vec(vec) => {
+                if vec.capacity() >= capacity {
+                    return;
+                }
+
+                vec.reserve(capacity - vec.capacity());
+            }
         }
     }
 }
 
-impl<T, const SIZE: usize> AsRef<[T]> for ArrayOrVecSlice<T, SIZE> {
-    fn as_ref(&self) -> &[T] {
-        &self.data.as_ref()[self.range.start..self.range.end]
+impl<const SIZE: usize> ArrayOrVecBuf<u8, SIZE> {
+    pub fn spare_writer(&mut self) -> impl std::io::Write + '_ {
+        let spare = self.spare_capacity_mut();
+        unsafe { MaybeUninit::slice_assume_init_mut(spare) }
     }
 }
 
-impl<T, const SIZE: usize> Deref for ArrayOrVecSlice<T, SIZE> {
+impl<T, const SIZE: usize> AsRef<[T]> for ArrayOrVecBuf<T, SIZE> {
+    fn as_ref(&self) -> &[T] {
+        self.as_slice()
+    }
+}
+impl<T, const SIZE: usize> AsMut<[T]> for ArrayOrVecBuf<T, SIZE> {
+    fn as_mut(&mut self) -> &mut [T] {
+        self.as_mut_slice()
+    }
+}
+
+impl<T, const SIZE: usize> Deref for ArrayOrVecBuf<T, SIZE> {
     type Target = [T];
 
     fn deref(&self) -> &[T] {
@@ -161,52 +157,66 @@ impl<T, const SIZE: usize> Deref for ArrayOrVecSlice<T, SIZE> {
     }
 }
 
-impl<T, const SIZE: usize> From<ArrayOrVec<T, SIZE>> for ArrayOrVecSlice<T, SIZE> {
-    fn from(array_or_vec: ArrayOrVec<T, SIZE>) -> Self {
-        Self {
-            range: Range {
-                start: 0,
-                end: array_or_vec.len(),
-            },
-            data: array_or_vec,
+impl<T, const SIZE: usize> DerefMut for ArrayOrVecBuf<T, SIZE> {
+    fn deref_mut(&mut self) -> &mut [T] {
+        self.as_mut()
+    }
+}
+
+impl<T, const SIZE: usize> From<[T; SIZE]> for ArrayOrVecBuf<T, SIZE> {
+    fn from(array: [T; SIZE]) -> Self {
+        Self::from_array(array)
+    }
+}
+
+impl<T, const SIZE: usize> From<Vec<T>> for ArrayOrVecBuf<T, SIZE> {
+    fn from(vec: Vec<T>) -> Self {
+        Self::from_vec(vec)
+    }
+}
+
+pub(crate) enum ArrayOrVecBufIter<T, const SIZE: usize> {
+    Array(ArrayBufIter<T, SIZE>),
+    Vec(vec::IntoIter<T>),
+}
+
+impl<T, const SIZE: usize> IntoIterator for ArrayOrVecBuf<T, SIZE> {
+    type Item = T;
+    type IntoIter = ArrayOrVecBufIter<T, SIZE>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            Self::Array(array) => ArrayOrVecBufIter::Array(array.into_iter()),
+            Self::Vec(vec) => ArrayOrVecBufIter::Vec(vec.into_iter()),
         }
     }
 }
 
-pub(crate) struct ArrayOrVecSliceIter<T, const SIZE: usize>(
-    std::iter::Skip<std::iter::Take<ArrayOrVecIter<T, SIZE>>>,
-);
-
-impl<T, const SIZE: usize> IntoIterator for ArrayOrVecSlice<T, SIZE> {
-    type Item = T;
-    type IntoIter = ArrayOrVecSliceIter<T, SIZE>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        ArrayOrVecSliceIter(
-            self.data
-                .into_iter()
-                .take(self.range.end)
-                .skip(self.range.start),
-        )
-    }
-}
-
-impl<T, const SIZE: usize> Iterator for ArrayOrVecSliceIter<T, SIZE> {
+impl<T, const SIZE: usize> Iterator for ArrayOrVecBufIter<T, SIZE> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next()
+        match self {
+            ArrayOrVecBufIter::Array(array) => array.next(),
+            ArrayOrVecBufIter::Vec(iter) => iter.next(),
+        }
     }
 }
 
-impl<T, const SIZE: usize> DoubleEndedIterator for ArrayOrVecSliceIter<T, SIZE> {
+impl<T, const SIZE: usize> DoubleEndedIterator for ArrayOrVecBufIter<T, SIZE> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.0.next_back()
+        match self {
+            ArrayOrVecBufIter::Array(iter) => iter.next_back(),
+            ArrayOrVecBufIter::Vec(iter) => iter.next_back(),
+        }
     }
 }
 
-impl<T, const SIZE: usize> ExactSizeIterator for ArrayOrVecSliceIter<T, SIZE> {
+impl<T, const SIZE: usize> ExactSizeIterator for ArrayOrVecBufIter<T, SIZE> {
     fn len(&self) -> usize {
-        self.0.len()
+        match self {
+            ArrayOrVecBufIter::Array(iter) => iter.len(),
+            ArrayOrVecBufIter::Vec(iter) => iter.len(),
+        }
     }
 }
