@@ -61,12 +61,6 @@ pub fn build_helper_crate(
     release: bool,
     ext: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    println!(
-        "Building helper crate {} for target {}",
-        crate_name,
-        target.unwrap_or("default")
-    );
-
     let payload_crate_path = PathBuf::from_str(".\\tests\\helpers")?
         .join(crate_name)
         .canonicalize()?;
