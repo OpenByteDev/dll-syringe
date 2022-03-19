@@ -96,7 +96,7 @@ mod payload {
             let err = result.unwrap_err();
             assert!(matches!(err, PayloadRpcError::RemoteProcedure(_)));
             let err_message = match err {
-                PayloadRpcError::RemoteProcedure(e) => e.to_string(),
+                PayloadRpcError::RemoteProcedure(e) => e,
                 _ => panic!("Expected RpcError::RemoteProcedure"),
             };
             assert_eq!(err_message, String::from("Some error message"));
