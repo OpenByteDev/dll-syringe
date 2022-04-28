@@ -121,3 +121,4 @@ Licensed under MIT license ([LICENSE](https://github.com/OpenByteDev/dll-syringe
 
 ## Attribution
 Inspired by [Reloaded.Injector](https://github.com/Reloaded-Project/Reloaded.Injector) from [Sewer](https://github.com/Sewer56).
+ 
