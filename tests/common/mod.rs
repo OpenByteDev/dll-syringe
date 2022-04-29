@@ -5,8 +5,6 @@ use std::{
     str::FromStr,
 };
 
-use platforms::target::Arch;
-
 pub fn build_test_payload_x86() -> Result<PathBuf, Box<dyn Error>> {
     build_helper_crate(
         "test_payload",
@@ -44,15 +42,11 @@ pub fn build_test_target_x64() -> Result<PathBuf, Box<dyn Error>> {
 }
 
 fn find_x64_variant_of_target() -> String {
-    let platform = platforms::Platform::guess_current().unwrap();
-    let x64_triple = platform.target_triple.replace("i686", "x86_64");
-    platforms::Platform::find(&x64_triple).unwrap().to_string()
+    current_platform::CURRENT_PLATFORM.replace("i686", "x86_64")
 }
 
 fn find_x86_variant_of_target() -> String {
-    let platform = platforms::Platform::guess_current().unwrap();
-    let x64_triple = platform.target_triple.replace("x86_64", "i686");
-    platforms::Platform::find(&x64_triple).unwrap().to_string()
+    current_platform::CURRENT_PLATFORM.replace("x86_64", "i686")
 }
 
 pub fn build_helper_crate(
