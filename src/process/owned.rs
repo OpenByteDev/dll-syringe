@@ -87,7 +87,7 @@ impl Hash for OwnedProcess {
     }
 }
 
-impl<'a> Process for OwnedProcess {
+impl Process for OwnedProcess {
     type Handle = OwnedHandle;
 
     fn borrowed(&self) -> BorrowedProcess<'_> {

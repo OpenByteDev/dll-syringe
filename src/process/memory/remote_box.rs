@@ -152,7 +152,7 @@ impl<T: ?Sized + Copy> RemoteBox<T> {
     }
 }
 
-impl<'a, T: Sized + Copy> RemoteBox<T> {
+impl<T: Sized + Copy> RemoteBox<T> {
     pub fn read(&self) -> Result<T, io::Error> {
         unsafe { self.allocation.memory().read_struct(0) }
     }
