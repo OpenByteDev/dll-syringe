@@ -157,7 +157,7 @@ impl<'a> Process for BorrowedProcess<'a> {
             Cow::Borrowed(target_module_path.as_os_str())
         };
 
-        let target_module_handle = same_file::Handle::from_path(target_module_path)?;
+        let target_module_handle = same_file::Handle::from_path(&target_module_path)?;
 
         let modules = self.module_handles()?;
 
@@ -165,8 +165,17 @@ impl<'a> Process for BorrowedProcess<'a> {
             let module = unsafe { ProcessModule::new_unchecked(module_handle, *self) };
             let module_path = module.path()?.into_os_string();
 
-            if target_module_handle == same_file::Handle::from_path(module_path)? {
-                return Ok(Some(module));
+            match same_file::Handle::from_path(&module_path) {
+                Ok(module_handle) => {
+                    if module_handle == target_module_handle {
+                        return Ok(Some(module));
+                    }
+                }
+                Err(_) => {
+                    if target_module_path.eq_ignore_ascii_case(&module_path) {
+                        return Ok(Some(module));
+                    }
+                }
             }
         }
 
