@@ -2,11 +2,9 @@
 #![feature(
     maybe_uninit_uninit_array,
     maybe_uninit_slice,
-    maybe_uninit_array_assume_init,
     once_cell,
     io_safety,
     linked_list_cursors,
-    vec_into_raw_parts,
     generic_associated_types,
     min_specialization
 )]
