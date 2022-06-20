@@ -2,9 +2,8 @@ use iced_x86::{code_asm::*, IcedError};
 
 use std::{
     any::{self, TypeId},
-    cmp, fmt, io,
-    lazy::OnceCell,
-    mem, slice,
+    cell::OnceCell,
+    cmp, fmt, io, mem, slice,
 };
 
 use crate::{

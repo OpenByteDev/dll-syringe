@@ -2,7 +2,7 @@ use cstr::cstr;
 use iced_x86::{code_asm::*, IcedError};
 use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
-use std::{io, lazy::OnceCell, mem, path::Path};
+use std::{cell::OnceCell, io, mem, path::Path};
 use u16cstr::u16cstr;
 use widestring::U16CString;
 use winapi::shared::{
