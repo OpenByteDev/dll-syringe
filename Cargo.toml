@@ -1,6 +1,6 @@
 [package]
 name = "dll-syringe"
-version = "0.11.3"
+version = "0.12.0"
 description = "A windows dll injection library written in rust."
 readme = "README.md"
 repository = "https://github.com/OpenByteDev/dll-syringe" 
