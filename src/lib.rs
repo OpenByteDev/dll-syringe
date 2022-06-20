@@ -3,7 +3,6 @@
     maybe_uninit_uninit_array,
     maybe_uninit_slice,
     once_cell,
-    io_safety,
     linked_list_cursors,
     generic_associated_types,
     min_specialization
