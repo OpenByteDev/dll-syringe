@@ -27,7 +27,7 @@ use winapi::shared::winerror::ERROR_PARTIAL_COPY;
 pub enum IoOrNulError {
     /// Variant representing an illegal interior nul value.
     #[error("interior nul found")]
-    Nul(#[from] widestring::NulError<u16>),
+    Nul(#[from] widestring::error::ContainsNul<u16>),
     /// Variant representing an windows api error.
     #[error("io error: {}", _0)]
     Io(#[from] io::Error),
@@ -208,7 +208,7 @@ impl From<io::Error> for LoadInjectHelpDataError {
 pub enum InjectError {
     /// Variant representing an illegal interior nul value in the module path.
     #[error("module path contains illegal interior nul")]
-    IllegalPath(#[from] widestring::NulError<u16>),
+    IllegalPath(#[from] widestring::error::ContainsNul<u16>),
     /// Variant representing an io error.
     #[error("io error: {}", _0)]
     Io(io::Error),
@@ -445,7 +445,7 @@ impl From<ExceptionOrIoError> for LoadProcedureError {
 pub enum SyringeError {
     /// Variant representing an illegal interior nul value in the module path.
     #[error("module path contains illegal interior nul")]
-    IllegalPath(#[from] widestring::NulError<u16>),
+    IllegalPath(#[from] widestring::error::ContainsNul<u16>),
     /// Variant representing an io error.
     #[error("io error: {}", _0)]
     Io(io::Error),
