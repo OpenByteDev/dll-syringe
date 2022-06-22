@@ -9,6 +9,7 @@ documentation = "https://docs.rs/dll-syringe"
 license = "MIT"
 authors = ["OpenByte <development.openbyte@gmail.com>"]
 edition = "2021"
+resolver = "2"
 categories = []
 keywords = ["dll-injection", "dll", "injector", "windows", "rpc"]
 
