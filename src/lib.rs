@@ -2,11 +2,15 @@
 #![feature(
     maybe_uninit_uninit_array,
     maybe_uninit_slice,
-    once_cell,
     linked_list_cursors,
     generic_associated_types,
-    min_specialization
 )]
+#![cfg_attr(feature = "syringe", feature(
+    once_cell,
+))]
+#![cfg_attr(feature = "rpc-core", feature(
+    min_specialization
+))]
 #![warn(
     unsafe_op_in_unsafe_fn,
     missing_docs,
