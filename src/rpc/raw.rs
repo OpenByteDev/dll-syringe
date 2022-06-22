@@ -2,7 +2,7 @@ use iced_x86::{code_asm::*, IcedError};
 
 use std::{
     any::{self, TypeId},
-    cell::OnceCell,
+    lazy::OnceCell,
     cmp, fmt, io, mem, slice,
 };
 
