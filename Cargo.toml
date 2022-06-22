@@ -32,7 +32,7 @@ serde = { version = "1.0", default-features = false, optional = true }
 [target.'cfg(target_arch = "x86")'.dependencies]
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-goblin = { version = "0.5", optional = true, default-features = false, features = ["std", "pe32"] }
+goblin = { version = "0.5", optional = true, features = ["std", "pe32"], default-features = false }
 
 [dev-dependencies]
 current_platform = { version = "0.2", default-features = false }
