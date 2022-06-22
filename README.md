@@ -74,7 +74,7 @@ let syringe = Syringe::for_process(target_process);
 // inject the payload into the target process
 let injected_payload = syringe.inject("injection_payload.dll").unwrap();
 
-let remote_add = syringe.get_payload_procedure::<fn(f64, f64) -> f64>(injected_payload, "add").unwrap().unwrap();
+let remote_add = unsafe { syringe.get_payload_procedure::<fn(f64, f64) -> f64>(injected_payload, "add") }.unwrap().unwrap();
 let result = remote_add.call(&2.0, &4.0).unwrap();
 println!("{}", result); // prints 6
 
@@ -108,7 +108,7 @@ let syringe = Syringe::for_process(target_process);
 // inject the payload into the target process
 let injected_payload = syringe.inject("injection_payload.dll").unwrap();
 
-let remote_add = syringe.get_raw_procedure::<extern "system" fn(f64, f64) -> f64>(injected_payload, "add").unwrap().unwrap();
+let remote_add = unsafe { syringe.get_raw_procedure::<extern "system" fn(f64, f64) -> f64>(injected_payload, "add") }.unwrap().unwrap();
 let result = remote_add.call(2.0, 4.0).unwrap();
 println!("{}", result); // prints 6
 
