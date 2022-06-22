@@ -1,10 +1,16 @@
 use cstr::cstr;
-use iced_x86::{code_asm::*, IcedError};
+use iced_x86::{
+    code_asm::{
+        dword_ptr,
+        registers::{gpr32::*, gpr64::*},
+        CodeAssembler,
+    },
+    IcedError,
+};
 use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
 use std::{cell::OnceCell, io, mem, path::Path};
-use u16cstr::u16cstr;
-use widestring::U16CString;
+use widestring::{u16cstr, U16CString};
 use winapi::shared::{
     minwindef::{BOOL, DWORD, FALSE, HMODULE},
     ntdef::LPCWSTR,
