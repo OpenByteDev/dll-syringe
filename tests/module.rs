@@ -1,4 +1,4 @@
-use dll_syringe::{process::Process, Syringe};
+use dll_syringe::process::Process;
 use std::time::Duration;
 
 #[allow(unused)]
@@ -23,6 +23,9 @@ process_test! {
         assert_eq!(base_name, main_module.base_name().unwrap());
     }
 }
+
+#[cfg(feature = "syringe")]
+use dll_syringe::Syringe;
 
 #[cfg(feature = "syringe")]
 syringe_test! {
