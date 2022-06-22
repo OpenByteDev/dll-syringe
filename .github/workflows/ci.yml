@@ -42,19 +42,19 @@ jobs:
           override: true
       
     - name: Build
-      run: cargo build --target ${{ matrix.target }} -- --nocapture
+      run: cargo build --target ${{ matrix.target }}
       
     - name: Test
       run: cargo test --target ${{ matrix.target }} --all-targets --all-features -- --nocapture
       
     - name: Build (default features)
-      run: cargo build --target ${{ matrix.target }} --all-targets -- --nocapture
+      run: cargo build --target ${{ matrix.target }} --all-targets
     - name: Build (no features)
-      run: cargo build --target ${{ matrix.target }} --no-default-features --all-targets -- --nocapture
+      run: cargo build --target ${{ matrix.target }} --no-default-features --all-targets
     - name: Build (feature syringe)
-      run: cargo build --target ${{ matrix.target }} --features syringe --all-targets -- --nocapture
+      run: cargo build --target ${{ matrix.target }} --features syringe --all-targets
     - name: Build (feature rpc)
-      run: cargo build --target ${{ matrix.target }} --features rpc --all-targets -- --nocapture
+      run: cargo build --target ${{ matrix.target }} --features rpc --all-targets
 
   documentation:
     runs-on: ${{ matrix.os }}
