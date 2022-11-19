@@ -105,7 +105,7 @@ fn payload_procedure_helper_inner<A: DeserializeOwned, R: Serialize>(
 
 fn allocate_local_process_memory(len: usize) -> io::Result<&'static mut [u8]> {
     let current_process = BorrowedProcess::current();
-    let result_memory = ProcessMemoryBuffer::allocate_data(current_process, len as usize)?;
+    let result_memory = ProcessMemoryBuffer::allocate_data(current_process, len)?;
     Ok(result_memory.into_dangling_local_slice().unwrap())
 }
 
