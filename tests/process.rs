@@ -1,5 +1,5 @@
 use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
-use std::{fs, time::Duration};
+use std::{mem, fs, time::Duration};
 
 #[allow(unused)]
 mod common;
@@ -16,7 +16,7 @@ process_test! {
     fn list_module_handles_on_running_succeeds(
         process: OwnedProcess
     ) {
-        process.borrowed().module_handles().unwrap();
+        let _ = process.borrowed().module_handles().unwrap().for_each(mem::drop);
     }
 }
 
