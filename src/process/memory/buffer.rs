@@ -209,8 +209,7 @@ impl Drop for ProcessMemoryBuffer<'_> {
         let result = unsafe { self._free() };
         debug_assert!(
             result.is_ok(),
-            "Failed to free process memory buffer: {:?}",
-            result
+            "Failed to free process memory buffer: {result:?}"
         );
     }
 }
