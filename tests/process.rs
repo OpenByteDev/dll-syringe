@@ -1,5 +1,5 @@
 use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
-use std::{mem, fs, time::Duration};
+use std::{fs, mem, time::Duration};
 
 #[allow(unused)]
 mod common;
