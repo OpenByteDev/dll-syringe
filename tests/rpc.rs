@@ -245,7 +245,7 @@ mod raw {
             let remote_add = unsafe { syringe.get_raw_procedure::<extern "C" fn(u32, u32) -> u32>(module, "add_raw_c") }.unwrap().unwrap();
             syringe.process().kill().unwrap();
             let add_err = remote_add.call(42, 10).unwrap_err();
-            assert!(matches!(add_err, RawRpcError::ProcessInaccessible), "{:?}", add_err);
+            assert!(matches!(add_err, RawRpcError::ProcessInaccessible), "{add_err:?}");
         }
     }
 
@@ -258,7 +258,7 @@ mod raw {
             let module = syringe.inject(payload_path).unwrap();
             let remote_add = unsafe { syringe.get_raw_procedure::<extern "C" fn()>(module, "crash") }.unwrap().unwrap();
             let add_err = remote_add.call().unwrap_err();
-            assert!(matches!(add_err, RawRpcError::RemoteException(dll_syringe::error::ExceptionCode::AccessViolation)), "{:?}", add_err);
+            assert!(matches!(add_err, RawRpcError::RemoteException(dll_syringe::error::ExceptionCode::AccessViolation)), "{add_err:?}");
         }
     }
 }

@@ -84,7 +84,7 @@ pub fn build_helper_crate(
     }
 
     payload_artifact_path.push(if release { "release" } else { "debug" });
-    payload_artifact_path.push(format!("{}.{}", crate_name, ext));
+    payload_artifact_path.push(format!("{crate_name}.{ext}"));
     assert!(&payload_artifact_path.exists());
 
     Ok(payload_artifact_path)

@@ -43,6 +43,6 @@ syringe_test! {
         let result = syringe.inject(payload_path);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(matches!(err, InjectError::ProcessInaccessible), "{:?}", err);
+        assert!(matches!(err, InjectError::ProcessInaccessible), "{err:?}");
     }
 }

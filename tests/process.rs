@@ -16,7 +16,7 @@ process_test! {
     fn list_module_handles_on_running_succeeds(
         process: OwnedProcess
     ) {
-        let _ = process.borrowed().module_handles().unwrap().for_each(mem::drop);
+        process.borrowed().module_handles().unwrap().for_each(mem::drop);
     }
 }
 

@@ -29,6 +29,6 @@ syringe_test! {
         let result = syringe.eject(module);
         assert!(result.is_err());
         let err = result.unwrap_err();
-        assert!(matches!(err, EjectError::ProcessInaccessible), "{:?}", err);
+        assert!(matches!(err, EjectError::ProcessInaccessible), "{err:?}");
     }
 }

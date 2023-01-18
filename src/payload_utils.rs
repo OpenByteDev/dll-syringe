@@ -78,7 +78,7 @@ pub fn __payload_procedure_helper<A: DeserializeOwned, R: Serialize>(
                 (*buf_info_ptr).data = error_buf.as_ptr() as u64;
                 (*buf_info_ptr).len = error_buf.len() as u64;
             }
-            let _ = write!(error_buf, "{}", message);
+            let _ = write!(error_buf, "{message}");
         }
     }
 }
