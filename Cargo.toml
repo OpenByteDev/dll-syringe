@@ -19,7 +19,7 @@ cstr = { version = "0.2", default-features = false }
 sysinfo = { version = "0.27", default-features = false }
 widestring = { version = "1.0", features = ["std", "alloc"], default-features = false }
 path-absolutize = { version = "3.0", default-features = false }
-stopwatch = { version = "0.0", default-features = false }
+stopwatch2 = { version = "2.0", default-features = false }
 thiserror = { version = "1.0", default-features = false }
 num_enum = { version = "0.5", default-features = false }
 shrinkwraprs = { version = "0.3", default-features = false }

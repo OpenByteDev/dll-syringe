@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use stopwatch::Stopwatch;
+use stopwatch2::Stopwatch;
 
 pub(crate) fn retry_with_timeout<R>(
     operation: impl Fn() -> Option<R>,
@@ -20,7 +20,8 @@ pub(crate) fn retry_faillable_until_some_with_timeout<R, E>(
     operation: impl Fn() -> Result<Option<R>, E>,
     timeout: Duration,
 ) -> Result<Option<R>, E> {
-    let stopwatch = Stopwatch::start_new();
+    let mut stopwatch = Stopwatch::default();
+    stopwatch.start();
     loop {
         match operation() {
             Ok(result) => {
