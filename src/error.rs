@@ -225,6 +225,9 @@ pub enum InjectError {
     /// This can occur if it crashed or was terminated.
     #[error("inaccessible target process")]
     ProcessInaccessible,
+    /// Variant representing an incompatible payload module compiled for a different target than the target process.
+    #[error("mismatch between target and payload architecture")]
+    ArchitectureMismatch,
     /// Variant representing an error while loading an pe file.
     #[cfg(target_arch = "x86_64")]
     #[cfg(feature = "into-x86-from-x64")]
@@ -462,6 +465,9 @@ pub enum SyringeError {
     /// This can occur if it crashed or was terminated.
     #[error("inaccessible target process")]
     ProcessInaccessible,
+    /// Variant representing an incompatible payload module compiled for a different target than the target process.
+    #[error("mismatch between target and payload architecture")]
+    ArchitectureMismatch,
     /// Variant representing an inaccessible target module.
     /// This can occur if the target module was ejected or unloaded.
     #[error("inaccessible target module")]
@@ -531,6 +537,7 @@ impl From<InjectError> for SyringeError {
             InjectError::RemoteIo(e) => Self::RemoteIo(e),
             InjectError::RemoteException(e) => Self::RemoteException(e),
             InjectError::ProcessInaccessible => Self::ProcessInaccessible,
+            InjectError::ArchitectureMismatch => Self::ArchitectureMismatch,
             #[cfg(target_arch = "x86_64")]
             #[cfg(feature = "into-x86-from-x64")]
             InjectError::Goblin(e) => Self::Goblin(e),

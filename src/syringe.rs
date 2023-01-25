@@ -145,8 +145,15 @@ impl Syringe {
             .remote_allocator
             .alloc_and_copy_buf(wide_module_path.as_slice())?;
 
-        let injected_module_handle =
-            load_library_w.call(remote_wide_module_path.as_raw_ptr().cast())?;
+        let injected_module_handle = load_library_w
+            .call(remote_wide_module_path.as_raw_ptr().cast())
+            .map_err(|e| match e {
+                InjectError::RemoteIo(io) if io.raw_os_error() == Some(193) => {
+                    InjectError::ArchitectureMismatch
+                }
+                _ => e,
+            })?;
+
         let injected_module =
             unsafe { ProcessModule::new_unchecked(injected_module_handle, self.process()) };
 

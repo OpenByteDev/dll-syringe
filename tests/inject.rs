@@ -46,3 +46,53 @@ syringe_test! {
         assert!(matches!(err, InjectError::ProcessInaccessible), "{err:?}");
     }
 }
+
+mod inject_with_wrong_payload_fails_with_module_incompatible {
+    use super::*;
+    use dll_syringe::process::OwnedProcess;
+    use std::{
+        path::Path,
+        process::{Command, Stdio},
+    };
+
+    #[test]
+    #[cfg(target_arch = "x86")]
+    fn x86() {
+        test_with_setup(
+            common::build_test_payload_x64().unwrap(),
+            common::build_test_target_x86().unwrap(),
+        )
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn x86_64() {
+        test_with_setup(
+            common::build_test_payload_x86().unwrap(),
+            common::build_test_target_x64().unwrap(),
+        )
+    }
+
+    fn test_with_setup(payload_path: impl AsRef<Path>, target_path: impl AsRef<Path>) {
+        let dummy_process: OwnedProcess = Command::new(target_path.as_ref())
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap()
+            .into();
+
+        let _guard = dummy_process.try_clone().unwrap().kill_on_drop();
+
+        test(dummy_process, payload_path.as_ref())
+    }
+
+    fn test(process: OwnedProcess, payload_path: &Path) {
+        let syringe = Syringe::for_process(process);
+
+        let result = syringe.inject(payload_path);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, InjectError::ArchitectureMismatch), "{err:?}");
+    }
+}
