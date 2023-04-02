@@ -1,6 +1,6 @@
 #![cfg(windows)]
 #![feature(maybe_uninit_uninit_array, maybe_uninit_slice, linked_list_cursors)]
-#![cfg_attr(feature = "syringe", feature(once_cell,))]
+#![cfg_attr(feature = "syringe", feature(once_cell_try))]
 #![cfg_attr(feature = "rpc-core", feature(min_specialization))]
 #![warn(
     unsafe_op_in_unsafe_fn,
