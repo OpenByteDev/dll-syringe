@@ -44,6 +44,11 @@ jobs:
     - name: Build
       run: cargo build --target ${{ matrix.target }}
       
+    - name: Build test target
+      run: cargo build --target ${{ matrix.target }} --manifest-path "tests/helpers/test_target/Cargo.toml" --all-targets
+    - name: Build test payload
+      run: cargo build --target ${{ matrix.target }} --manifest-path "tests/helpers/test_payload/Cargo.toml" --all-targets
+      
     - name: Test
       run: cargo test --target ${{ matrix.target }} --all-targets --all-features -- --nocapture
       
