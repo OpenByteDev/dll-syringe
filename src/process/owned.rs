@@ -14,7 +14,7 @@ use std::{
 };
 
 use sysinfo::{PidExt, ProcessExt, SystemExt};
-use winapi::{shared::minwindef::FALSE, um::processthreadsapi::OpenProcess};
+use windows_sys::Win32::{Foundation::FALSE, System::Threading::OpenProcess};
 
 use crate::process::{BorrowedProcess, OwnedProcessModule, Process, PROCESS_INJECTION_ACCESS};
 
@@ -175,11 +175,11 @@ impl OwnedProcess {
             )
         };
 
-        if handle.is_null() {
+        if (handle as *mut std::ffi::c_void).is_null() {
             return Err(io::Error::last_os_error());
         }
 
-        Ok(unsafe { OwnedProcess::from_raw_handle(handle) })
+        Ok(unsafe { OwnedProcess::from_raw_handle(handle as *mut std::ffi::c_void) })
     }
 
     /// Returns a list of all currently running processes.

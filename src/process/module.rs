@@ -14,18 +14,17 @@ use crate::{
 };
 use path_absolutize::Absolutize;
 use widestring::{U16CStr, U16CString};
-use winapi::{
-    shared::{
-        minwindef::{HINSTANCE__, HMODULE},
-        winerror::{ERROR_INSUFFICIENT_BUFFER, ERROR_MOD_NOT_FOUND},
-    },
-    um::{
-        libloaderapi::{GetModuleFileNameW, GetModuleHandleW, GetProcAddress},
-        memoryapi::VirtualQueryEx,
-        psapi::{GetModuleBaseNameW, GetModuleFileNameExW},
-        winnt::{MEMORY_BASIC_INFORMATION, PAGE_NOACCESS},
+use windows_sys::Win32::{
+    Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_MOD_NOT_FOUND, HMODULE},
+    System::{
+        LibraryLoader::{GetModuleFileNameW, GetModuleHandleW, GetProcAddress},
+        Memory::{VirtualQueryEx, MEMORY_BASIC_INFORMATION, PAGE_NOACCESS},
+        ProcessStatus::{GetModuleBaseNameW, GetModuleFileNameExW},
     },
 };
+
+#[derive(Debug, Clone, Copy)]
+pub enum HINSTANCE__ {}
 
 /// A handle to a process module.
 ///
@@ -57,7 +56,7 @@ impl<P: Process> ProcessModule<P> {
     /// The caller must guarantee that the given handle is valid and that the module is loaded into the given process.
     /// (and stays that way while using the returned instance).
     pub unsafe fn new_unchecked(handle: ModuleHandle, process: P) -> Self {
-        let handle = unsafe { NonNull::new_unchecked(handle) };
+        let handle = unsafe { NonNull::new_unchecked(handle as *mut _) };
         Self { handle, process }
     }
 
@@ -66,6 +65,7 @@ impl<P: Process> ProcessModule<P> {
     /// # Safety
     /// The caller must guarantee that the given handle is valid and that the module is loaded into the given process.
     /// (and stays that way while using the returned instance).
+    #[must_use]
     pub unsafe fn new_local_unchecked(handle: ModuleHandle) -> Self {
         unsafe { ProcessModule::new_unchecked(handle, P::current()) }
     }
@@ -154,7 +154,7 @@ impl<P: Process> ProcessModule<P> {
         module: &U16CStr,
     ) -> Result<Option<ProcessModule<P>>, io::Error> {
         let handle = unsafe { GetModuleHandleW(module.as_ptr()) };
-        if handle.is_null() {
+        if (handle as *mut std::ffi::c_void).is_null() {
             let err = io::Error::last_os_error();
             if err.raw_os_error().unwrap() == ERROR_MOD_NOT_FOUND as _ {
                 return Ok(None);
@@ -191,7 +191,7 @@ impl<P: Process> ProcessModule<P> {
     /// Returns the underlying handle og the module.
     #[must_use]
     pub fn handle(&self) -> ModuleHandle {
-        self.handle.as_ptr()
+        self.handle.as_ptr() as isize
     }
 
     /// Returns the process this module is loaded in.
@@ -237,7 +237,7 @@ impl<P: Process> ProcessModule<P> {
                 let buf_size = buf_size as u32;
                 let result = unsafe {
                     GetModuleFileNameExW(
-                        self.process().as_raw_handle(),
+                        self.process().as_raw_handle() as isize,
                         self.handle(),
                         buf_ptr,
                         buf_size,
@@ -270,7 +270,7 @@ impl<P: Process> ProcessModule<P> {
                 let buf_size = buf_size as u32;
                 let result = unsafe {
                     GetModuleBaseNameW(
-                        self.process().as_raw_handle(),
+                        self.process().as_raw_handle() as isize,
                         self.handle(),
                         buf_ptr,
                         buf_size,
@@ -333,8 +333,8 @@ impl<P: Process> ProcessModule<P> {
     ) -> Result<RawFunctionPtr, io::Error> {
         assert!(self.is_local());
 
-        let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ptr()) };
-        if let Some(fn_ptr) = NonNull::new(fn_ptr) {
+        let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ptr() as *const u8) };
+        if let Some(fn_ptr) = NonNull::new(fn_ptr.unwrap() as *mut _) {
             Ok(fn_ptr.as_ptr())
         } else {
             Err(io::Error::last_os_error())
@@ -357,7 +357,7 @@ impl<P: Process> ProcessModule<P> {
         let raw_module = self.handle.as_ptr().cast();
         let result = unsafe {
             VirtualQueryEx(
-                self.process.as_raw_handle(),
+                self.process.as_raw_handle() as isize,
                 raw_module,
                 module_info.as_mut_ptr(),
                 mem::size_of::<MEMORY_BASIC_INFORMATION>(),
@@ -411,7 +411,7 @@ mod tests {
 
         let module = result.unwrap().unwrap();
         assert!(module.is_local());
-        assert!(!module.handle().is_null());
+        assert!(!((module.handle() as *mut std::ffi::c_void).is_null()));
     }
 
     #[test]

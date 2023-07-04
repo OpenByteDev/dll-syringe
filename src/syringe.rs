@@ -11,10 +11,7 @@ use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
 use std::{cell::OnceCell, io, mem, path::Path};
 use widestring::{u16cstr, U16CString};
-use winapi::shared::{
-    minwindef::{BOOL, DWORD, FALSE, HMODULE},
-    ntdef::LPCWSTR,
-};
+use windows_sys::Win32::Foundation::{BOOL, FALSE, FARPROC, HMODULE};
 
 use crate::{
     error::{EjectError, ExceptionCode, ExceptionOrIoError, InjectError, LoadInjectHelpDataError},
@@ -24,19 +21,22 @@ use crate::{
     },
 };
 
+#[allow(clippy::upper_case_acronyms)]
+type LPCWSTR = *const u16;
+#[allow(clippy::upper_case_acronyms)]
+type DWORD = u32;
+#[allow(clippy::upper_case_acronyms)]
+type LPCSTR = *const i8;
+
 #[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
 use {
     goblin::pe::PE,
     std::{convert::TryInto, fs, mem::MaybeUninit, path::PathBuf, time::Duration},
     widestring::U16Str,
-    winapi::{shared::minwindef::MAX_PATH, um::wow64apiset::GetSystemWow64DirectoryW},
 };
 
 #[cfg(feature = "rpc-core")]
-use {
-    crate::function::RawFunctionPtr,
-    winapi::shared::{minwindef::FARPROC, ntdef::LPCSTR},
-};
+use crate::function::RawFunctionPtr;
 
 type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
@@ -207,7 +207,7 @@ impl Syringe {
 
         let exit_code = self.process().run_remote_thread(
             unsafe { mem::transmute(inject_data.get_free_library_fn_ptr()) },
-            module.handle(),
+            module.handle() as *mut std::ffi::c_void,
         )?;
 
         let free_library_result = exit_code as BOOL;
@@ -363,6 +363,8 @@ impl Syringe {
 
     #[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
     fn wow64_dir() -> Result<PathBuf, io::Error> {
+        use windows_sys::Win32::System::SystemInformation::GetSystemWow64DirectoryW;
+        const MAX_PATH: usize = 260;
         let mut path_buf = MaybeUninit::uninit_array::<MAX_PATH>();
         let path_buf_len: u32 = path_buf.len().try_into().unwrap();
         let result = unsafe { GetSystemWow64DirectoryW(path_buf[0].as_mut_ptr(), path_buf_len) };
@@ -419,7 +421,7 @@ impl LoadLibraryWStub {
         Syringe::remote_exit_code_to_error_or_exception(exit_code)?;
 
         let injected_module_handle = self.result.read()?;
-        assert!(!injected_module_handle.is_null());
+        assert!(!((injected_module_handle as *mut std::ffi::c_void).is_null()));
 
         Ok(injected_module_handle)
     }

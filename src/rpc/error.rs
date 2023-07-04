@@ -1,7 +1,7 @@
 use std::io;
 
 use thiserror::Error;
-use winapi::shared::winerror::ERROR_PARTIAL_COPY;
+use windows_sys::Win32::Foundation::ERROR_PARTIAL_COPY;
 
 use crate::error::ExceptionCode;
 

@@ -7,20 +7,22 @@ use std::{
     ptr, slice,
 };
 
-use winapi::{
-    shared::minwindef::DWORD,
-    um::{
-        memoryapi::{ReadProcessMemory, VirtualAllocEx, VirtualFreeEx, WriteProcessMemory},
-        processthreadsapi::FlushInstructionCache,
-        sysinfoapi::GetSystemInfo,
-        winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PAGE_READWRITE},
+use windows_sys::Win32::System::{
+    Diagnostics::Debug::{FlushInstructionCache, ReadProcessMemory, WriteProcessMemory},
+    Memory::{
+        VirtualAllocEx, VirtualFreeEx, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
+        PAGE_EXECUTE_READWRITE, PAGE_READWRITE,
     },
+    SystemInformation::GetSystemInfo,
 };
 
 use crate::{
     process::{BorrowedProcess, Process},
     utils,
 };
+
+#[allow(clippy::upper_case_acronyms)]
+type DWORD = u32;
 
 /// A owned buffer in the memory space of a (remote) process.
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "process-memory")))]
@@ -88,7 +90,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
     ) -> Result<Self, io::Error> {
         let ptr = unsafe {
             VirtualAllocEx(
-                process.as_raw_handle(),
+                process.as_raw_handle() as isize,
                 ptr::null_mut(),
                 len,
                 allocation_type,
@@ -181,7 +183,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
     unsafe fn _free(&mut self) -> Result<(), io::Error> {
         let result = unsafe {
             VirtualFreeEx(
-                self.process.as_raw_handle(),
+                self.process.as_raw_handle() as isize,
                 self.as_ptr().cast(),
                 0,
                 MEM_RELEASE,
@@ -293,7 +295,7 @@ impl<'a> ProcessMemorySlice<'a> {
         let mut bytes_read = 0;
         let result = unsafe {
             ReadProcessMemory(
-                self.process.as_raw_handle(),
+                self.process.as_raw_handle() as isize,
                 self.ptr.add(offset).cast(),
                 buf.as_mut_ptr().cast(),
                 buf.len(),
@@ -340,7 +342,7 @@ impl<'a> ProcessMemorySlice<'a> {
         let mut bytes_written = 0;
         let result = unsafe {
             WriteProcessMemory(
-                self.process.as_raw_handle(),
+                self.process.as_raw_handle() as isize,
                 self.ptr.add(offset).cast(),
                 buf.as_ptr().cast(),
                 buf.len(),
@@ -410,7 +412,11 @@ impl<'a> ProcessMemorySlice<'a> {
     /// This may be necesary if the buffer is used to store dynamically generated code. For details see [`FlushInstructionCache`].
     pub fn flush_instruction_cache(&self) -> Result<(), io::Error> {
         let result = unsafe {
-            FlushInstructionCache(self.process.as_raw_handle(), self.as_ptr().cast(), self.len)
+            FlushInstructionCache(
+                self.process.as_raw_handle() as isize,
+                self.as_ptr().cast(),
+                self.len,
+            )
         };
         if result == 0 {
             Err(io::Error::last_os_error())

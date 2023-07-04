@@ -1,6 +1,10 @@
 use std::{fmt::Display, str::FromStr};
 
-use winapi::shared::minwindef::{__some_function, FARPROC};
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Copy)]
+pub enum __some_function {}
+#[allow(clippy::upper_case_acronyms)]
+type FARPROC = *mut __some_function;
 
 /// Type alias for a raw untyped function pointer.
 pub type RawFunctionPtr = FARPROC;

@@ -1,7 +1,5 @@
 use std::{cmp, io, mem::MaybeUninit, path::PathBuf};
 
-use winapi::shared::minwindef::MAX_PATH;
-
 use super::ArrayBuf;
 
 pub enum FillPathBufResult {
@@ -13,6 +11,7 @@ pub enum FillPathBufResult {
 pub fn win_fill_path_buf_helper(
     mut f: impl FnMut(*mut u16, usize) -> FillPathBufResult,
 ) -> Result<PathBuf, io::Error> {
+    const MAX_PATH: usize = 260;
     let mut buf = ArrayBuf::<u16, MAX_PATH>::new_uninit();
     match f(buf.as_mut_ptr(), buf.capacity()) {
         FillPathBufResult::BufTooSmall { mut size_hint } => {

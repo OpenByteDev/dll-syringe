@@ -12,16 +12,11 @@ use std::{
     time::Duration,
 };
 
-use winapi::{
-    shared::{
-        minwindef::{FALSE, HMODULE},
-        winerror::ERROR_PARTIAL_COPY,
-    },
-    um::{
-        handleapi::DuplicateHandle,
-        processthreadsapi::GetCurrentProcess,
-        psapi::{EnumProcessModulesEx, LIST_MODULES_ALL},
-        winnt::DUPLICATE_SAME_ACCESS,
+use windows_sys::Win32::{
+    Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS, ERROR_PARTIAL_COPY, FALSE, HMODULE},
+    System::{
+        ProcessStatus::{EnumProcessModulesEx, LIST_MODULES_ALL},
+        Threading::GetCurrentProcess,
     },
 };
 
@@ -214,7 +209,7 @@ impl<'a> BorrowedProcess<'a> {
         let result = unsafe {
             DuplicateHandle(
                 process,
-                raw_handle,
+                raw_handle as isize,
                 process,
                 new_handle.as_mut_ptr(),
                 0,
@@ -225,7 +220,9 @@ impl<'a> BorrowedProcess<'a> {
         if result == 0 {
             return Err(io::Error::last_os_error());
         }
-        Ok(unsafe { OwnedProcess::from_raw_handle(new_handle.assume_init()) })
+        Ok(unsafe {
+            OwnedProcess::from_raw_handle(new_handle.assume_init() as *mut std::ffi::c_void)
+        })
     }
 
     /// Returns a snapshot of the handles of the modules currently loaded in this process.
@@ -241,7 +238,7 @@ impl<'a> BorrowedProcess<'a> {
         loop {
             let result = unsafe {
                 EnumProcessModulesEx(
-                    self.as_raw_handle(),
+                    self.as_raw_handle() as isize,
                     module_buf.as_mut_ptr(),
                     module_buf_byte_size,
                     bytes_needed_new.as_mut_ptr(),
@@ -285,7 +282,7 @@ impl<'a> BorrowedProcess<'a> {
                 let mut bytes_needed_new = MaybeUninit::uninit();
                 let result = unsafe {
                     EnumProcessModulesEx(
-                        self.as_raw_handle(),
+                        self.as_raw_handle() as isize,
                         module_buf_vec.as_mut_ptr(),
                         module_buf_byte_size,
                         bytes_needed_new.as_mut_ptr(),
@@ -305,7 +302,9 @@ impl<'a> BorrowedProcess<'a> {
             }
         };
 
-        debug_assert!(modules.iter().all(|module| !module.is_null()));
+        debug_assert!(modules
+            .iter()
+            .all(|module| !((*module as *mut std::ffi::c_void).is_null())));
 
         Ok(modules.into_iter())
     }

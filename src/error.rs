@@ -5,23 +5,18 @@ use std::{
 
 use num_enum::{IntoPrimitive, TryFromPrimitive, TryFromPrimitiveError};
 use thiserror::Error;
-use winapi::um::{
-    minwinbase::{
-        EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EXCEPTION_BREAKPOINT,
-        EXCEPTION_DATATYPE_MISALIGNMENT, EXCEPTION_FLT_DENORMAL_OPERAND,
-        EXCEPTION_FLT_DIVIDE_BY_ZERO, EXCEPTION_FLT_INEXACT_RESULT,
-        EXCEPTION_FLT_INVALID_OPERATION, EXCEPTION_FLT_OVERFLOW, EXCEPTION_FLT_STACK_CHECK,
-        EXCEPTION_FLT_UNDERFLOW, EXCEPTION_GUARD_PAGE, EXCEPTION_ILLEGAL_INSTRUCTION,
-        EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW, EXCEPTION_INVALID_DISPOSITION,
-        EXCEPTION_INVALID_HANDLE, EXCEPTION_IN_PAGE_ERROR, EXCEPTION_NONCONTINUABLE_EXCEPTION,
-        EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP, EXCEPTION_STACK_OVERFLOW,
-    },
-    winnt::STATUS_UNWIND_CONSOLIDATE,
+use windows_sys::Win32::Foundation::{
+    ERROR_PARTIAL_COPY, EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ARRAY_BOUNDS_EXCEEDED,
+    EXCEPTION_BREAKPOINT, EXCEPTION_DATATYPE_MISALIGNMENT, EXCEPTION_FLT_DENORMAL_OPERAND,
+    EXCEPTION_FLT_DIVIDE_BY_ZERO, EXCEPTION_FLT_INEXACT_RESULT, EXCEPTION_FLT_INVALID_OPERATION,
+    EXCEPTION_FLT_OVERFLOW, EXCEPTION_FLT_STACK_CHECK, EXCEPTION_FLT_UNDERFLOW,
+    EXCEPTION_GUARD_PAGE, EXCEPTION_ILLEGAL_INSTRUCTION, EXCEPTION_INT_DIVIDE_BY_ZERO,
+    EXCEPTION_INT_OVERFLOW, EXCEPTION_INVALID_DISPOSITION, EXCEPTION_INVALID_HANDLE,
+    EXCEPTION_IN_PAGE_ERROR, EXCEPTION_NONCONTINUABLE_EXCEPTION, EXCEPTION_PRIV_INSTRUCTION,
+    EXCEPTION_SINGLE_STEP, EXCEPTION_STACK_OVERFLOW, STATUS_UNWIND_CONSOLIDATE,
 };
 
 #[cfg(feature = "syringe")]
-use winapi::shared::winerror::ERROR_PARTIAL_COPY;
-
 #[derive(Debug, Error)]
 /// Error enum representing either a windows api error or a nul error from an invalid interior nul.
 pub enum IoOrNulError {
@@ -56,57 +51,57 @@ pub enum GetLocalProcedureAddressError {
 /// Codes for unhandled windows exceptions from [msdn](https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode).
 pub enum ExceptionCode {
     /// The thread attempts to read from or write to a virtual address for which it does not have access.
-    AccessViolation = EXCEPTION_ACCESS_VIOLATION,
+    AccessViolation = EXCEPTION_ACCESS_VIOLATION as u32,
     /// The thread attempts to access an array element that is out of bounds, and the underlying hardware supports bounds checking.
-    ArrayBoundsExceeded = EXCEPTION_ARRAY_BOUNDS_EXCEEDED,
+    ArrayBoundsExceeded = EXCEPTION_ARRAY_BOUNDS_EXCEEDED as u32,
     /// A breakpoint is encountered.
-    Breakpoint = EXCEPTION_BREAKPOINT,
+    Breakpoint = EXCEPTION_BREAKPOINT as u32,
     /// The thread attempts to read or write data that is misaligned on hardware that does not provide alignment.
     /// For example, 16-bit values must be aligned on 2-byte boundaries, 32-bit values on 4-byte boundaries, and so on.
-    DatatypeMisalignment = EXCEPTION_DATATYPE_MISALIGNMENT,
+    DatatypeMisalignment = EXCEPTION_DATATYPE_MISALIGNMENT as u32,
     /// One of the operands in a floating point operation is denormal.
     /// A denormal value is one that is too small to represent as a standard floating point value.
-    FltDenormalOperand = EXCEPTION_FLT_DENORMAL_OPERAND,
+    FltDenormalOperand = EXCEPTION_FLT_DENORMAL_OPERAND as u32,
     /// The thread attempts to divide a floating point value by a floating point divisor of 0 (zero).
-    FltDivideByZero = EXCEPTION_FLT_DIVIDE_BY_ZERO,
+    FltDivideByZero = EXCEPTION_FLT_DIVIDE_BY_ZERO as u32,
     /// The result of a floating point operation cannot be represented exactly as a decimal fraction.
-    FltInexactResult = EXCEPTION_FLT_INEXACT_RESULT,
+    FltInexactResult = EXCEPTION_FLT_INEXACT_RESULT as u32,
     /// A floating point exception that is not included in this list.
-    FltInvalidOperation = EXCEPTION_FLT_INVALID_OPERATION,
+    FltInvalidOperation = EXCEPTION_FLT_INVALID_OPERATION as u32,
     /// The exponent of a floating point operation is greater than the magnitude allowed by the corresponding type.
-    FltOverflow = EXCEPTION_FLT_OVERFLOW,
+    FltOverflow = EXCEPTION_FLT_OVERFLOW as u32,
     /// The stack has overflowed or underflowed, because of a floating point operation.
-    FltStackCheck = EXCEPTION_FLT_STACK_CHECK,
+    FltStackCheck = EXCEPTION_FLT_STACK_CHECK as u32,
     /// The exponent of a floating point operation is less than the magnitude allowed by the corresponding type.
-    FltUnderflow = EXCEPTION_FLT_UNDERFLOW,
+    FltUnderflow = EXCEPTION_FLT_UNDERFLOW as u32,
     /// The thread accessed memory allocated with the PAGE_GUARD modifier.
-    GuardPage = EXCEPTION_GUARD_PAGE,
+    GuardPage = EXCEPTION_GUARD_PAGE as u32,
     /// The thread tries to execute an invalid instruction.
-    IllegalInstruction = EXCEPTION_ILLEGAL_INSTRUCTION,
+    IllegalInstruction = EXCEPTION_ILLEGAL_INSTRUCTION as u32,
     /// The thread tries to access a page that is not present, and the system is unable to load the page.
     /// For example, this exception might occur if a network connection is lost while running a program over a network.
-    InPageError = EXCEPTION_IN_PAGE_ERROR,
+    InPageError = EXCEPTION_IN_PAGE_ERROR as u32,
     /// The thread attempts to divide an integer value by an integer divisor of 0 (zero).
-    IntegerDivideByZero = EXCEPTION_INT_DIVIDE_BY_ZERO,
+    IntegerDivideByZero = EXCEPTION_INT_DIVIDE_BY_ZERO as u32,
     /// The result of an integer operation creates a value that is too large to be held by the destination register.
     /// In some cases, this will result in a carry out of the most significant bit of the result.
     /// Some operations do not set the carry flag.
-    IntegerOverflow = EXCEPTION_INT_OVERFLOW,
+    IntegerOverflow = EXCEPTION_INT_OVERFLOW as u32,
     /// An exception handler returns an invalid disposition to the exception dispatcher.
     /// Programmers using a high-level language such as C should never encounter this exception.
-    InvalidDisposition = EXCEPTION_INVALID_DISPOSITION,
+    InvalidDisposition = EXCEPTION_INVALID_DISPOSITION as u32,
     /// The thread used a handle to a kernel object that was invalid (probably because it had been closed.)
-    InvalidHandle = EXCEPTION_INVALID_HANDLE,
+    InvalidHandle = EXCEPTION_INVALID_HANDLE as u32,
     /// The thread attempts to continue execution after a non-continuable exception occurs.
-    NoncontinuableException = EXCEPTION_NONCONTINUABLE_EXCEPTION,
+    NoncontinuableException = EXCEPTION_NONCONTINUABLE_EXCEPTION as u32,
     /// The thread attempts to execute an instruction with an operation that is not allowed in the current computer mode.
-    PrivilegedInstruction = EXCEPTION_PRIV_INSTRUCTION,
+    PrivilegedInstruction = EXCEPTION_PRIV_INSTRUCTION as u32,
     /// A trace trap or other single instruction mechanism signals that one instruction is executed.
-    SingleStep = EXCEPTION_SINGLE_STEP,
+    SingleStep = EXCEPTION_SINGLE_STEP as u32,
     /// The thread uses up its stack.
-    StackOverflow = EXCEPTION_STACK_OVERFLOW,
+    StackOverflow = EXCEPTION_STACK_OVERFLOW as u32,
     /// A frame consolidation has been executed.
-    UnwindConsolidate = STATUS_UNWIND_CONSOLIDATE,
+    UnwindConsolidate = STATUS_UNWIND_CONSOLIDATE as u32,
 }
 
 impl ExceptionCode {
