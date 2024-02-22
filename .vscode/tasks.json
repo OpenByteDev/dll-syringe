@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Test on Windows",
+      "type": "shell",
+      "command": "pwsh ./scripts/test.ps1",
+    },
+    {
+      "label": "Clean",
+      "type": "shell",
+      "command": "pwsh ./scripts/clean.ps1",
+    },
+    {
+      "label": "Test on Wine (See Readme)",
+      "type": "shell",
+      "command": "pwsh ./scripts/test-wine.ps1",
+    },
+  ]
+}
