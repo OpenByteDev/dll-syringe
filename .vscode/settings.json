@@ -1,0 +1,11 @@
+{
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "[rust]": {
+        "editor.formatOnSave": true
+    },
+    "rust-analyzer.linkedProjects": [
+        "Cargo.toml",
+        "tests/helpers/test_payload/Cargo.toml",
+        "tests/helpers/test_target/Cargo.toml",
+    ]
+}

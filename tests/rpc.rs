@@ -9,11 +9,11 @@ mod core {
     pub use super::*;
     use std::time::Duration;
 
-    process_test! {
+    suspended_process_test! {
         fn get_procedure_address_of_win32_fn(
             process: OwnedProcess,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
 
             let module = syringe.process().wait_for_module_by_name("kernel32.dll", Duration::from_secs(1)).unwrap().unwrap();
             let open_process = syringe.get_procedure_address(
@@ -29,7 +29,7 @@ mod core {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let dll_main = syringe.get_procedure_address(module, "DllMain").unwrap();
@@ -37,11 +37,11 @@ mod core {
         }
     }
 
-    process_test! {
+    suspended_process_test! {
         fn get_procedure_address_of_invalid(
             process: OwnedProcess,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.process().wait_for_module_by_name("kernel32.dll", Duration::from_secs(1)).unwrap().unwrap();
             let invalid = syringe.get_procedure_address(module, "ProcedureThatDoesNotExist").unwrap();
             assert!(invalid.is_none());
@@ -59,7 +59,7 @@ mod payload {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_add = unsafe { syringe.get_payload_procedure::<fn(u32, u32) -> u32>(module, "add") }.unwrap().unwrap();
@@ -73,7 +73,7 @@ mod payload {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_sum = unsafe { syringe.get_payload_procedure::<fn(Vec<u64>) -> u64>(module, "sum") }.unwrap().unwrap();
@@ -87,7 +87,7 @@ mod payload {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_does_panic = unsafe { syringe.get_payload_procedure::<fn()>(module, "does_panic") }.unwrap().unwrap();
@@ -114,7 +114,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_add = unsafe { syringe.get_raw_procedure::<extern "system" fn(u32, u32) -> u32>(module, "add_raw") }.unwrap().unwrap();
@@ -128,7 +128,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_sub = unsafe { syringe.get_raw_procedure::<extern "system" fn(u32, u32) -> u32>(module, "sub_raw") }.unwrap().unwrap();
@@ -142,7 +142,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_add = unsafe { syringe.get_raw_procedure::<extern "system" fn(u16, u8) -> u16>(module, "add_smol_raw") }.unwrap().unwrap();
@@ -156,7 +156,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_sum = unsafe { syringe.get_raw_procedure::<extern "system" fn(u32, u32, u32, u32, u32) -> u32>(module, "sum_5_raw") }.unwrap().unwrap();
@@ -170,7 +170,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_sum = unsafe { syringe.get_raw_procedure::<extern "system" fn(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32) -> u32>(module, "sum_10_raw") }.unwrap().unwrap();
@@ -184,7 +184,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_sub = unsafe { syringe.get_raw_procedure::<extern "system" fn(f32, f32) -> f32>(module, "sub_float_raw") }.unwrap().unwrap();
@@ -198,7 +198,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_add = unsafe { syringe.get_raw_procedure::<extern "C" fn(u32, u32) -> u32>(module, "add_raw_c") }.unwrap().unwrap();
@@ -212,7 +212,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_sum = unsafe { syringe.get_raw_procedure::<extern "C" fn(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32) -> u32>(module, "sum_10_raw_c") }.unwrap().unwrap();
@@ -226,7 +226,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
             let remote_add = unsafe { syringe.get_raw_procedure::<extern "C" fn(u32, u32) -> u32>(module, "add_raw_c") }.unwrap().unwrap();
             syringe.eject(module).unwrap();
@@ -240,7 +240,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
             let remote_add = unsafe { syringe.get_raw_procedure::<extern "C" fn(u32, u32) -> u32>(module, "add_raw_c") }.unwrap().unwrap();
             syringe.process().kill().unwrap();
@@ -254,7 +254,7 @@ mod raw {
             process: OwnedProcess,
             payload_path: &Path,
         ) {
-            let syringe = Syringe::for_process(process);
+            let syringe = Syringe::for_suspended_process(process).unwrap();
             let module = syringe.inject(payload_path).unwrap();
             let remote_add = unsafe { syringe.get_raw_procedure::<extern "C" fn()>(module, "crash") }.unwrap().unwrap();
             let add_err = remote_add.call().unwrap_err();
