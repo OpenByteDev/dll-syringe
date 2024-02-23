@@ -163,12 +163,17 @@ fn is_running_under_wine() -> bool {
     }
 }
 
+// winapi crate doesn't have this.
+// This is in ntdll, so already loaded for every Windows process.
+extern "system" {
+    fn RtlGetVersion(lpVersionInformation: &mut OSVERSIONINFOW) -> u32;
+}
+
 fn is_older_than_windows_10() -> bool {
     unsafe {
-        let version = GetVersion();
-        let major = (version & 0xFF) as u8;
-
-        // Windows 10 is version 10.0. Threshold for older versions is any major version less than 10.
-        major < 10
+        let mut os_info: OSVERSIONINFOW = zeroed();
+        os_info.dwOSVersionInfoSize = size_of::<OSVERSIONINFOW>() as u32;
+        RtlGetVersion(&mut os_info);
+        os_info.dwMajorVersion < 10
     }
 }
