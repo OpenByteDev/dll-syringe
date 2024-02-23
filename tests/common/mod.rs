@@ -1,44 +1,30 @@
 use std::{
+    env::{current_dir, var},
     error::Error,
+    fs::{canonicalize, remove_file, File},
+    io::{copy, ErrorKind},
     path::PathBuf,
     process::{Command, Stdio},
     str::FromStr,
+    sync::Mutex,
 };
 
+static mut RUST_INSTALL_LOCK: Mutex<i32> = Mutex::new(0);
+
 pub fn build_test_payload_x86() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate(
-        "test_payload",
-        Some(&find_x86_variant_of_target()),
-        false,
-        "dll",
-    )
+    build_helper_crate("test_payload", &find_x86_variant_of_target(), false, "dll")
 }
 
 pub fn build_test_target_x86() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate(
-        "test_target",
-        Some(&find_x86_variant_of_target()),
-        false,
-        "exe",
-    )
+    build_helper_crate("test_target", &find_x86_variant_of_target(), false, "exe")
 }
 
 pub fn build_test_payload_x64() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate(
-        "test_payload",
-        Some(&find_x64_variant_of_target()),
-        false,
-        "dll",
-    )
+    build_helper_crate("test_payload", &find_x64_variant_of_target(), false, "dll")
 }
 
 pub fn build_test_target_x64() -> Result<PathBuf, Box<dyn Error>> {
-    build_helper_crate(
-        "test_target",
-        Some(&find_x64_variant_of_target()),
-        false,
-        "exe",
-    )
+    build_helper_crate("test_target", &find_x64_variant_of_target(), false, "exe")
 }
 
 fn find_x64_variant_of_target() -> String {
@@ -51,7 +37,7 @@ fn find_x86_variant_of_target() -> String {
 
 pub fn build_helper_crate(
     crate_name: &str,
-    target: Option<&str>,
+    target: &str,
     release: bool,
     ext: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
@@ -59,35 +45,47 @@ pub fn build_helper_crate(
         .join(crate_name)
         .canonicalize()?;
 
-    let mut command = Command::new("cargo");
-    command
-        .arg("build")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    if let Some(target) = target {
-        command.arg("--target").arg(target);
+    // For cross/wine testing, we precompile in external script.
+    if !is_cross() {
+        let mut command = Command::new("cargo");
+        command
+            .arg("build")
+            .arg("--target")
+            .arg(target)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+    
+        let exit_code = command.current_dir(&payload_crate_path).spawn()?.wait()?;
+        assert!(
+            exit_code.success(),
+            "Failed to build helper crate {} for target {}",
+            crate_name,
+            target
+        );
     }
-    let exit_code = command.current_dir(&payload_crate_path).spawn()?.wait()?;
-    assert!(
-        exit_code.success(),
-        "Failed to build helper crate {} for target {}",
-        crate_name,
-        target.unwrap_or("default")
-    );
 
     let mut payload_artifact_path = payload_crate_path;
     payload_artifact_path.push("target");
-
-    if let Some(target) = target {
-        payload_artifact_path.push(target);
-    }
-
+    payload_artifact_path.push(target);
     payload_artifact_path.push(if release { "release" } else { "debug" });
     payload_artifact_path.push(format!("{crate_name}.{ext}"));
-    assert!(&payload_artifact_path.exists());
+    assert!(&payload_artifact_path.exists(), "Artifact doesn't exist! {:?}", &payload_artifact_path);
 
     Ok(payload_artifact_path)
+}
+
+/// Detects cross-rs.
+///
+/// Remarks:
+///
+/// I wish I could install Rust itself via `Rustup` here, but the Ubuntu image that ships with
+/// `cross` doesn't have the right packages to support encryption, thus we can't download toolchains
+/// (I tried). And I also didn't have good luck with pre-build step and downloading extra packages.
+///
+/// So as a compromise, we build the test binaries outside for testing from Linux.
+fn is_cross() -> bool {
+    return var("CROSS_SYSROOT").is_ok();
 }
 
 #[macro_export]

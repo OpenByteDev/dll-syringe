@@ -1,5 +1,6 @@
 use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
-use std::{fs, mem, time::Duration};
+use winapi::um::{libloaderapi::{GetProcAddress, LoadLibraryA}, sysinfoapi::GetVersion};
+use std::{fs, mem, time::Duration, ffi::CString};
 
 #[allow(unused)]
 mod common;
@@ -91,6 +92,11 @@ process_test! {
     fn long_process_paths_are_supported(
         process: OwnedProcess
     ) {
+        if is_running_under_wine() || is_older_than_windows_10() {
+            println!("Test skipped due to running under an environment with unsupported long paths. (Wine or older than Windows 10).");
+            return;
+        }
+
         let process_path = process.path().unwrap();
         process.kill().unwrap();
 
@@ -137,4 +143,28 @@ fn current_pseudo_process_eq_current_process() {
     assert_eq!(pseudo, normal);
     assert_eq!(pseudo.try_to_owned().unwrap(), normal);
     assert_eq!(pseudo, normal.try_clone().unwrap());
+}
+
+fn is_running_under_wine() -> bool {
+    unsafe {
+        let ntdll = CString::new("ntdll.dll").unwrap();
+        let lib = LoadLibraryA(ntdll.as_ptr());
+        if !lib.is_null() {
+            let func_name = CString::new("wine_get_version").unwrap();
+            let func = GetProcAddress(lib, func_name.as_ptr());
+            !func.is_null()
+        } else {
+            false
+        }
+    }
+}
+
+fn is_older_than_windows_10() -> bool {
+    unsafe {
+        let version = GetVersion();
+        let major = (version & 0xFF) as u8;
+
+        // Windows 10 is version 10.0. Threshold for older versions is any major version less than 10.
+        major < 10
+    }
 }

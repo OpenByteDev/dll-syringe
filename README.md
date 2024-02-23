@@ -42,11 +42,11 @@ syringe.eject(injected_payload).unwrap();
 ## Remote Procedure Calls (RPC)
 This crate supports two mechanisms for rpc. Both only work one-way for calling exported functions in the target process and are only intended for one-time initialization usage. For extended communication a dedicated rpc library should be used.
 
-|                  | `RemotePayloadProcedure`        | `RemoteRawProcedure` |
-| ---------------- | ------------------------------ | ------------------------------------------ |
-| Feature | `rpc-payload` | `rpc-raw` |
-| Argument and Return Requirements | `Serialize + DeserializeOwned` | `Copy`, Argument size has to be smaller than `usize` in target process |
-| Function Definition       | Using macro `payload_procedure!` | Any `extern "system"` or `extern "C"` with `#[no_mangle]` |
+|                                  | `RemotePayloadProcedure`         | `RemoteRawProcedure`                                                   |
+| -------------------------------- | -------------------------------- | ---------------------------------------------------------------------- |
+| Feature                          | `rpc-payload`                    | `rpc-raw`                                                              |
+| Argument and Return Requirements | `Serialize + DeserializeOwned`   | `Copy`, Argument size has to be smaller than `usize` in target process |
+| Function Definition              | Using macro `payload_procedure!` | Any `extern "system"` or `extern "C"` with `#[no_mangle]`              |
 
 ### RemotePayloadProcedure
 A rpc mechanism based on [`bincode`](https://crates.io/crates/bincode).
@@ -119,6 +119,36 @@ syringe.eject(injected_payload).unwrap();
 ## License
 Licensed under MIT license ([LICENSE](https://github.com/OpenByteDev/dll-syringe/blob/master/LICENSE) or http://opensource.org/licenses/MIT)
 
+## Instructions for Contributors
+
+### Prerequisites
+
+You will need the nightly toolchains of Rust and Cargo to build/test this project.
+
+```
+rustup target add x86_64-pc-windows-msvc --toolchain nightly
+rustup target add i686-pc-windows-msvc --toolchain nightly
+```
+
+> [!NOTE]
+> Also applies to developing on Linux, you'll need it for your IDE (i.e. rust-analyzer or RustRover) to work properly.
+
+### Run Tests
+
+Run the `./scripts/test.ps1` script from PowerShell.
+
+### Running Tests on Linux
+
+You'll need `cargo xwin` to build the MSVC targets on Linux:
+
+```
+cargo install cargo-xwin
+```
+
+After that, you can run the tests with `./scripts/test-wine.ps1` PowerShell script.
+(As opposed to `./scripts/test.ps1`)
+
+Make sure you have Wine installed!
+
 ## Attribution
 Inspired by [Reloaded.Injector](https://github.com/Reloaded-Project/Reloaded.Injector) from [Sewer](https://github.com/Sewer56).
- 
