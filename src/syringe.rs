@@ -128,12 +128,12 @@ impl Syringe {
 
         // Thankfully we can 'initialize' this suspended process without running any end user logic
         // (e.g. a game's entry point) by creating a dummy method and invoking it.
-        let ret = 0xC3;
+        let ret: u8 = 0xC3;
         let bx = syringe.remote_allocator.alloc_and_copy(&ret)?;
-        let mut dummy_param = 0;
-        syringe
-            .process()
-            .run_remote_thread(unsafe { mem::transmute(bx.as_raw_ptr()) }, &mut dummy_param)?;
+        syringe.process().run_remote_thread(
+            unsafe { mem::transmute(bx.as_raw_ptr()) },
+            std::ptr::null::<u8>() as *mut u8,
+        )?;
 
         Ok(syringe)
     }
