@@ -33,7 +33,7 @@ syringe_test! {
         process: OwnedProcess,
         payload_path: &Path,
     ) {
-        let syringe = Syringe::for_process(process);
+        let syringe = Syringe::for_suspended_process(process).unwrap();
         let module = syringe.inject(payload_path).unwrap();
         assert!(module.guess_is_loaded());
     }
@@ -45,7 +45,7 @@ syringe_test! {
         process: OwnedProcess,
         payload_path: &Path,
     ) {
-        let syringe = Syringe::for_process(process);
+        let syringe = Syringe::for_suspended_process(process).unwrap();
         let module = syringe.inject(payload_path).unwrap();
         syringe.eject(module).unwrap();
         assert!(!module.try_guess_is_loaded().unwrap());
@@ -58,7 +58,7 @@ syringe_test! {
         process: OwnedProcess,
         payload_path: &Path,
     ) {
-        let syringe = Syringe::for_process(process);
+        let syringe = Syringe::for_suspended_process(process).unwrap();
         let module = syringe.inject(payload_path).unwrap();
         syringe.process().kill().unwrap();
         assert!(!module.try_guess_is_loaded().unwrap());

@@ -1,6 +1,10 @@
+use core::mem::{size_of, zeroed};
 use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
-use winapi::um::{libloaderapi::{GetProcAddress, LoadLibraryA}, sysinfoapi::GetVersion};
-use std::{fs, mem, time::Duration, ffi::CString};
+use std::{ffi::CString, fs, mem, process::Command, time::Duration};
+use winapi::um::{
+    libloaderapi::{GetProcAddress, LoadLibraryA},
+    winnt::OSVERSIONINFOW,
+};
 
 #[allow(unused)]
 mod common;
@@ -29,7 +33,7 @@ process_test! {
     }
 }
 
-process_test! {
+suspended_process_test! {
     fn list_module_handles_on_crashed_does_not_hang(
         process: OwnedProcess
     ) {
@@ -39,7 +43,7 @@ process_test! {
     }
 }
 
-process_test! {
+suspended_process_test! {
     fn is_alive_is_true_for_running(
         process: OwnedProcess
     ) {
@@ -49,7 +53,7 @@ process_test! {
     }
 }
 
-process_test! {
+suspended_process_test! {
     fn is_alive_is_false_for_killed(
         process: OwnedProcess
     ) {
@@ -77,7 +81,7 @@ process_test! {
     }
 }
 
-process_test! {
+suspended_process_test! {
     fn kill_guard_kills_process_on_drop(
         process: OwnedProcess
     ) {
@@ -88,7 +92,7 @@ process_test! {
     }
 }
 
-process_test! {
+suspended_process_test! {
     fn long_process_paths_are_supported(
         process: OwnedProcess
     ) {
