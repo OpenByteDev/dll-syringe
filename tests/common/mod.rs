@@ -87,7 +87,7 @@ pub fn build_helper_crate(
 ///
 /// So as a compromise, we build the test binaries outside for testing from Linux.
 fn is_cross() -> bool {
-    return var("CROSS_SYSROOT").is_ok();
+    var("CROSS_SYSROOT").is_ok()
 }
 
 #[macro_export]
