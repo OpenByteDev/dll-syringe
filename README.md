@@ -9,6 +9,11 @@
 A windows dll injection library written in Rust.
 
 ## Supported scenarios
+
+> [!WARNING]
+> Although tests currently pass, some uses of 64-bit into 32-bit may potentially fail on 
+> Linux (WINE) due to [Wine Bug #56362](https://bugs.winehq.org/show_bug.cgi?id=56362).
+
 | Injector Process | Target Process | Supported?                                 |
 | ---------------- | -------------- | ------------------------------------------ |
 | 32-bit           | 32-bit         | Yes                                        |
