@@ -9,8 +9,6 @@ use std::{
     sync::Mutex,
 };
 
-static mut RUST_INSTALL_LOCK: Mutex<i32> = Mutex::new(0);
-
 pub fn build_test_payload_x86() -> Result<PathBuf, Box<dyn Error>> {
     build_helper_crate("test_payload", &find_x86_variant_of_target(), false, "dll")
 }
@@ -55,7 +53,7 @@ pub fn build_helper_crate(
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
-    
+
         let exit_code = command.current_dir(&payload_crate_path).spawn()?.wait()?;
         assert!(
             exit_code.success(),
@@ -70,7 +68,11 @@ pub fn build_helper_crate(
     payload_artifact_path.push(target);
     payload_artifact_path.push(if release { "release" } else { "debug" });
     payload_artifact_path.push(format!("{crate_name}.{ext}"));
-    assert!(&payload_artifact_path.exists(), "Artifact doesn't exist! {:?}", &payload_artifact_path);
+    assert!(
+        &payload_artifact_path.exists(),
+        "Artifact doesn't exist! {:?}",
+        &payload_artifact_path
+    );
 
     Ok(payload_artifact_path)
 }
