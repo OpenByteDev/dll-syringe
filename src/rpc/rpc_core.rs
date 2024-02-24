@@ -1,5 +1,4 @@
-use iced_x86::{code_asm::*, IcedError};
-
+use iced_x86::code_asm::*;
 use std::{
     ffi::CString,
     mem,
@@ -83,6 +82,7 @@ impl Syringe {
                 .unwrap()
             };
             let function_stub = self.remote_allocator.alloc_and_copy_buf(code.as_slice())?;
+            #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
             function_stub.memory().flush_instruction_cache()?;
 
             Ok(RemoteProcedureStub {
