@@ -48,6 +48,10 @@ pub mod error;
 /// Module containing traits and types for working with function pointers.
 pub mod function;
 
+/// C exports for the library.
+#[cfg(feature = "c-exports")]
+pub mod c_exports;
+
 #[cfg(feature = "payload-utils")]
 #[doc(hidden)]
 pub mod payload_utils;
