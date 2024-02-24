@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="Reloaded.Project.Configurations/NuGet.Build.props" />
+  
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <AssemblyName>dll_syringe.Net.Sys</AssemblyName>
+    <RootNamespace>dll_syringe.Net.Sys</RootNamespace>
+    <PackageProjectUrl>https://github.com/OpenByteDev/dll-syringe</PackageProjectUrl>
+    <Description>A windows dll injection library written in Rust. (Raw C# Bindings).</Description>
+    <Version>0.16.0</Version>
+    <Authors></Authors>
+    <Product>dll-syringe</Product>
+
+    <!-- Common Settings -->
+    <LangVersion>preview</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <!-- <PackageIcon>nuget-icon.png</PackageIcon> -->
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)/../../LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>/</PackagePath>
+    </None>
+    <None Include="$(MSBuildThisFileDirectory)nuget-icon.png">
+      <Pack>True</Pack>
+      <PackagePath>/</PackagePath>
+    </None>
+    <None Include="runtimes\**\*" Pack="true" PackagePath="runtimes" />
+  </ItemGroup>
+
+</Project>
