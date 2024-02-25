@@ -54,7 +54,7 @@ payload-utils = ["bincode", "serde"]
 syringe = ["iced-x86"]
 full = ["into-x86-from-x64", "rpc", "process-memory", "payload-utils"]
 doc-cfg = ["full"]
-c-exports = []
+c-exports = ["syringe"]
 
 [package.metadata.docs.rs]
 targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
