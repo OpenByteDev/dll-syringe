@@ -28,6 +28,10 @@ jobs:
       with:
         targets: ${{ matrix.target }}
 
+    # We need this because we also text x64-to-x86 injection.
+    - name: Add i686 Rust Target
+      run: rustup target add i686-pc-windows-msvc --toolchain nightly
+
     - name: Can Build
       run: cargo build --target ${{ matrix.target }}
       
