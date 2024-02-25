@@ -5,15 +5,16 @@ use std::os::raw::c_char;
 use std::path::Path;
 use std::ptr::null_mut;
 
+// Note: Don't specify [repr(C)] for these structs, as they are not passed to C code.
+// The C code only interacts with pointers to these structs.
+
 /// Represents an instance of a Syringe for a target process.
-#[repr(C)]
 #[derive(Debug)]
 pub struct CSyringe {
     syringe: Syringe,
 }
 
 /// Represents a module within a process, allowing for ejection of a previously injected module.
-#[repr(C)]
 #[derive(Debug)]
 pub struct CProcessModule<'a> {
     module: BorrowedProcessModule<'a>,

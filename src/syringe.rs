@@ -27,7 +27,7 @@ use crate::{
 #[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
 use {
     goblin::pe::PE,
-    std::{convert::TryInto, fs, mem::MaybeUninit, path::PathBuf, time::Duration},
+    std::{fs, mem::MaybeUninit, path::PathBuf, time::Duration},
     widestring::U16Str,
     winapi::{shared::minwindef::MAX_PATH, um::wow64apiset::GetSystemWow64DirectoryW},
 };

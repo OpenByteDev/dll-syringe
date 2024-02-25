@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master,add-c-exports ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,49 +18,117 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolchain: ["nightly"]
         os: ["windows-latest"]
         target: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
-        include:
-          - target: x86_64-pc-windows-msvc
-            target32: i686-pc-windows-msvc
     steps:
-    - uses: actions/checkout@v2
-    
-    - name: Install latest rust ${{ matrix.toolchain }} for ${{ matrix.target }}
-      uses: actions-rs/toolchain@v1
+    - uses: actions/checkout@v4
+  
+    - name: Install Nightly Rust
+      uses: dtolnay/rust-toolchain@nightly
       with:
-          target: ${{ matrix.target }}
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-          
-    - name: Install latest rust ${{ matrix.toolchain }} for x86 version of target
-      if: matrix.target32
-      uses: actions-rs/toolchain@v1
-      with:
-          target: ${{ matrix.target32 }}
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-      
-    - name: Build
+        targets: ${{ matrix.target }}
+
+    - name: Can Build
       run: cargo build --target ${{ matrix.target }}
       
-    - name: Build test target
-      run: cargo build --target ${{ matrix.target }} --manifest-path "tests/helpers/test_target/Cargo.toml" --all-targets
-    - name: Build test payload
-      run: cargo build --target ${{ matrix.target }} --manifest-path "tests/helpers/test_payload/Cargo.toml" --all-targets
+    - name: Can Build test target
+      run: cargo build --target ${{ matrix.target }} --manifest-path "tests/helpers/test_target/Cargo.toml"
+    - name: Can Build test payload
+      run: cargo build --target ${{ matrix.target }} --manifest-path "tests/helpers/test_payload/Cargo.toml"
       
     - name: Test
-      run: cargo test --target ${{ matrix.target }} --all-targets --all-features -- --nocapture
+      run: cargo test --target ${{ matrix.target }} --all-features -- --nocapture
       
-    - name: Build (default features)
-      run: cargo build --target ${{ matrix.target }} --all-targets
-    - name: Build (no features)
-      run: cargo build --target ${{ matrix.target }} --no-default-features --all-targets
-    - name: Build (feature syringe)
-      run: cargo build --target ${{ matrix.target }} --features syringe --all-targets
-    - name: Build (feature rpc)
-      run: cargo build --target ${{ matrix.target }} --features rpc --all-targets
+    - name: Can Build (no features)
+      run: cargo build --target ${{ matrix.target }} --no-default-features
+    - name: Can Build (feature syringe)
+      run: cargo build --target ${{ matrix.target }} --no-default-features --features syringe
+    - name: Can Build (feature rpc)
+      run: cargo build --target ${{ matrix.target }} --no-default-features --features rpc
+
+  test-on-wine:
+    runs-on: ubuntu-latest
+  
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+  
+      # Install Rust nightly toolchain
+      - name: Install Nightly Rust
+        uses: dtolnay/rust-toolchain@nightly
+  
+      # Add Windows MSVC targets
+      - name: Add Rust targets
+        run: |
+          rustup target add x86_64-pc-windows-msvc --toolchain nightly
+          rustup target add i686-pc-windows-msvc --toolchain nightly
+  
+      # Install cargo-xwin
+      - name: Install cargo-xwin
+        run: cargo install cargo-xwin
+  
+      # Run tests with Wine
+      - name: Run tests on Wine
+        run: ./scripts/test-wine.ps1
+        shell: pwsh
+
+  build-c-libs:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            use_cross: false
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+            use_cross: false
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - id: build-libs
+        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/build-c-library@v1 # upgrade if needed
+        with:
+          target: ${{ matrix.target }}
+          use_pgo: false
+          use_cross: ${{ matrix.use_cross }}
+          features: "c-exports"
+
+  build-c-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Generate C++ bindings
+        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/generate-bindings@v1
+        with:
+          config_file: cbindgen_cpp.toml
+          header_file: bindings_cpp.hpp
+  
+      - name: Generate C bindings
+        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/generate-bindings@v1
+        with:
+          config_file: cbindgen_c.toml
+          header_file: bindings_c.h
+
+  build-dotnet-library:
+    needs: build-c-libs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build and Package .NET Library
+        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/build-dotnet-library@dotnet-bindings
+        with:
+          targets: 'x86_64-pc-windows-msvc,i686-pc-windows-msvc'
 
   documentation:
     runs-on: ${{ matrix.os }}
@@ -67,19 +136,25 @@ jobs:
       matrix:
         os: ["windows-latest"]
     steps:
-    - uses: actions/checkout@v2
-    - name: Install latest nightly
-      uses: actions-rs/toolchain@v1
+    - uses: actions/checkout@v4
       with:
-          profile: minimal
-          toolchain: nightly
-          override: true
+        submodules: recursive
+    
+    - name: Install Nightly Rust
+      uses: dtolnay/rust-toolchain@nightly
+
+    # Add Windows MSVC targets
+    - name: Add Rust targets
+      run: |
+        rustup target add x86_64-pc-windows-msvc --toolchain nightly
+        rustup target add i686-pc-windows-msvc --toolchain nightly
+      
     - name: Generate documentation
-      run: cargo doc --all-features
+      run: cargo +nightly doc --all-features
     - name: Install cargo-deadlinks
-      run: cargo install cargo-deadlinks
+      run: cargo +nightly install cargo-deadlinks
     - name: Check dead links in doc
-      run: cargo deadlinks
+      run: cargo +nightly deadlinks
 
   clippy:
     runs-on: ${{ matrix.os }}
@@ -87,13 +162,81 @@ jobs:
       matrix:
         os: ["windows-latest"]
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
         with:
-            toolchain: nightly
-            components: clippy
-            override: true
-      - uses: actions-rs/clippy-check@v1
+          submodules: recursive
+
+      - name: Install Nightly Rust
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+          components: clippy
+
+      - uses: giraffate/clippy-action@v1
+        with:
+          reporter: 'github-pr-review'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+  
+  publish-crate:
+    permissions:
+      contents: write
+
+    needs: [test,build-c-libs,build-c-headers,test-on-wine,build-dotnet-library]
+    # Publish only on tags
+    if: startsWith(github.ref, 'refs/tags/') 
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: ↙️ Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload to NuGet
+        shell: pwsh
+        run: |
+          $items = Get-ChildItem -Path "artifacts/**.nupkg" -Recurse
+          Foreach ($item in $items)
+          {
+              Write-Host "Pushing $item"
+              dotnet nuget push "$item" -k "${{ secrets.NUGET_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
+          }
+
+          $items = Get-ChildItem -Path "artifacts/**.snupkg" -Recurse
+          Foreach ($item in $items)
+          {
+              Write-Host "Pushing Symbol Package $item"
+              dotnet nuget push "$item" -k "${{ secrets.NUGET_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
+          }
+
+      - name: Compress Artifacts
+        shell: bash
+        run: |
+          dir="artifacts"
+          if [ ! -d "$dir" ]; then
+            echo "Directory $dir does not exist. No artifacts found."
+            exit 0
+          fi
+
+          for subdir in "$dir"/*; do
+            if [ -d "$subdir" ]; then
+              base=$(basename "$subdir")
+              zip -r "$dir/$base.zip" "$subdir"
+              rm -r "$subdir"
+            fi
+          done
+          ls -A ./artifacts
+
+      - name: GitHub Release Artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/*
+
+
+      - name: Publish to crates.io
+        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/publish-crate@v1
+        with:
+          token: ${{ secrets.CRATES_IO_TOKEN }}

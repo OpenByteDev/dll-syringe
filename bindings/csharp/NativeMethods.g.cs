@@ -52,13 +52,11 @@ namespace dll_syringe.Net.Sys
     [StructLayout(LayoutKind.Sequential)]
     public unsafe partial struct CSyringe
     {
-        public Syringe syringe;
     }
 
     [StructLayout(LayoutKind.Sequential)]
     public unsafe partial struct CProcessModule
     {
-        public BorrowedProcessModule module;
     }
 
 
