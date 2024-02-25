@@ -94,9 +94,11 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             use_cross: false
+            features: "c-exports,into-x86-from-x64"
           - os: windows-latest
             target: i686-pc-windows-msvc
             use_cross: false
+            features: "c-exports"
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -110,7 +112,8 @@ jobs:
           target: ${{ matrix.target }}
           use_pgo: false
           use_cross: ${{ matrix.use_cross }}
-          features: "c-exports"
+          features:  ${{ matrix.features }}
+          no_default_features: true
 
   build-c-headers:
     runs-on: ubuntu-latest
