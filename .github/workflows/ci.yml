@@ -72,6 +72,16 @@ jobs:
       - name: Install cargo-xwin
         run: cargo install cargo-xwin
   
+      # We can't use 'cross' due to using xwin, so we have to manually install Wine
+      - name: Install Wine
+        run: |
+          sudo apt-get install ppa-purge && sudo ppa-purge -y ppa:ubuntu-toolchain-r/test
+          sudo dpkg --add-architecture i386
+          sudo mkdir -pm755 /etc/apt/keyrings && sudo wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+          sudo wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources
+          sudo apt-get update
+          sudo apt install --install-recommends winehq-stable
+
       # Run tests with Wine
       - name: Run tests on Wine
         run: ./scripts/test-wine.ps1
