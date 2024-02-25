@@ -11,8 +11,6 @@ public static unsafe partial class NativeMethods
     // Library path will search
     // win => __DllName, __DllName.dll
     // linux, osx => __DllName.so, __DllName.dylib
-    static NativeMethods() => NativeLibrary.SetDllImportResolver(typeof(NativeMethods).Assembly, DllImportResolver);
-
     internal static IntPtr DllImportResolver(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
     {
         if (libraryName == __DllName)
