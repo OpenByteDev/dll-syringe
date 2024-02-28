@@ -39,19 +39,19 @@ public static unsafe partial class NativeMethods
                 dllName = "lib" + dllName;
             }
 
-            if (RuntimeInformation.OSArchitecture == Architecture.X86)
+            if (RuntimeInformation.ProcessArchitecture == Architecture.X86)
             {
                 path += "x86";
             }
-            else if (RuntimeInformation.OSArchitecture == Architecture.X64)
+            else if (RuntimeInformation.ProcessArchitecture == Architecture.X64)
             {
                 path += "x64";
             }
-            else if (RuntimeInformation.OSArchitecture == Architecture.Arm)
+            else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm)
             {
                 path += "arm";
             }
-            else if (RuntimeInformation.OSArchitecture == Architecture.Arm64)
+            else if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
             {
                 path += "arm64";
             }
