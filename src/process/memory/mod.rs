@@ -1,4 +1,5 @@
 mod buffer;
+#[allow(unused_imports)]
 pub use buffer::*;
 
 #[cfg(feature = "syringe")]

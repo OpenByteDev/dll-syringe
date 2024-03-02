@@ -27,7 +27,7 @@ use crate::{
 #[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
 use {
     goblin::pe::PE,
-    std::{convert::TryInto, fs, mem::MaybeUninit, path::PathBuf, time::Duration},
+    std::{fs, mem::MaybeUninit, path::PathBuf, time::Duration},
     widestring::U16Str,
     winapi::{shared::minwindef::MAX_PATH, um::wow64apiset::GetSystemWow64DirectoryW},
 };
@@ -114,6 +114,28 @@ impl Syringe {
             #[cfg(feature = "rpc-core")]
             get_proc_address_stub: OnceCell::new(),
         }
+    }
+
+    /// Creates a new syringe for the given suspended target process.
+    pub fn for_suspended_process(process: OwnedProcess) -> Result<Self, io::Error> {
+        let syringe = Self::for_process(process);
+
+        // If we are injecting into a 'suspended' process, then said process is said to not be fully
+        // initialized. This means:
+        // - We can't use `EnumProcessModulesEx` and friends.
+        // - So we can't locate Kernel32.dll in 32-bit process (from 64-bit process)
+        // - And therefore calling LoadLibrary is not possible.
+
+        // Thankfully we can 'initialize' this suspended process without running any end user logic
+        // (e.g. a game's entry point) by creating a dummy method and invoking it.
+        let ret: u8 = 0xC3;
+        let bx = syringe.remote_allocator.alloc_and_copy(&ret)?;
+        syringe.process().run_remote_thread(
+            unsafe { mem::transmute(bx.as_raw_ptr()) },
+            std::ptr::null::<u8>() as *mut u8,
+        )?;
+
+        Ok(syringe)
     }
 
     /// Returns the target process for this syringe.

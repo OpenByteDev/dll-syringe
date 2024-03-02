@@ -1,5 +1,4 @@
-use iced_x86::{code_asm::*, IcedError};
-
+use iced_x86::code_asm::*;
 use std::{
     any::{self, TypeId},
     cell::OnceCell,
@@ -165,6 +164,7 @@ where
                 Self::build_call_stub_x64(self.ptr, result.as_ptr().as_ptr(), float_mask).unwrap()
             };
             let code = self.remote_allocator.alloc_and_copy_buf(code.as_slice())?;
+            #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
             code.memory().flush_instruction_cache()?;
 
             Ok(RemoteRawProcedureStub {

@@ -1,5 +1,10 @@
+use core::mem::{size_of, zeroed};
 use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
-use std::{fs, mem, time::Duration};
+use std::{ffi::CString, fs, mem, process::Command, time::Duration};
+use winapi::um::{
+    libloaderapi::{GetProcAddress, LoadLibraryA},
+    winnt::OSVERSIONINFOW,
+};
 
 #[allow(unused)]
 mod common;
@@ -28,7 +33,7 @@ process_test! {
     }
 }
 
-process_test! {
+suspended_process_test! {
     fn list_module_handles_on_crashed_does_not_hang(
         process: OwnedProcess
     ) {
@@ -38,7 +43,7 @@ process_test! {
     }
 }
 
-process_test! {
+suspended_process_test! {
     fn is_alive_is_true_for_running(
         process: OwnedProcess
     ) {
@@ -48,7 +53,7 @@ process_test! {
     }
 }
 
-process_test! {
+suspended_process_test! {
     fn is_alive_is_false_for_killed(
         process: OwnedProcess
     ) {
@@ -76,7 +81,7 @@ process_test! {
     }
 }
 
-process_test! {
+suspended_process_test! {
     fn kill_guard_kills_process_on_drop(
         process: OwnedProcess
     ) {
@@ -87,10 +92,15 @@ process_test! {
     }
 }
 
-process_test! {
+suspended_process_test! {
     fn long_process_paths_are_supported(
         process: OwnedProcess
     ) {
+        if is_running_under_wine() || is_older_than_windows_10() {
+            println!("Test skipped due to running under an environment with unsupported long paths. (Wine or older than Windows 10).");
+            return;
+        }
+
         let process_path = process.path().unwrap();
         process.kill().unwrap();
 
@@ -137,4 +147,33 @@ fn current_pseudo_process_eq_current_process() {
     assert_eq!(pseudo, normal);
     assert_eq!(pseudo.try_to_owned().unwrap(), normal);
     assert_eq!(pseudo, normal.try_clone().unwrap());
+}
+
+fn is_running_under_wine() -> bool {
+    unsafe {
+        let ntdll = CString::new("ntdll.dll").unwrap();
+        let lib = LoadLibraryA(ntdll.as_ptr());
+        if !lib.is_null() {
+            let func_name = CString::new("wine_get_version").unwrap();
+            let func = GetProcAddress(lib, func_name.as_ptr());
+            !func.is_null()
+        } else {
+            false
+        }
+    }
+}
+
+// winapi crate doesn't have this.
+// This is in ntdll, so already loaded for every Windows process.
+extern "system" {
+    fn RtlGetVersion(lpVersionInformation: &mut OSVERSIONINFOW) -> u32;
+}
+
+fn is_older_than_windows_10() -> bool {
+    unsafe {
+        let mut os_info: OSVERSIONINFOW = zeroed();
+        os_info.dwOSVersionInfoSize = size_of::<OSVERSIONINFOW>() as u32;
+        RtlGetVersion(&mut os_info);
+        os_info.dwMajorVersion < 10
+    }
 }

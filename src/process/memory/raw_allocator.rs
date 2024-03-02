@@ -1,6 +1,5 @@
-use std::{collections::LinkedList, io, mem, ptr::NonNull};
-
 use crate::process::{memory::ProcessMemoryBuffer, BorrowedProcess, Process};
+use std::{collections::LinkedList, io, mem, ptr::NonNull};
 
 pub trait RawAllocator {
     type Error;
@@ -224,12 +223,17 @@ pub enum AllocError {
 }
 
 #[cfg(test)]
+struct AlignTestStruct {
+    _a: u8,
+    _b: u16,
+    _c: u32,
+    _d: u64,
+}
+
+#[cfg(test)]
 mod tests {
-    use std::mem;
-
-    use crate::process::memory::ProcessMemorySlice;
-
     use super::*;
+    use crate::process::memory::ProcessMemorySlice;
 
     #[test]
     fn single_alloc() {
@@ -366,12 +370,4 @@ mod tests {
         let alloc = allocator.alloc(page_size + 1).unwrap();
         assert!(alloc.len > page_size);
     }
-}
-
-#[cfg(test)]
-struct AlignTestStruct {
-    _a: u8,
-    _b: u16,
-    _c: u32,
-    _d: u64,
 }
