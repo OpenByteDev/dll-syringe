@@ -1,6 +1,6 @@
 use core::mem::{size_of, zeroed};
 use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
-use std::{ffi::CString, fs, mem, process::Command, time::Duration};
+use std::{ffi::CString, fs, mem, mem::size_of, time::Duration, process::Command};
 use winapi::um::{
     libloaderapi::{GetProcAddress, LoadLibraryA},
     winnt::OSVERSIONINFOW,
