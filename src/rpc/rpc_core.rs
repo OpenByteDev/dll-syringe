@@ -1,5 +1,4 @@
-use iced_x86::{code_asm::*, IcedError};
-
+use iced_x86::code_asm::*;
 use std::{
     ffi::CString,
     mem,
