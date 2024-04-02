@@ -338,6 +338,12 @@ impl<'a> ProcessMemorySlice<'a> {
         }
 
         let mut bytes_written = 0;
+        if buf.is_empty() {
+            // This works around a discrepancy between Wine and actual Windows.
+            // On Wine, a 0 sized write fails, on Windows this suceeds. Will file as bug soon.
+            return Ok(());
+        }
+
         let result = unsafe {
             WriteProcessMemory(
                 self.process.as_raw_handle(),
