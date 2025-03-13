@@ -13,7 +13,7 @@ pub(crate) struct ArrayBuf<T, const SIZE: usize> {
 impl<T, const SIZE: usize> ArrayBuf<T, SIZE> {
     pub fn new_uninit() -> Self {
         Self {
-            data: MaybeUninit::uninit_array(),
+            data: [const { MaybeUninit::uninit() }; SIZE],
             len: 0,
         }
     }

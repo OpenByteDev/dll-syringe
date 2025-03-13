@@ -28,7 +28,7 @@ impl<T, const SIZE: usize> ArrayOrVecBuf<T, SIZE> {
     }
 
     pub fn new_uninit_array() -> Self {
-        Self::from_partial_init_array(MaybeUninit::uninit_array(), 0)
+        Self::from_partial_init_array([const { MaybeUninit::uninit() }; SIZE], 0)
     }
 
     pub fn from_array(array: [T; SIZE]) -> Self {
