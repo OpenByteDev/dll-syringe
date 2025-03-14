@@ -371,7 +371,7 @@ impl Syringe {
         }
 
         let path_len = result as usize;
-        let path = unsafe { MaybeUninit::slice_assume_init_ref(&path_buf[..path_len]) };
+        let path = unsafe { path_buf[..path_len].assume_init_mut() };
         Ok(PathBuf::from(U16Str::from_slice(path).to_os_string()))
     }
 }

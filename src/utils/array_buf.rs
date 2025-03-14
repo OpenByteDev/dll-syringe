@@ -45,11 +45,11 @@ impl<T, const SIZE: usize> ArrayBuf<T, SIZE> {
     }
 
     pub fn as_slice(&self) -> &[T] {
-        unsafe { MaybeUninit::slice_assume_init_ref(&self.data[..self.len]) }
+        unsafe { self.data[..self.len].assume_init_ref() }
     }
 
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        unsafe { MaybeUninit::slice_assume_init_mut(&mut self.data[..self.len]) }
+        unsafe { self.data[..self.len].assume_init_mut() }
     }
 
     pub fn spare_capacity_mut(&mut self) -> &mut [MaybeUninit<T>] {

@@ -134,7 +134,7 @@ impl<T, const SIZE: usize> ArrayOrVecBuf<T, SIZE> {
 impl<const SIZE: usize> ArrayOrVecBuf<u8, SIZE> {
     pub fn spare_writer(&mut self) -> impl std::io::Write + '_ {
         let spare = self.spare_capacity_mut();
-        unsafe { MaybeUninit::slice_assume_init_mut(spare) }
+        unsafe { spare.assume_init_mut() }
     }
 }
 
