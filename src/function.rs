@@ -148,15 +148,30 @@ macro_rules! impl_fn {
     };
 
     (@impl_all ($($nm:ident : $ty:ident),*)) => {
-        impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("Rust")     fn($($ty),*) -> Ret);
-        impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("cdecl")    fn($($ty),*) -> Ret);
-        impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("stdcall")  fn($($ty),*) -> Ret);
-        impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("fastcall") fn($($ty),*) -> Ret);
-        impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("win64")    fn($($ty),*) -> Ret);
-        impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("sysv64")   fn($($ty),*) -> Ret);
-        impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("aapcs")    fn($($ty),*) -> Ret);
-        impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("C")        fn($($ty),*) -> Ret);
-        impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("system")   fn($($ty),*) -> Ret);
+         // Universal conventions
+         impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("Rust")     fn($($ty),*) -> Ret);
+         impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("C")        fn($($ty),*) -> Ret);
+         impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("system")   fn($($ty),*) -> Ret);
+
+         // x86-specific conventions
+         #[cfg(target_arch = "x86")]
+         impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("cdecl")    fn($($ty),*) -> Ret);
+         #[cfg(target_arch = "x86")]
+         impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("stdcall")  fn($($ty),*) -> Ret);
+         #[cfg(target_arch = "x86")]
+         impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("fastcall") fn($($ty),*) -> Ret);
+
+         // x86_64 Windows
+         #[cfg(all(target_arch = "x86_64", target_os = "windows"))]
+         impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("win64")    fn($($ty),*) -> Ret);
+
+         // x86_64 System V (Linux/macOS)
+         #[cfg(all(target_arch = "x86_64", not(target_os = "windows")))]
+         impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("sysv64")   fn($($ty),*) -> Ret);
+
+         // ARM conventions
+         #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
+         impl_fn!(@impl_u_and_s ($($nm : $ty),*) ("aapcs")    fn($($ty),*) -> Ret);
     };
 
     (@impl_u_and_s ($($nm:ident : $ty:ident),*) ($call_conv:expr) fn($($param_ty:ident),*) -> $ret:ty) => {
