@@ -13,7 +13,6 @@ use std::{
     time::Duration,
 };
 
-use sysinfo::{PidExt, ProcessExt, SystemExt};
 use winapi::{shared::minwindef::FALSE, um::processthreadsapi::OpenProcess};
 
 use crate::process::{BorrowedProcess, OwnedProcessModule, Process, PROCESS_INJECTION_ACCESS};
@@ -179,7 +178,7 @@ impl OwnedProcess {
             return Err(io::Error::last_os_error());
         }
 
-        Ok(unsafe { OwnedProcess::from_raw_handle(handle) })
+        Ok(unsafe { OwnedProcess::from_raw_handle(handle.cast()) })
     }
 
     /// Returns a list of all currently running processes.
@@ -188,7 +187,11 @@ impl OwnedProcess {
         // TODO: avoid using sysinfo for this
         // TODO: deduplicate code
         let mut system = sysinfo::System::new();
-        system.refresh_processes();
+        system.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::All,
+            true,
+            sysinfo::ProcessRefreshKind::nothing(),
+        );
         system
             .processes()
             .values()
@@ -203,11 +206,15 @@ impl OwnedProcess {
         // TODO: avoid using sysinfo for this
         // TODO: deduplicate code
         let mut system = sysinfo::System::new();
-        system.refresh_processes();
+        system.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::All,
+            true,
+            sysinfo::ProcessRefreshKind::nothing(),
+        );
         system
             .processes()
             .values()
-            .filter(move |process| process.name().contains(name.as_ref()))
+            .filter(move |process| process.name().to_string_lossy().contains(name.as_ref()))
             .map(|process| process.pid())
             .filter_map(|pid| OwnedProcess::from_pid(pid.as_u32()).ok())
             .collect()
@@ -219,11 +226,15 @@ impl OwnedProcess {
         // TODO: avoid using sysinfo for this
         // TODO: deduplicate code
         let mut system = sysinfo::System::new();
-        system.refresh_processes();
+        system.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::All,
+            true,
+            sysinfo::ProcessRefreshKind::nothing(),
+        );
         system
             .processes()
             .values()
-            .filter(move |process| process.name().contains(name.as_ref()))
+            .filter(move |process| process.name().to_string_lossy().contains(name.as_ref()))
             .map(|process| process.pid())
             .find_map(|pid| OwnedProcess::from_pid(pid.as_u32()).ok())
     }

@@ -214,7 +214,7 @@ impl<'a> BorrowedProcess<'a> {
         let result = unsafe {
             DuplicateHandle(
                 process,
-                raw_handle,
+                raw_handle.cast(),
                 process,
                 new_handle.as_mut_ptr(),
                 0,
@@ -225,7 +225,7 @@ impl<'a> BorrowedProcess<'a> {
         if result == 0 {
             return Err(io::Error::last_os_error());
         }
-        Ok(unsafe { OwnedProcess::from_raw_handle(new_handle.assume_init()) })
+        Ok(unsafe { OwnedProcess::from_raw_handle(new_handle.assume_init().cast()) })
     }
 
     /// Returns a snapshot of the handles of the modules currently loaded in this process.
@@ -241,7 +241,7 @@ impl<'a> BorrowedProcess<'a> {
         loop {
             let result = unsafe {
                 EnumProcessModulesEx(
-                    self.as_raw_handle(),
+                    self.as_raw_handle().cast(),
                     module_buf.as_mut_ptr(),
                     module_buf_byte_size,
                     bytes_needed_new.as_mut_ptr(),
@@ -285,7 +285,7 @@ impl<'a> BorrowedProcess<'a> {
                 let mut bytes_needed_new = MaybeUninit::uninit();
                 let result = unsafe {
                     EnumProcessModulesEx(
-                        self.as_raw_handle(),
+                        self.as_raw_handle().cast(),
                         module_buf_vec.as_mut_ptr(),
                         module_buf_byte_size,
                         bytes_needed_new.as_mut_ptr(),

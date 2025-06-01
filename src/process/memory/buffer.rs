@@ -88,7 +88,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
     ) -> Result<Self, io::Error> {
         let ptr = unsafe {
             VirtualAllocEx(
-                process.as_raw_handle(),
+                process.as_raw_handle().cast(),
                 ptr::null_mut(),
                 len,
                 allocation_type,
@@ -181,7 +181,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
     unsafe fn _free(&mut self) -> Result<(), io::Error> {
         let result = unsafe {
             VirtualFreeEx(
-                self.process.as_raw_handle(),
+                self.process.as_raw_handle().cast(),
                 self.as_ptr().cast(),
                 0,
                 MEM_RELEASE,
@@ -293,7 +293,7 @@ impl<'a> ProcessMemorySlice<'a> {
         let mut bytes_read = 0;
         let result = unsafe {
             ReadProcessMemory(
-                self.process.as_raw_handle(),
+                self.process.as_raw_handle().cast(),
                 self.ptr.add(offset).cast(),
                 buf.as_mut_ptr().cast(),
                 buf.len(),
@@ -346,7 +346,7 @@ impl<'a> ProcessMemorySlice<'a> {
 
         let result = unsafe {
             WriteProcessMemory(
-                self.process.as_raw_handle(),
+                self.process.as_raw_handle().cast(),
                 self.ptr.add(offset).cast(),
                 buf.as_ptr().cast(),
                 buf.len(),
@@ -416,7 +416,11 @@ impl<'a> ProcessMemorySlice<'a> {
     /// This may be necesary if the buffer is used to store dynamically generated code. For details see [`FlushInstructionCache`].
     pub fn flush_instruction_cache(&self) -> Result<(), io::Error> {
         let result = unsafe {
-            FlushInstructionCache(self.process.as_raw_handle(), self.as_ptr().cast(), self.len)
+            FlushInstructionCache(
+                self.process.as_raw_handle().cast(),
+                self.as_ptr().cast(),
+                self.len,
+            )
         };
         if result == 0 {
             Err(io::Error::last_os_error())

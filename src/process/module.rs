@@ -237,7 +237,7 @@ impl<P: Process> ProcessModule<P> {
                 let buf_size = buf_size as u32;
                 let result = unsafe {
                     GetModuleFileNameExW(
-                        self.process().as_raw_handle(),
+                        self.process().as_raw_handle().cast(),
                         self.handle(),
                         buf_ptr,
                         buf_size,
@@ -270,7 +270,7 @@ impl<P: Process> ProcessModule<P> {
                 let buf_size = buf_size as u32;
                 let result = unsafe {
                     GetModuleBaseNameW(
-                        self.process().as_raw_handle(),
+                        self.process().as_raw_handle().cast(),
                         self.handle(),
                         buf_ptr,
                         buf_size,
@@ -357,7 +357,7 @@ impl<P: Process> ProcessModule<P> {
         let raw_module = self.handle.as_ptr().cast();
         let result = unsafe {
             VirtualQueryEx(
-                self.process.as_raw_handle(),
+                self.process.as_raw_handle().cast(),
                 raw_module,
                 module_info.as_mut_ptr(),
                 mem::size_of::<MEMORY_BASIC_INFORMATION>(),

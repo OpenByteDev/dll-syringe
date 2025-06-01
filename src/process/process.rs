@@ -80,7 +80,7 @@ pub trait Process: AsHandle + AsRawHandle {
     /// Returns the raw pseudo handle representing the current process.
     #[must_use]
     fn raw_current_handle() -> ProcessHandle {
-        unsafe { GetCurrentProcess() }
+        unsafe { GetCurrentProcess() }.cast()
     }
 
     /// Returns the pseudo handle representing the current process.
@@ -113,13 +113,14 @@ pub trait Process: AsHandle + AsRawHandle {
         }
 
         let mut exit_code = MaybeUninit::uninit();
-        let result = unsafe { GetExitCodeProcess(self.as_raw_handle(), exit_code.as_mut_ptr()) };
+        let result =
+            unsafe { GetExitCodeProcess(self.as_raw_handle().cast(), exit_code.as_mut_ptr()) };
         result != FALSE && unsafe { exit_code.assume_init() } == STILL_ACTIVE
     }
 
     /// Returns the id of this process.
     fn pid(&self) -> Result<NonZeroU32, io::Error> {
-        let result = unsafe { GetProcessId(self.as_raw_handle()) };
+        let result = unsafe { GetProcessId(self.as_raw_handle().cast()) };
         NonZeroU32::new(result).ok_or_else(io::Error::last_os_error)
     }
 
@@ -130,7 +131,7 @@ pub trait Process: AsHandle + AsRawHandle {
     /// This method also returns `false` for a 32-bit process running under 32-bit Windows or 64-bit Windows 10 on ARM.
     fn runs_under_wow64(&self) -> Result<bool, io::Error> {
         let mut is_wow64 = MaybeUninit::uninit();
-        let result = unsafe { IsWow64Process(self.as_raw_handle(), is_wow64.as_mut_ptr()) };
+        let result = unsafe { IsWow64Process(self.as_raw_handle().cast(), is_wow64.as_mut_ptr()) };
         if result == 0 {
             return Err(io::Error::last_os_error());
         }
@@ -152,7 +153,7 @@ pub trait Process: AsHandle + AsRawHandle {
         win_fill_path_buf_helper(|buf_ptr, buf_size| {
             let mut buf_size = buf_size as u32;
             let result = unsafe {
-                QueryFullProcessImageNameW(self.as_raw_handle(), 0, buf_ptr, &mut buf_size)
+                QueryFullProcessImageNameW(self.as_raw_handle().cast(), 0, buf_ptr, &mut buf_size)
             };
             if result == 0 {
                 let err = io::Error::last_os_error();
@@ -184,7 +185,7 @@ pub trait Process: AsHandle + AsRawHandle {
 
     /// Terminates this process with the given exit code.
     fn kill_with_exit_code(&self, exit_code: u32) -> Result<(), io::Error> {
-        let result = unsafe { TerminateProcess(self.as_raw_handle(), exit_code) };
+        let result = unsafe { TerminateProcess(self.as_raw_handle().cast(), exit_code) };
         if result == 0 {
             return Err(io::Error::last_os_error());
         }
@@ -199,7 +200,7 @@ pub trait Process: AsHandle + AsRawHandle {
     ) -> Result<u32, io::Error> {
         let thread_handle = self.start_remote_thread(remote_fn, parameter)?;
 
-        let reason = unsafe { WaitForSingleObject(thread_handle.as_raw_handle(), INFINITE) };
+        let reason = unsafe { WaitForSingleObject(thread_handle.as_raw_handle().cast(), INFINITE) };
         if reason == WAIT_FAILED {
             return Err(io::Error::last_os_error());
         }
@@ -229,7 +230,7 @@ pub trait Process: AsHandle + AsRawHandle {
         // create a remote thread that will call LoadLibraryW with payload_path as its argument.
         let thread_handle = unsafe {
             CreateRemoteThread(
-                self.as_raw_handle(),
+                self.as_raw_handle().cast(),
                 ptr::null_mut(),
                 0,
                 Some(mem::transmute(remote_fn)),
@@ -242,7 +243,7 @@ pub trait Process: AsHandle + AsRawHandle {
             return Err(io::Error::last_os_error());
         }
 
-        Ok(unsafe { OwnedHandle::from_raw_handle(thread_handle) })
+        Ok(unsafe { OwnedHandle::from_raw_handle(thread_handle.cast()) })
     }
 
     /// Searches the modules in this process for one with the given name.
