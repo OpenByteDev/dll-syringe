@@ -213,8 +213,7 @@ impl Syringe {
         let free_library_result = exit_code as BOOL;
 
         if free_library_result == FALSE {
-            return Err(EjectError::RemoteIo(io::Error::new(
-                io::ErrorKind::Other,
+            return Err(EjectError::RemoteIo(io::Error::other(
                 "failed to eject module from process",
             )));
         }

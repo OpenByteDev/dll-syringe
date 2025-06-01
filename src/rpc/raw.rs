@@ -372,7 +372,7 @@ macro_rules! impl_call {
                     } else {
                         unreachable!();
                     }
-                    unsafe { mem::transmute::<[u8; mem::size_of::<usize>()], usize>(buf) }
+                    usize::from_ne_bytes(buf)
                 },)*];
 
                 // use vars to avoid dead_code warning

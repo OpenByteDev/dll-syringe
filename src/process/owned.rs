@@ -238,7 +238,7 @@ impl OwnedProcess {
     ///
     /// # Safety
     /// - This method is unsafe as the returned instance can outlive the owned instance,
-    /// thus the caller must guarantee that the owned instance outlives the returned instance.
+    ///   thus the caller must guarantee that the owned instance outlives the returned instance.
     #[must_use]
     pub unsafe fn borrowed_static(&self) -> BorrowedProcess<'static> {
         unsafe {

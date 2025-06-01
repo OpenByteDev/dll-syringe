@@ -21,7 +21,8 @@
     clippy::module_inception,
     clippy::module_name_repetitions,
     clippy::missing_errors_doc,
-    clippy::borrow_as_ptr
+    clippy::borrow_as_ptr,
+    clippy::missing_transmute_annotations
 )]
 #![cfg_attr(feature = "doc-cfg", doc = include_str!("../crate-doc.md"))]
 #![cfg_attr(not(feature = "doc-cfg"), allow(missing_docs))]

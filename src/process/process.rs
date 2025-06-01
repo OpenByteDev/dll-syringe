@@ -205,8 +205,9 @@ pub trait Process: AsHandle + AsRawHandle {
         }
 
         let mut exit_code = MaybeUninit::uninit();
-        let result =
-            unsafe { GetExitCodeThread(thread_handle.as_raw_handle(), exit_code.as_mut_ptr()) };
+        let result = unsafe {
+            GetExitCodeThread(thread_handle.as_raw_handle().cast(), exit_code.as_mut_ptr())
+        };
         if result == 0 {
             return Err(io::Error::last_os_error());
         }

@@ -177,13 +177,13 @@ pub(crate) struct GetProcAddressParams {
 }
 
 #[derive(Debug)]
-pub(crate) struct RemoteProcedureStub<A: ?Sized + Copy, R: Copy> {
+pub(crate) struct RemoteProcedureStub<A: Copy, R: Copy> {
     pub code: RemoteAllocation,
     pub parameter: RemoteBox<A>,
     pub result: RemoteBox<R>,
 }
 
-impl<A: ?Sized + Copy, R: Copy> RemoteProcedureStub<A, R> {
+impl<A: Copy, R: Copy> RemoteProcedureStub<A, R> {
     #[allow(dead_code)]
     pub(crate) fn call(&self, args: &A) -> Result<R, RawRpcError> {
         self.parameter.write(args)?;

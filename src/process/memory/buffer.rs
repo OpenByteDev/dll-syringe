@@ -96,11 +96,11 @@ impl<'a> ProcessMemoryBuffer<'a> {
             )
         };
 
-        return if ptr.is_null() {
+        if ptr.is_null() {
             Err(io::Error::last_os_error())
         } else {
             Ok(unsafe { Self::from_raw_parts(ptr.cast(), len, process) })
-        };
+        }
     }
 
     /// Allocates a new buffer with enough space to store a value of type `T` in the given process.

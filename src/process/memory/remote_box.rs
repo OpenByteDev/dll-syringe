@@ -51,9 +51,8 @@ impl RemoteBoxAllocator {
         Ok(allocation)
     }
     pub fn alloc_and_copy_buf<T: Copy>(&self, buf: &[T]) -> Result<RemoteAllocation, io::Error> {
-        let bytes = unsafe {
-            slice::from_raw_parts(buf.as_ptr() as *const u8, std::mem::size_of_val(buf))
-        };
+        let bytes =
+            unsafe { slice::from_raw_parts(buf.as_ptr() as *const u8, std::mem::size_of_val(buf)) };
         let allocation = self.alloc_raw(bytes.len())?;
         allocation.write_bytes(bytes)?;
         Ok(allocation)
@@ -146,7 +145,7 @@ impl<T: ?Sized> RemoteBox<T> {
     }
 }
 
-impl<T: ?Sized + Copy> RemoteBox<T> {
+impl<T: Copy> RemoteBox<T> {
     pub fn write(&self, value: &T) -> Result<(), io::Error> {
         self.allocation.memory().write_struct(0, value)
     }
