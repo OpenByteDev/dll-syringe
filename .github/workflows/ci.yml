@@ -57,6 +57,8 @@ jobs:
           submodules: true
       - name: Install latest nightly
         uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
       - name: cargo install cargo-hack
         uses: taiki-e/install-action@cargo-hack
       - name: cargo hack
