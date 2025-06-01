@@ -1,4 +1,3 @@
-use cstr::cstr;
 use iced_x86::{
     code_asm::{
         dword_ptr,
@@ -281,14 +280,14 @@ impl Syringe {
                 .unwrap();
 
         let load_library_fn_ptr =
-            kernel32_module.get_local_procedure_address_cstr(cstr!("LoadLibraryW"))?;
+            kernel32_module.get_local_procedure_address_cstr(c"LoadLibraryW")?;
         let free_library_fn_ptr =
-            kernel32_module.get_local_procedure_address_cstr(cstr!("FreeLibrary"))?;
+            kernel32_module.get_local_procedure_address_cstr(c"FreeLibrary")?;
         let get_last_error_fn_ptr =
-            kernel32_module.get_local_procedure_address_cstr(cstr!("GetLastError"))?;
+            kernel32_module.get_local_procedure_address_cstr(c"GetLastError")?;
         #[cfg(feature = "rpc-core")]
         let get_proc_address_fn_ptr =
-            kernel32_module.get_local_procedure_address_cstr(cstr!("GetProcAddress"))?;
+            kernel32_module.get_local_procedure_address_cstr(c"GetProcAddress")?;
 
         Ok(InjectHelpData {
             kernel32_module: kernel32_module.handle(),
