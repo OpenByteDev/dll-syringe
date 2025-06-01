@@ -475,7 +475,7 @@ pub enum SyringeError {
     /// Variant representing an error while serializing or deserializing.
     #[cfg(feature = "rpc-payload")]
     #[error("serde error: {}", _0)]
-    Serde(Box<bincode::ErrorKind>),
+    Serde(crate::rpc::SerdeError),
     /// Variant representing an error or panic inside a remote payload procedure.
     #[cfg(feature = "rpc-payload")]
     #[error("remote payload error: {}", _0)]

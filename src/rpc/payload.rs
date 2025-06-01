@@ -91,9 +91,13 @@ where
     F::Output: DeserializeOwned,
 {
     fn call_with_args(&self, args: F::RefArgs<'_>) -> Result<F::Output, PayloadRpcError> {
-        let arg_bytes = bincode::serialized_size(&args)? as usize;
+        let config = bincode::config::standard();
+
+        let mut size_writer = bincode::enc::write::SizeWriter::default();
+        bincode::serde::encode_into_writer(&args, &mut size_writer, config)?;
+        let arg_bytes = size_writer.bytes_written;
         let mut local_arg_buf = ArrayOrVecBuf::<_, 512>::with_capacity(arg_bytes);
-        bincode::serialize_into(local_arg_buf.spare_writer(), &args)?;
+        bincode::serde::encode_into_std_write(&args, &mut local_arg_buf.spare_writer(), config)?;
         unsafe { local_arg_buf.set_len(arg_bytes) };
 
         // Allocate a buffer in the remote process to hold the argument.
@@ -143,7 +147,7 @@ where
                 String::from_utf8_unchecked(local_result_buf.into_vec())
             }))
         } else {
-            Ok(bincode::deserialize(&local_result_buf)?)
+            Ok(bincode::serde::decode_from_slice(&local_result_buf, config)?.0)
         }
     }
 }

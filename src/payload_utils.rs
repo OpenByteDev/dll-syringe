@@ -87,18 +87,22 @@ fn payload_procedure_helper_inner<A: DeserializeOwned, R: Serialize>(
     buf: &mut [u8],
     f: impl FnOnce(A) -> R,
 ) -> Result<&'_ mut [u8], PayloadProcedureHelperError> {
-    let args = bincode::deserialize(buf)?;
+    let config = bincode::config::standard();
+
+    let args = bincode::serde::decode_from_slice(buf, config)?.0;
 
     let result = f(args);
 
-    let required_buf_len = bincode::serialized_size(&result)? as usize;
+    let mut size_writer = bincode::enc::write::SizeWriter::default();
+    bincode::serde::encode_into_writer(&result, &mut size_writer, config)?;
+    let required_buf_len = size_writer.bytes_written;
     let result_buf = if required_buf_len > buf.len() {
         allocate_local_process_memory(required_buf_len)?
     } else {
         buf
     };
 
-    bincode::serialize_into(&mut *result_buf, &result)?;
+    bincode::serde::encode_into_slice(result, &mut *result_buf, config)?;
 
     Ok(result_buf)
 }
@@ -111,8 +115,10 @@ fn allocate_local_process_memory(len: usize) -> io::Result<&'static mut [u8]> {
 
 #[derive(Debug, Error)]
 enum PayloadProcedureHelperError {
-    #[error("bincode error: {0}")]
-    Bincode(#[from] Box<bincode::ErrorKind>),
+    #[error("serializeerror: {0}")]
+    Serialize(#[from] bincode::error::EncodeError),
+    #[error("deserialize error: {0}")]
+    Deserialize(#[from] bincode::error::DecodeError),
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 }
