@@ -92,3 +92,18 @@ jobs:
             components: clippy
       - name: Clippy check
         run: cargo clippy --all-features
+  
+  fmt:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["windows-latest"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: dtolnay/rust-toolchain@stable
+      with:
+          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
+          toolchain: nightly
+          components: rustfmt
+    - name: Format check
+      run: cargo fmt --all -- --check
