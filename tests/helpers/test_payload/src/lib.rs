@@ -96,6 +96,8 @@ pub extern "C" fn sum_10_raw_c(
 
 #[no_mangle]
 pub extern "C" fn crash() {
-    let ptr = std::ptr::null_mut::<u32>();
-    std::hint::black_box(unsafe { *std::hint::black_box(ptr) });
+    #[allow(invalid_null_arguments)]
+    unsafe {
+        std::ptr::write(std::ptr::null_mut(), 42u32);
+    }
 }
