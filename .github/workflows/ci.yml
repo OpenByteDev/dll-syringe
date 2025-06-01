@@ -24,22 +24,20 @@ jobs:
           - target: x86_64-pc-windows-msvc
             target32: i686-pc-windows-msvc
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     
     - name: Install latest rust ${{ matrix.toolchain }} for ${{ matrix.target }}
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-          target: ${{ matrix.target }}
+          targets: ${{ matrix.target }}
           toolchain: ${{ matrix.toolchain }}
-          override: true
           
     - name: Install latest rust ${{ matrix.toolchain }} for x86 version of target
       if: matrix.target32
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-          target: ${{ matrix.target32 }}
+          targets: ${{ matrix.target32 }}
           toolchain: ${{ matrix.toolchain }}
-          override: true
       
     - name: Build
       run: cargo build --target ${{ matrix.target }}
@@ -67,13 +65,11 @@ jobs:
       matrix:
         os: ["windows-latest"]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Install latest nightly
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-          profile: minimal
           toolchain: nightly
-          override: true
     - name: Generate documentation
       run: cargo doc --all-features
     - name: Install cargo-deadlinks
@@ -87,13 +83,10 @@ jobs:
       matrix:
         os: ["windows-latest"]
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
             toolchain: nightly
             components: clippy
-            override: true
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+      - name: Clippy check
+        run: cargo clippy --all-features
