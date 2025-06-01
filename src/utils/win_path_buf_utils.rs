@@ -23,8 +23,7 @@ pub fn win_fill_path_buf_helper(
                 vec_buf.resize(buf_len, MaybeUninit::uninit());
                 match f(vec_buf[0].as_mut_ptr(), vec_buf.len()) {
                     FillPathBufResult::Success { actual_len } => {
-                        let slice =
-                            unsafe { MaybeUninit::slice_assume_init_ref(&vec_buf[..actual_len]) };
+                        let slice = unsafe { vec_buf[..actual_len].assume_init_ref() };
                         let wide_str = widestring::U16Str::from_slice(slice);
                         return Ok(wide_str.to_os_string().into());
                     }

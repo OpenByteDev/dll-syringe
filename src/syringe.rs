@@ -363,7 +363,7 @@ impl Syringe {
 
     #[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
     fn wow64_dir() -> Result<PathBuf, io::Error> {
-        let mut path_buf = MaybeUninit::uninit_array::<MAX_PATH>();
+        let mut path_buf = const { [MaybeUninit::uninit(); MAX_PATH] };
         let path_buf_len: u32 = path_buf.len().try_into().unwrap();
         let result = unsafe { GetSystemWow64DirectoryW(path_buf[0].as_mut_ptr(), path_buf_len) };
         if result == 0 {
@@ -371,7 +371,7 @@ impl Syringe {
         }
 
         let path_len = result as usize;
-        let path = unsafe { MaybeUninit::slice_assume_init_ref(&path_buf[..path_len]) };
+        let path = unsafe { &path_buf[..path_len].assume_init_ref() };
         Ok(PathBuf::from(U16Str::from_slice(path).to_os_string()))
     }
 }
