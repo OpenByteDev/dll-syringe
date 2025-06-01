@@ -13,12 +13,11 @@ env:
       
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         toolchain: ["nightly"]
-        os: ["windows-latest"]
         target: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
         include:
           - target: x86_64-pc-windows-msvc
@@ -27,14 +26,14 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Install latest rust ${{ matrix.toolchain }} for ${{ matrix.target }}
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@nightly
       with:
           targets: ${{ matrix.target }}
           toolchain: ${{ matrix.toolchain }}
           
     - name: Install latest rust ${{ matrix.toolchain }} for x86 version of target
       if: matrix.target32
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@nightly
       with:
           targets: ${{ matrix.target32 }}
           toolchain: ${{ matrix.toolchain }}
@@ -49,28 +48,28 @@ jobs:
       
     - name: Test
       run: cargo test --target ${{ matrix.target }} --all-targets --all-features -- --nocapture
-      
-    - name: Build (default features)
-      run: cargo build --target ${{ matrix.target }} --all-targets
-    - name: Build (no features)
-      run: cargo build --target ${{ matrix.target }} --no-default-features --all-targets
-    - name: Build (feature syringe)
-      run: cargo build --target ${{ matrix.target }} --features syringe --all-targets
-    - name: Build (feature rpc)
-      run: cargo build --target ${{ matrix.target }} --features rpc --all-targets
-
+  
+  hack:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install latest nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
+      - name: cargo install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+      - name: cargo hack
+        run: cargo hack --feature-powerset check
+        
   documentation:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: ["windows-latest"]
+    runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
     - name: Install latest nightly
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@nightly
       with:
           targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
-          toolchain: nightly
     - name: Generate documentation
       run: cargo doc --all-features
     - name: Install cargo-deadlinks
@@ -79,16 +78,25 @@ jobs:
       run: cargo deadlinks
 
   clippy:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: ["windows-latest"]
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install latest nightly
+        uses: dtolnay/rust-toolchain@nightly
         with:
             targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
-            toolchain: nightly
             components: clippy
       - name: Clippy check
         run: cargo clippy --all-features
+  
+  fmt:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install latest nightly
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
+          components: rustfmt
+    - name: Format check
+      run: cargo fmt --all -- --check
