@@ -38,7 +38,9 @@ jobs:
           targets: ${{ matrix.target32 }}
           toolchain: ${{ matrix.toolchain }}
       
-    - name: Build
+    - name: Build macros
+      run: cargo build --target ${{ matrix.target }} --manifest-path "dll-syringe-macros/Cargo.toml" --all-targets
+    - name: Build main crate
       run: cargo build --target ${{ matrix.target }}
       
     - name: Build test target
