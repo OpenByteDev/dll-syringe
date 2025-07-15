@@ -57,9 +57,7 @@ pub fn build_helper_crate(
         let exit_code = command.current_dir(&payload_crate_path).spawn()?.wait()?;
         assert!(
             exit_code.success(),
-            "Failed to build helper crate {} for target {}",
-            crate_name,
-            target
+            "Failed to build helper crate {crate_name} for target {target}"
         );
     }
 
