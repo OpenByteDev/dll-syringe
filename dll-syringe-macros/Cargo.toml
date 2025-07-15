@@ -1,0 +1,19 @@
+[package]
+name = "dll-syringe-macros"
+version = "0.1.0"
+description = "Macros for dll-syringe"
+repository = "https://github.com/OpenByteDev/dll-syringe" 
+homepage = "https://github.com/OpenByteDev/dll-syringe"
+documentation = "https://docs.rs/dll-syringe"
+license = "MIT"
+authors = ["OpenByte <development.openbyte@gmail.com>"]
+edition = "2024"
+resolver = "2"
+keywords = ["dll-injection", "dll", "injector", "windows", "rpc"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0", features = ["parsing", "printing", "proc-macro", "full", "clone-impls"], default-features = false }
+quote = { version = "1", features = ["proc-macro"], default-features = false }

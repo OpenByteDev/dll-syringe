@@ -14,6 +14,7 @@ categories = []
 keywords = ["dll-injection", "dll", "injector", "windows", "rpc"]
 
 [dependencies]
+dll-syringe-macros = { path = "dll-syringe-macros", version = "0.1" }
 winapi = { version = "0.3", features = [
     "processthreadsapi", "libloaderapi", "memoryapi", 
     "wow64apiset", "sysinfoapi", "winerror", 

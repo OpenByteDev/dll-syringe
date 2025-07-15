@@ -14,29 +14,7 @@ use crate::{
 };
 
 /// A macro for defining an exported function that can be used with [`RemotePayloadProcedure`](crate::rpc::RemotePayloadProcedure).
-#[macro_export]
-macro_rules! payload_procedure {
-    ($(pub)? fn $fn:ident ( $($name:ident : $type:ty),* )
-        $body:block
-    ) => {
-        $crate::payload_procedure! {
-            pub fn $fn ( $($name : $type),* ) -> () $body
-        }
-    };
-    ($(pub)? fn $fn:ident ( $($name:ident : $type:ty),* ) -> $ret:ty
-        $body:block
-    ) => {
-        #[no_mangle]
-        pub unsafe extern "system" fn $fn (__args_and_params: *mut ::core::ffi::c_void) {
-            $crate::payload_utils::__payload_procedure_helper(__args_and_params, |__args| {
-                let ($($name ,)*) = __args;
-
-                fn __inner ( $($name : $type),* ) -> $ret $body
-                __inner($($name ,)*)
-            });
-        }
-    };
-}
+pub use dll_syringe_macros::payload_procedure;
 
 pub fn __payload_procedure_helper<A: DeserializeOwned, R: Serialize>(
     buf_info_ptr: *mut c_void,
