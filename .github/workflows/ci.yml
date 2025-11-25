@@ -50,7 +50,24 @@ jobs:
       
     - name: Test
       run: cargo test --target ${{ matrix.target }} --all-targets --all-features -- --nocapture
-  
+      
+  arm-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install latest rust nightly for aarch64-pc-windows-msvc
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly
+          targets: aarch64-pc-windows-msvc
+
+      - name: Check macros
+        run: cargo check --manifest-path dll-syringe-macros/Cargo.toml --all-features
+        
+      - name: Check main crate
+        run: cargo check --all-features
+
   hack:
     runs-on: windows-latest
     steps:
