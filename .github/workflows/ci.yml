@@ -63,10 +63,10 @@ jobs:
           targets: aarch64-pc-windows-msvc
 
       - name: Check macros
-        run: cargo check --manifest-path dll-syringe-macros/Cargo.toml --all-features
+        run: cargo check --manifest-path dll-syringe-macros/Cargo.toml --target aarch64-pc-windows-msvc --all-features
         
       - name: Check main crate
-        run: cargo check --all-features
+        run: cargo check --target aarch64-pc-windows-msvc --all-features
 
   hack:
     runs-on: windows-latest
