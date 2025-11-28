@@ -1,10 +1,6 @@
 use iced_x86::{code_asm::*, IcedError};
 
-use std::{
-    ffi::CString,
-    mem,
-    ptr,
-};
+use std::{ffi::CString, mem, ptr};
 
 use crate::{
     error::LoadProcedureError,
