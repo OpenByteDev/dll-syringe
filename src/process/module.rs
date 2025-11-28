@@ -8,10 +8,10 @@ use std::{
 
 use crate::{
     error::{GetLocalProcedureAddressError, IoOrNulError},
-    function::{FunctionPtr, RawFunctionPtr},
     process::{BorrowedProcess, OwnedProcess, Process},
     utils::{win_fill_path_buf_helper, FillPathBufResult},
 };
+use fn_ptr::{FnPtr, UntypedFnPtr};
 use path_absolutize::Absolutize;
 use widestring::{U16CStr, U16CString};
 use winapi::{
@@ -302,7 +302,7 @@ impl<P: Process> ProcessModule<P> {
     pub fn get_local_procedure_address(
         &self,
         proc_name: impl AsRef<str>,
-    ) -> Result<RawFunctionPtr, GetLocalProcedureAddressError> {
+    ) -> Result<UntypedFnPtr, GetLocalProcedureAddressError> {
         if self.is_remote() {
             return Err(GetLocalProcedureAddressError::UnsupportedRemoteTarget);
         }
@@ -319,7 +319,7 @@ impl<P: Process> ProcessModule<P> {
     ///
     /// # Safety
     /// The target function must abide by the given function signature.
-    pub unsafe fn get_local_procedure<F: FunctionPtr>(
+    pub unsafe fn get_local_procedure<F: FnPtr>(
         &self,
         proc_name: impl AsRef<str>,
     ) -> Result<F, GetLocalProcedureAddressError> {
@@ -330,12 +330,12 @@ impl<P: Process> ProcessModule<P> {
     pub(crate) fn get_local_procedure_address_cstr(
         &self,
         proc_name: &CStr,
-    ) -> Result<RawFunctionPtr, io::Error> {
+    ) -> Result<UntypedFnPtr, io::Error> {
         assert!(self.is_local());
 
         let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ptr()) };
         if let Some(fn_ptr) = NonNull::new(fn_ptr) {
-            Ok(fn_ptr.as_ptr())
+            Ok(fn_ptr.as_ptr().cast())
         } else {
             Err(io::Error::last_os_error())
         }

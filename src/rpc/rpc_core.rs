@@ -3,12 +3,11 @@ use iced_x86::{code_asm::*, IcedError};
 use std::{
     ffi::CString,
     mem,
-    ptr::{self, NonNull},
+    ptr,
 };
 
 use crate::{
     error::LoadProcedureError,
-    function::{FunctionPtr, RawFunctionPtr},
     process::{
         memory::{RemoteAllocation, RemoteBox},
         BorrowedProcessModule, Process,
@@ -16,6 +15,7 @@ use crate::{
     rpc::error::RawRpcError,
     GetProcAddressFn, Syringe,
 };
+use fn_ptr::{FnPtr, UntypedFnPtr};
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-core")))]
 impl Syringe {
@@ -24,7 +24,7 @@ impl Syringe {
         &self,
         module: BorrowedProcessModule<'_>,
         name: impl AsRef<str>,
-    ) -> Result<Option<RawFunctionPtr>, LoadProcedureError> {
+    ) -> Result<Option<UntypedFnPtr>, LoadProcedureError> {
         assert!(
             module.process() == &self.process(),
             "trying to get a procedure from a module from a different process"
@@ -41,7 +41,7 @@ impl Syringe {
         })?;
 
         // clear the result
-        stub.result.write(&ptr::null_mut())?;
+        stub.result.write(&ptr::null())?;
 
         let exit_code = self.remote_allocator.process().run_remote_thread(
             unsafe { mem::transmute(stub.code.as_raw_ptr()) },
@@ -49,13 +49,13 @@ impl Syringe {
         )?;
         Syringe::remote_exit_code_to_exception(exit_code)?;
 
-        Ok(NonNull::new(stub.result.read()?).map(|p| p.as_ptr()))
+        let ptr = stub.result.read()?;
+        Ok(if ptr.is_null() { None } else { Some(ptr) })
     }
 
     fn build_get_proc_address_stub(
         &self,
-    ) -> Result<&RemoteProcedureStub<GetProcAddressParams, RawFunctionPtr>, LoadProcedureError>
-    {
+    ) -> Result<&RemoteProcedureStub<GetProcAddressParams, UntypedFnPtr>, LoadProcedureError> {
         self.get_proc_address_stub.get_or_try_init(|| {
             let inject_data = self.inject_help_data.get_or_try_init(|| {
                 Self::load_inject_help_data_for_process(self.remote_allocator.process())
@@ -66,7 +66,7 @@ impl Syringe {
             let parameter = self
                 .remote_allocator
                 .alloc_uninit::<GetProcAddressParams>()?;
-            let result = self.remote_allocator.alloc_uninit::<RawFunctionPtr>()?;
+            let result = self.remote_allocator.alloc_uninit::<UntypedFnPtr>()?;
 
             // Allocate memory in remote process and build a method stub.
             let code = if self.remote_allocator.process().is_x86()? {
@@ -96,7 +96,7 @@ impl Syringe {
     #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
     fn build_get_proc_address_x86(
         get_proc_address: GetProcAddressFn,
-        return_buffer: *mut RawFunctionPtr,
+        return_buffer: *mut UntypedFnPtr,
     ) -> Result<Vec<u8>, IcedError> {
         assert!(!return_buffer.is_null());
         assert_eq!(get_proc_address as u32 as usize, get_proc_address as usize);
@@ -133,7 +133,7 @@ impl Syringe {
     #[allow(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_with_truncation)]
     fn build_get_proc_address_x64(
         get_proc_address: GetProcAddressFn,
-        return_buffer: *mut RawFunctionPtr,
+        return_buffer: *mut UntypedFnPtr,
     ) -> Result<Vec<u8>, IcedError> {
         assert!(!return_buffer.is_null());
 

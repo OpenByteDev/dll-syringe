@@ -4,7 +4,6 @@ use std::marker::PhantomData;
 
 use crate::{
     error::LoadProcedureError,
-    function::{FunctionPtr, RawFunctionPtr},
     process::{
         memory::{ProcessMemoryBuffer, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, ModuleHandle,
@@ -13,6 +12,7 @@ use crate::{
     utils::ArrayOrVecBuf,
     ArgAndResultBufInfo, Syringe,
 };
+use fn_ptr::{FnPtr, UntypedFnPtr};
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
 impl Syringe {
@@ -25,14 +25,14 @@ impl Syringe {
     ///
     /// # Safety
     /// The target function must abide by the given signature and has to be declared using the [`payload_procedure!`](crate::payload_procedure) macro.
-    pub unsafe fn get_payload_procedure<F: PayloadRpcFunctionPtr>(
+    pub unsafe fn get_payload_procedure<F: PayloadRpcFnPtr>(
         &self,
         module: BorrowedProcessModule<'_>,
         name: &str,
     ) -> Result<Option<RemotePayloadProcedure<F>>, LoadProcedureError> {
         match self.get_procedure_address(module, name) {
             Ok(Some(procedure)) => Ok(Some(RemotePayloadProcedure::new(
-                unsafe { RealPayloadRpcFunctionPtr::from_ptr(procedure) },
+                unsafe { RealPayloadRpcFnPtr::from_ptr(procedure) },
                 self.remote_allocator.clone(),
                 module.handle(),
             ))),
@@ -44,24 +44,24 @@ impl Syringe {
 
 /// A function pointer that can be used with [`RemotePayloadProcedure`].
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
-pub trait PayloadRpcFunctionPtr: FunctionPtr {}
+pub trait PayloadRpcFnPtr: FnPtr {}
 
-type RealPayloadRpcFunctionPtr = extern "system" fn(Truncate<*mut ArgAndResultBufInfo>);
+type RealPayloadRpcFnPtr = extern "system" fn(Truncate<*mut ArgAndResultBufInfo>);
 
 /// A struct representing a procedure from a module of a remote process.
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-payload")))]
 #[derive(Debug)]
 pub struct RemotePayloadProcedure<F> {
-    f: RemoteRawProcedure<RealPayloadRpcFunctionPtr>,
+    f: RemoteRawProcedure<RealPayloadRpcFnPtr>,
     phantom: PhantomData<fn() -> F>,
 }
 
 impl<F> RemotePayloadProcedure<F>
 where
-    F: FunctionPtr,
+    F: FnPtr,
 {
     pub(crate) fn new(
-        ptr: RealPayloadRpcFunctionPtr,
+        ptr: RealPayloadRpcFnPtr,
         remote_allocator: RemoteBoxAllocator,
         module_handle: ModuleHandle,
     ) -> Self {
@@ -79,18 +79,22 @@ where
 
     /// Returns the raw underlying pointer to the remote procedure.
     #[must_use]
-    pub fn as_raw_ptr(&self) -> RawFunctionPtr {
+    pub fn as_raw_ptr(&self) -> UntypedFnPtr {
         self.f.as_raw_ptr()
     }
 }
 
 impl<F> RemotePayloadProcedure<F>
 where
-    F: PayloadRpcFunctionPtr,
-    for<'r> F::RefArgs<'r>: Serialize,
+    F: PayloadRpcFnPtr,
+    for<'a> F::Args: Tuple<'a>,
+    for<'a> <F::Args as Tuple<'a>>::Refs: Serialize,
     F::Output: DeserializeOwned,
 {
-    fn call_with_args(&self, args: F::RefArgs<'_>) -> Result<F::Output, PayloadRpcError> {
+    fn call_with_args(
+        &self,
+        args: <F::Args as Tuple<'_>>::Refs,
+    ) -> Result<F::Output, PayloadRpcError> {
         let config = bincode::config::standard();
 
         let mut size_writer = bincode::enc::write::SizeWriter::default();
@@ -162,8 +166,8 @@ macro_rules! impl_call {
     };
 
     (@impl_all ($($nm:ident : $ty:ident),*)) => {
-        impl <$($ty,)* Output> PayloadRpcFunctionPtr for fn($($ty),*) -> Output where $($ty : 'static + Serialize,)* Output: 'static + DeserializeOwned { }
-        impl <$($ty,)* Output> PayloadRpcFunctionPtr for unsafe fn($($ty),*) -> Output where $($ty : 'static + Serialize,)* Output: 'static + DeserializeOwned { }
+        impl <$($ty,)* Output> PayloadRpcFnPtr for fn($($ty),*) -> Output where $($ty : 'static + Serialize,)* Output: 'static + DeserializeOwned { }
+        impl <$($ty,)* Output> PayloadRpcFnPtr for unsafe fn($($ty),*) -> Output where $($ty : 'static + Serialize,)* Output: 'static + DeserializeOwned { }
 
         impl <$($ty,)* Output> RemotePayloadProcedure<fn($($ty),*) -> Output> where $($ty: 'static + Serialize,)* Output: 'static + DeserializeOwned,  {
             /// Calls the remote procedure with the given arguments.
@@ -200,6 +204,44 @@ macro_rules! impl_call {
 }
 
 impl_call! {
-    arg0:  A, arg1:  B, arg2:  C, arg3:  D, arg4:  E, arg5:  F,arg6:  G,
-    arg7:  H, arg8:  I, arg9:  J, arg10: K, arg11: L
+    arg0: A, arg1: B, arg2: C, arg3: D, arg4: E, arg5: F, arg6: G,
+    arg7: H, arg8: I, arg9: J, arg10: K, arg11: L
 }
+
+/// Marker trait defined for all tuples. Used to get
+#[doc(hidden)]
+pub trait Tuple<'a> {
+    type Refs;
+}
+
+// Macro to generate TupleRefs for a given tuple size
+macro_rules! impl_tuple_refs {
+    // base case: empty tuple
+    () => {
+        impl<'a> Tuple<'a> for () {
+            type Refs = ();
+        }
+    };
+
+    // recursive case: tuple with N elements
+    ($($T:ident),+) => {
+        impl<'a, $($T : 'a),+> Tuple<'a> for ($($T),+,) {
+            type Refs = ($( &'a $T ),+,);
+        }
+    };
+}
+
+// Generate implementations for 0..12 elements
+impl_tuple_refs!();
+impl_tuple_refs!(T0);
+impl_tuple_refs!(T0, T1);
+impl_tuple_refs!(T0, T1, T2);
+impl_tuple_refs!(T0, T1, T2, T3);
+impl_tuple_refs!(T0, T1, T2, T3, T4);
+impl_tuple_refs!(T0, T1, T2, T3, T4, T5);
+impl_tuple_refs!(T0, T1, T2, T3, T4, T5, T6);
+impl_tuple_refs!(T0, T1, T2, T3, T4, T5, T6, T7);
+impl_tuple_refs!(T0, T1, T2, T3, T4, T5, T6, T7, T8);
+impl_tuple_refs!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9);
+impl_tuple_refs!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
+impl_tuple_refs!(T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
