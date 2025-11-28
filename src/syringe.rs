@@ -33,7 +33,7 @@ use {
 
 #[cfg(feature = "rpc-core")]
 use {
-    crate::function::RawFunctionPtr,
+    fn_ptr::UntypedFnPtr,
     winapi::shared::{minwindef::FARPROC, ntdef::LPCSTR},
 };
 
@@ -99,7 +99,7 @@ pub struct Syringe {
     load_library_w_stub: OnceCell<LoadLibraryWStub>,
     #[cfg(feature = "rpc-core")]
     pub(crate) get_proc_address_stub:
-        OnceCell<crate::rpc::RemoteProcedureStub<crate::rpc::GetProcAddressParams, RawFunctionPtr>>,
+        OnceCell<crate::rpc::RemoteProcedureStub<crate::rpc::GetProcAddressParams, UntypedFnPtr>>,
 }
 
 impl Syringe {

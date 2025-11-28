@@ -8,7 +8,6 @@ use std::{
 
 use crate::{
     error::LoadProcedureError,
-    function::{Abi, FunctionPtr, RawFunctionPtr},
     process::{
         memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, ModuleHandle, Process, ProcessModule,
@@ -16,6 +15,7 @@ use crate::{
     rpc::error::RawRpcError,
     Syringe,
 };
+use fn_ptr::{make_non_extern, Abi, FnPtr, UntypedFnPtr};
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
 impl Syringe {
@@ -30,7 +30,7 @@ impl Syringe {
     ///
     /// # Safety
     /// The target function must abide by the given signature.
-    pub unsafe fn get_raw_procedure<F: RawRpcFunctionPtr>(
+    pub unsafe fn get_raw_procedure<F: RawRpcFnPtr>(
         &self,
         module: BorrowedProcessModule<'_>,
         name: &str,
@@ -49,7 +49,7 @@ impl Syringe {
 
 /// A function pointer that can be used with [`RemoteRawProcedure`].
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
-pub trait RawRpcFunctionPtr: FunctionPtr {}
+pub trait RawRpcFnPtr: FnPtr {}
 
 /// A struct representing a procedure from a module of a remote process.
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
@@ -60,7 +60,7 @@ pub struct RemoteRawProcedure<F> {
     module_handle: ModuleHandle,
 }
 
-impl<F: FunctionPtr> fmt::Debug for RemoteRawProcedure<F> {
+impl<F: FnPtr> fmt::Debug for RemoteRawProcedure<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RemoteRawProcedure")
             .field("ptr", &self.ptr.as_ptr())
@@ -80,7 +80,7 @@ pub(crate) struct RemoteRawProcedureStub {
 
 impl<F> RemoteRawProcedure<F>
 where
-    F: FunctionPtr,
+    F: FnPtr,
 {
     pub(crate) fn new(
         ptr: F,
@@ -109,14 +109,14 @@ where
 
     /// Returns the raw underlying pointer to the remote procedure.
     #[must_use]
-    pub fn as_raw_ptr(&self) -> RawFunctionPtr {
+    pub fn as_raw_ptr(&self) -> UntypedFnPtr {
         self.as_ptr().as_ptr()
     }
 }
 
 impl<F> RemoteRawProcedure<F>
 where
-    F: RawRpcFunctionPtr,
+    F: RawRpcFnPtr,
 {
     fn call_with_args(&self, args: &[usize]) -> Result<F::Output, RawRpcError> {
         if !self.process().is_alive() {
@@ -158,7 +158,7 @@ where
             let parameter = self.remote_allocator.alloc_buf::<usize>(F::ARITY)?;
             let result = self.remote_allocator.alloc_uninit::<usize>()?;
 
-            let float_mask = <F::NonExtern>::build_float_mask();
+            let float_mask = <make_non_extern!(F)>::build_float_mask();
             let code = if self.process().is_x86()? {
                 Self::build_call_stub_x86(self.ptr, result.as_ptr().as_ptr(), float_mask).unwrap()
             } else {
@@ -316,7 +316,7 @@ trait BuildFloatMask {
 /// A transparent wrapper that when used as a parameter of a [`RemoteRawProcedure`] will be truncated without an error according to system endianess.
 pub struct Truncate<T>(pub T);
 
-impl<F: FunctionPtr> BuildFloatMask for F {
+impl<F: FnPtr> BuildFloatMask for F {
     default fn build_float_mask() -> u32 {
         // This default implementation will never be called as there exists a specialization for every valid function pointer (defined in the macro below).
         unreachable!()
@@ -333,10 +333,10 @@ macro_rules! impl_call {
     };
 
     (@impl_all ($($nm:ident : $ty:ident),*)) => {
-        impl <$($ty,)* Output> RawRpcFunctionPtr for extern "system" fn($($ty),*) -> Output where $($ty : 'static + Copy,)* Output: 'static + Copy { }
-        impl <$($ty,)* Output> RawRpcFunctionPtr for unsafe extern "system" fn($($ty),*) -> Output where $($ty : 'static + Copy,)* Output: 'static + Copy { }
-        impl <$($ty,)* Output> RawRpcFunctionPtr for extern "C" fn($($ty),*) -> Output where $($ty : 'static + Copy,)* Output: 'static + Copy { }
-        impl <$($ty,)* Output> RawRpcFunctionPtr for unsafe extern "C" fn($($ty),*) -> Output where $($ty : 'static + Copy,)* Output: 'static + Copy { }
+        impl <$($ty,)* Output> RawRpcFnPtr for extern "system" fn($($ty),*) -> Output where $($ty : 'static + Copy,)* Output: 'static + Copy { }
+        impl <$($ty,)* Output> RawRpcFnPtr for unsafe extern "system" fn($($ty),*) -> Output where $($ty : 'static + Copy,)* Output: 'static + Copy { }
+        impl <$($ty,)* Output> RawRpcFnPtr for extern "C" fn($($ty),*) -> Output where $($ty : 'static + Copy,)* Output: 'static + Copy { }
+        impl <$($ty,)* Output> RawRpcFnPtr for unsafe extern "C" fn($($ty),*) -> Output where $($ty : 'static + Copy,)* Output: 'static + Copy { }
 
         impl <$($ty,)* Output> RemoteRawProcedure<fn($($ty),*) -> Output> where $($ty : 'static + Copy,)* Output: 'static + Copy  {
             #[allow(clippy::too_many_arguments)]
@@ -451,6 +451,6 @@ macro_rules! impl_call {
 }
 
 impl_call! {
-    arg0:  A, arg1:  B, arg2:  C, arg3:  D, arg4:  E, arg5:  F,arg6:  G,
-    arg7:  H, arg8:  I, arg9:  J, arg10: K, arg11: L
+    arg0: A, arg1: B, arg2: C, arg3: D, arg4: E, arg5: F,arg6: G,
+    arg7: H, arg8: I, arg9: J, arg10: K, arg11: L
 }
