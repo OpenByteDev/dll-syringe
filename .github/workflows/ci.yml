@@ -23,7 +23,7 @@ jobs:
           - target: x86_64-pc-windows-msvc
             target32: i686-pc-windows-msvc
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     
     - name: Install latest rust ${{ matrix.toolchain }} for ${{ matrix.target }}
       uses: dtolnay/rust-toolchain@nightly
@@ -54,12 +54,11 @@ jobs:
   arm-build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install latest rust nightly for aarch64-pc-windows-msvc
         uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly
           targets: aarch64-pc-windows-msvc
 
       - name: Check macros
@@ -71,7 +70,7 @@ jobs:
   hack:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install latest nightly
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -84,7 +83,7 @@ jobs:
   documentation:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Install latest nightly
       uses: dtolnay/rust-toolchain@nightly
       with:
@@ -99,7 +98,7 @@ jobs:
   clippy:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install latest nightly
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -111,7 +110,7 @@ jobs:
   fmt:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Install latest nightly
       uses: dtolnay/rust-toolchain@nightly
       with:
