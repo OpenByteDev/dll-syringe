@@ -41,12 +41,12 @@ impl<'a> DerefMut for ProcessMemoryBuffer<'a> {
 }
 impl<'a> AsRef<ProcessMemorySlice<'a>> for ProcessMemoryBuffer<'a> {
     fn as_ref(&self) -> &ProcessMemorySlice<'a> {
-        self.deref()
+        self
     }
 }
 impl<'a> AsMut<ProcessMemorySlice<'a>> for ProcessMemoryBuffer<'a> {
     fn as_mut(&mut self) -> &mut ProcessMemorySlice<'a> {
-        self.deref_mut()
+        self
     }
 }
 
@@ -176,9 +176,9 @@ impl<'a> ProcessMemoryBuffer<'a> {
 
     /// Frees the buffer.
     pub fn free(mut self) -> Result<(), (Self, io::Error)> {
-        unsafe { self._free() }.map_err(|e| (self, e))
+        unsafe { self.dangerous_free() }.map_err(|e| (self, e))
     }
-    unsafe fn _free(&mut self) -> Result<(), io::Error> {
+    unsafe fn dangerous_free(&mut self) -> Result<(), io::Error> {
         let result = unsafe {
             VirtualFreeEx(
                 self.process.as_raw_handle().cast(),
@@ -206,7 +206,7 @@ impl<'a> ProcessMemoryBuffer<'a> {
 
 impl Drop for ProcessMemoryBuffer<'_> {
     fn drop(&mut self) {
-        let result = unsafe { self._free() };
+        let result = unsafe { self.dangerous_free() };
         debug_assert!(
             result.is_ok(),
             "Failed to free process memory buffer: {result:?}"
@@ -297,7 +297,7 @@ impl<'a> ProcessMemorySlice<'a> {
                 self.ptr.add(offset).cast(),
                 buf.as_mut_ptr().cast(),
                 buf.len(),
-                &mut bytes_read,
+                &raw mut bytes_read,
             )
         };
         if result == 0 {
@@ -350,7 +350,7 @@ impl<'a> ProcessMemorySlice<'a> {
                 self.ptr.add(offset).cast(),
                 buf.as_ptr().cast(),
                 buf.len(),
-                &mut bytes_written,
+                &raw mut bytes_written,
             )
         };
         if result == 0 {
@@ -367,7 +367,7 @@ impl<'a> ProcessMemorySlice<'a> {
     /// This function will panic if the given offset plus the given buffer length exceeds this buffer's length.
     pub fn write_struct<T: ?Sized>(&self, offset: usize, s: &T) -> Result<(), io::Error> {
         self.write(offset, unsafe {
-            slice::from_raw_parts(s as *const T as *const u8, mem::size_of_val(s))
+            slice::from_raw_parts(ptr::from_ref(s).cast::<u8>(), mem::size_of_val(s))
         })
     }
 

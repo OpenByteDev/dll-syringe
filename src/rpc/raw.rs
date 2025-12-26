@@ -3,7 +3,7 @@ use iced_x86::{code_asm::*, IcedError};
 use std::{
     any::{self, TypeId},
     cell::OnceCell,
-    cmp, fmt, io, mem, slice,
+    cmp, fmt, io, mem, ptr, slice,
 };
 
 use crate::{
@@ -363,7 +363,7 @@ macro_rules! impl_call {
                     );
 
                     let mut buf = [0u8; mem::size_of::<usize>()];
-                    let arg_bytes = unsafe { slice::from_raw_parts(&$nm as *const $ty as *const u8, mem::size_of::<$ty>()) };
+                    let arg_bytes = unsafe { slice::from_raw_parts(ptr::from_ref(&$nm).cast::<u8>(), mem::size_of::<$ty>()) };
                     let truncated_arg_len = cmp::min(mem::size_of::<$ty>(), target_pointer_size);
                     if cfg!(target_endian = "little") {
                         buf[..truncated_arg_len].copy_from_slice(&arg_bytes[..truncated_arg_len]);
