@@ -19,7 +19,7 @@ impl<T, const SIZE: usize> ArrayBuf<T, SIZE> {
     }
 
     pub fn from_array(mut array: [T; SIZE]) -> Self {
-        let data = unsafe { ptr::read(&mut array as *mut _ as *mut [MaybeUninit<T>; SIZE]) };
+        let data = unsafe { ptr::read(ptr::from_mut(&mut array).cast::<[MaybeUninit<T>; SIZE]>()) };
         Self { data, len: SIZE }
     }
 
@@ -35,6 +35,7 @@ impl<T, const SIZE: usize> ArrayBuf<T, SIZE> {
         self.len == 0
     }
 
+    #[allow(clippy::unused_self)]
     pub fn capacity(&self) -> usize {
         SIZE
     }

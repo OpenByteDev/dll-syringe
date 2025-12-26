@@ -144,7 +144,7 @@ where
                 )
             };
             result_memory.read(0, &mut local_result_buf)?;
-        };
+        }
 
         if result_buf_info.is_error {
             Err(PayloadRpcError::RemoteProcedure(unsafe {

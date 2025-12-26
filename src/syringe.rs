@@ -197,11 +197,11 @@ impl Syringe {
             .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process()))?;
 
         if !module.guess_is_loaded() {
-            if self.process().is_alive() {
-                return Err(EjectError::ModuleInaccessible);
+            return if self.process().is_alive() {
+                Err(EjectError::ModuleInaccessible)
             } else {
-                return Err(EjectError::ProcessInaccessible);
-            }
+                Err(EjectError::ProcessInaccessible)
+            };
         }
 
         let exit_code = self.process().run_remote_thread(

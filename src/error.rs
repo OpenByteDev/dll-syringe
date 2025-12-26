@@ -79,7 +79,7 @@ pub enum ExceptionCode {
     FltStackCheck = EXCEPTION_FLT_STACK_CHECK,
     /// The exponent of a floating point operation is less than the magnitude allowed by the corresponding type.
     FltUnderflow = EXCEPTION_FLT_UNDERFLOW,
-    /// The thread accessed memory allocated with the PAGE_GUARD modifier.
+    /// The thread accessed memory allocated with the `PAGE_GUARD` modifier.
     GuardPage = EXCEPTION_GUARD_PAGE,
     /// The thread tries to execute an invalid instruction.
     IllegalInstruction = EXCEPTION_ILLEGAL_INSTRUCTION,
@@ -191,7 +191,7 @@ pub(crate) enum LoadInjectHelpDataError {
 #[cfg(feature = "syringe")]
 impl From<io::Error> for LoadInjectHelpDataError {
     fn from(err: io::Error) -> Self {
-        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY.cast_signed())
             || err.kind() == io::ErrorKind::PermissionDenied
         {
             Self::ProcessInaccessible
@@ -238,7 +238,7 @@ pub enum InjectError {
 #[cfg(feature = "syringe")]
 impl From<io::Error> for InjectError {
     fn from(err: io::Error) -> Self {
-        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY.cast_signed())
             || err.kind() == io::ErrorKind::PermissionDenied
         {
             Self::ProcessInaccessible
@@ -338,7 +338,7 @@ impl From<LoadInjectHelpDataError> for EjectError {
 #[cfg(feature = "syringe")]
 impl From<io::Error> for EjectError {
     fn from(err: io::Error) -> Self {
-        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY.cast_signed())
             || err.kind() == io::ErrorKind::PermissionDenied
         {
             Self::ProcessInaccessible
@@ -414,7 +414,7 @@ impl From<LoadInjectHelpDataError> for LoadProcedureError {
 #[cfg(feature = "syringe")]
 impl From<io::Error> for LoadProcedureError {
     fn from(err: io::Error) -> Self {
-        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY.cast_signed())
             || err.kind() == io::ErrorKind::PermissionDenied
         {
             Self::ProcessInaccessible
@@ -490,7 +490,7 @@ pub enum SyringeError {
 #[cfg(feature = "syringe")]
 impl From<io::Error> for SyringeError {
     fn from(err: io::Error) -> Self {
-        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY.cast_signed())
             || err.kind() == io::ErrorKind::PermissionDenied
         {
             Self::ProcessInaccessible

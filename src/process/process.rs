@@ -153,7 +153,7 @@ pub trait Process: AsHandle + AsRawHandle {
         win_fill_path_buf_helper(|buf_ptr, buf_size| {
             let mut buf_size = buf_size as u32;
             let result = unsafe {
-                QueryFullProcessImageNameW(self.as_raw_handle().cast(), 0, buf_ptr, &mut buf_size)
+                QueryFullProcessImageNameW(self.as_raw_handle().cast(), 0, buf_ptr, &raw mut buf_size)
             };
             if result == 0 {
                 let err = io::Error::last_os_error();
@@ -213,7 +213,8 @@ pub trait Process: AsHandle + AsRawHandle {
             return Err(io::Error::last_os_error());
         }
         debug_assert_ne!(
-            result as u32, STILL_ACTIVE,
+            result,
+            STILL_ACTIVE.cast_signed(),
             "GetExitCodeThread returned STILL_ACTIVE after WaitForSingleObject"
         );
 

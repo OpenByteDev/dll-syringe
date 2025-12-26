@@ -31,7 +31,7 @@ pub enum RawRpcError {
 #[cfg_attr(all(feature = "rpc-core", not(feature = "rpc-raw")), doc(hidden))]
 impl From<io::Error> for RawRpcError {
     fn from(err: io::Error) -> Self {
-        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY.cast_signed())
             || err.kind() == io::ErrorKind::PermissionDenied
         {
             Self::ProcessInaccessible
@@ -106,7 +106,7 @@ impl From<bincode::error::DecodeError> for PayloadRpcError {
 #[cfg(feature = "rpc-payload")]
 impl From<io::Error> for PayloadRpcError {
     fn from(err: io::Error) -> Self {
-        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _)
+        if err.raw_os_error() == Some(ERROR_PARTIAL_COPY.cast_signed())
             || err.kind() == io::ErrorKind::PermissionDenied
         {
             Self::ProcessInaccessible
