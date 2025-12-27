@@ -281,7 +281,6 @@ where
         if float_mask & 0x8000_0000u32 != 0 {
             asm.movq(rax, xmm0)?;
         }
-        asm.movq(rax, xmm0)?;
         asm.mov(qword_ptr(result_buf as u64), rax)?;
 
         asm.mov(rax, 0u64)?; // return 0
