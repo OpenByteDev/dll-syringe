@@ -1,12 +1,10 @@
 #![cfg(feature = "c-exports")]
-#![cfg(feature = "syringe")]
 
 #[allow(unused)]
 mod common;
 
 use dll_syringe::{c_exports::*, process::Process};
-use std::{ffi::CString, os::windows::io::IntoRawHandle};
-use winapi::um::processthreadsapi::GetProcessId;
+use std::ffi::CString;
 
 syringe_test! {
     fn test_syringe_for_process(

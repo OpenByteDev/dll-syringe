@@ -33,7 +33,6 @@ iced-x86 = { version = "1.21", features = ["std", "code_asm", "op_code_info"], d
 cu-bincode = { version = "2.0", features = ["std", "serde"], default-features = false, optional = true }
 serde = { version = "1.0", default-features = false, optional = true }
 
-# C# Bindings
 [build-dependencies]
 csbindgen = "1.9.0"
 
