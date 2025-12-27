@@ -48,9 +48,8 @@ pub fn __payload_procedure_helper<A: DeserializeOwned, R: Serialize>(
                 _ => unreachable!(),
             };
 
-            let mut error_buf = match allocate_local_process_memory(message.len()) {
-                Ok(buf) => buf,
-                Err(_) => return,
+            let Ok(mut error_buf) = allocate_local_process_memory(message.len()) else {
+                return;
             };
             unsafe {
                 (*buf_info_ptr).data = error_buf.as_ptr() as u64;
