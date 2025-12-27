@@ -1,9 +1,8 @@
-use crate::process::{BorrowedProcessModule, OwnedProcess};
-use crate::Syringe;
-use std::ffi::CStr;
-use std::os::raw::c_char;
-use std::path::Path;
-use std::ptr::null_mut;
+use crate::{
+    process::{BorrowedProcessModule, OwnedProcess},
+    Syringe,
+};
+use std::{ffi::CStr, os::raw::c_char, path::Path, ptr::null_mut};
 
 // Note: Don't specify [repr(C)] for these structs, as they are not passed to C code.
 // The C code only interacts with pointers to these structs.
