@@ -50,7 +50,31 @@ jobs:
       
     - name: Test
       run: cargo test --target ${{ matrix.target }} --all-targets --all-features -- --nocapture
-      
+  
+  test-on-wine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install latest rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Add windows rust targets
+        run: |
+          rustup target add x86_64-pc-windows-msvc --toolchain nightly
+          rustup target add i686-pc-windows-msvc --toolchain nightly
+      - name: Install cargo-xwin
+        run: cargo install cargo-xwin
+      - name: Install Wine
+        run: |
+          sudo apt-get install ppa-purge && sudo ppa-purge -y ppa:ubuntu-toolchain-r/test
+          sudo dpkg --add-architecture i386
+          sudo mkdir -pm755 /etc/apt/keyrings && sudo wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+          sudo wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources
+          sudo apt-get update
+          sudo apt install --install-recommends winehq-stable
+      - name: Run tests on Wine
+        run: ./scripts/test-wine.ps1
+        shell: pwsh
+
   arm-build:
     runs-on: windows-latest
     steps:
@@ -118,3 +142,108 @@ jobs:
           components: rustfmt
     - name: Format check
       run: cargo fmt --all -- --check
+
+  build-c-libs:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            use_cross: false
+            features: "c-exports,into-x86-from-x64"
+          - os: windows-latest
+            target: i686-pc-windows-msvc
+            use_cross: false
+            features: "c-exports"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: build-libs
+        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/build-c-library@v1
+        with:
+          target: ${{ matrix.target }}
+          use_pgo: false
+          use_cross: ${{ matrix.use_cross }}
+          features:  ${{ matrix.features }}
+          no_default_features: true
+
+  build-c-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Generate C++ bindings
+        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/generate-bindings@v1
+        with:
+          config_file: cbindgen_cpp.toml
+          header_file: bindings_cpp.hpp
+      - name: Generate C bindings
+        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/generate-bindings@v1
+        with:
+          config_file: cbindgen_c.toml
+          header_file: bindings_c.h
+
+  build-dotnet-library:
+    needs: build-c-libs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      - name: Build and Package .NET Library
+        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/build-dotnet-library@dotnet-bindings
+        with:
+          targets: 'x86_64-pc-windows-msvc,i686-pc-windows-msvc'
+
+  publish-crate:
+    permissions:
+      contents: write
+    needs: [test,build-c-libs,build-c-headers,test-on-wine,build-dotnet-library]
+    if: startsWith(github.ref, 'refs/tags/') 
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Upload to NuGet
+        shell: pwsh
+        run: |
+          $items = Get-ChildItem -Path "artifacts/**.nupkg" -Recurse
+          Foreach ($item in $items)
+          {
+              Write-Host "Pushing $item"
+              dotnet nuget push "$item" -k "${{ secrets.NUGET_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
+          }
+
+          $items = Get-ChildItem -Path "artifacts/**.snupkg" -Recurse
+          Foreach ($item in $items)
+          {
+              Write-Host "Pushing Symbol Package $item"
+              dotnet nuget push "$item" -k "${{ secrets.NUGET_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
+          }
+      - name: Compress Artifacts
+        shell: bash
+        run: |
+          dir="artifacts"
+          if [ ! -d "$dir" ]; then
+            echo "Directory $dir does not exist. No artifacts found."
+            exit 0
+          fi
+
+          for subdir in "$dir"/*; do
+            if [ -d "$subdir" ]; then
+              base=$(basename "$subdir")
+              zip -r "$dir/$base.zip" "$subdir"
+              rm -r "$subdir"
+            fi
+          done
+          ls -A ./artifacts
+      - name: GitHub Release Artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/*
+      - name: Publish to crates.io
+        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/publish-crate@v1
+        with:
+          token: ${{ secrets.CRATES_IO_TOKEN }}
