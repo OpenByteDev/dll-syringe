@@ -19,44 +19,44 @@ namespace DllSyringe.Net.Sys
 
 
         /// <summary>
-        ///  Creates a new [`Syringe`] instance for a process identified by PID.
+        ///  Creates a new `Syringe` instance for a process identified by PID.
         ///
         ///  # Arguments
         ///  * `pid` - The PID of the target process.
         ///
         ///  # Returns
-        ///  A pointer to a [`Syringe`] instance, or null if the process could not be opened.
+        ///  A pointer to a `Syringe` instance, or null if the process could not be opened.
         ///
         ///  # Note
-        ///  The returned instance has to freed using [`syringe_free`].
+        ///  The returned instance has to freed using `syringe_free`.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_for_process", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern Syringe* syringe_for_process(uint pid);
 
         /// <summary>
-        ///  Creates a new [`Syringe`] instance for a suspended process identified by PID.
+        ///  Creates a new `Syringe` instance for a suspended process identified by PID.
         ///
         ///  # Arguments
         ///  * `pid` - The PID of the target suspended process.
         ///
         ///  # Returns
-        ///  A pointer to a [`Syringe`] instance, or null if the process could not be opened or initialized.
+        ///  A pointer to a `Syringe` instance, or null if the process could not be opened or initialized.
         ///
         ///  # Note
-        ///  The returned instance has to freed using [`syringe_free`].
+        ///  The returned instance has to freed using `syringe_free`.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_for_suspended_process", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern Syringe* syringe_for_suspended_process(uint pid);
 
         /// <summary>
-        ///  Injects a DLL into the target process associated with the given [`Syringe`].
+        ///  Injects a DLL into the target process associated with the given `Syringe`.
         ///
         ///  # Arguments
-        ///  * `syringe` - A pointer to the [`Syringe`] instance.
+        ///  * `syringe` - A pointer to the `Syringe` instance.
         ///  * `dll_path` - A C string path to the DLL to be injected.
         ///
         ///  # Returns
-        ///  [`true`] if injection succeeded, otherwise [`false`].
+        ///  `true` if injection succeeded, otherwise `false`.
         ///
         ///  # Safety
         ///  The caller must ensure the given syringe pointer is valid.
@@ -72,7 +72,7 @@ namespace DllSyringe.Net.Sys
         ///  Otherwise, it injects the DLL.
         ///
         ///  # Arguments
-        ///  * `syringe` - A pointer to the [`Syringe`] instance.
+        ///  * `syringe` - A pointer to the `Syringe` instance.
         ///  * `dll_path` - A C string path to the DLL to be injected.
         ///
         ///  # Returns
@@ -88,11 +88,11 @@ namespace DllSyringe.Net.Sys
         ///  Ejects a module from the target process.
         ///
         ///  # Arguments
-        ///  * `syringe` - A pointer to the [`Syringe`] instance.
+        ///  * `syringe` - A pointer to the `Syringe` instance.
         ///  * `module` - The base address of the module to be ejected.
         ///
         ///  # Returns
-        ///  [`true`] if ejection succeeded, otherwise [`false`].
+        ///  `true` if ejection succeeded, otherwise `false`.
         ///
         ///  # Safety
         ///  The caller must ensure that the given syringe pointer is valid and
@@ -103,10 +103,10 @@ namespace DllSyringe.Net.Sys
         public static extern bool syringe_eject(Syringe* syringe, ModuleHandle module);
 
         /// <summary>
-        ///  Frees a [`Syringe`] instance.
+        ///  Frees a `Syringe` instance.
         ///
         ///  # Arguments
-        ///  * `syringe` - A pointer to the [`Syringe`] instance to be freed.
+        ///  * `syringe` - A pointer to the `Syringe` instance to be freed.
         ///
         ///  # Safety
         ///  The caller must ensure that the given syringe pointer is valid or null.

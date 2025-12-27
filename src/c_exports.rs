@@ -4,42 +4,41 @@ use crate::{
 };
 use std::{ffi::CStr, os::raw::c_char, path::Path, ptr};
 
-/// Creates a new [`Syringe`] instance for a process identified by PID.
+/// Creates a new `Syringe` instance for a process identified by PID.
 ///
 /// # Arguments
 /// * `pid` - The PID of the target process.
 ///
 /// # Returns
-/// A pointer to a [`Syringe`] instance, or null if the process could not be opened.
+/// A pointer to a `Syringe` instance, or null if the process could not be opened.
 ///
 /// # Note
-/// The returned instance has to freed using [`syringe_free`].
+/// The returned instance has to freed using `syringe_free`.
 #[no_mangle]
 pub extern "C" fn syringe_for_process(pid: u32) -> *mut Syringe {
-    let process = match OwnedProcess::from_pid(pid) {
-        Ok(process) => process,
-        Err(_) => return ptr::null_mut(),
+    let Ok(process) = OwnedProcess::from_pid(pid) else {
+        return ptr::null_mut();
     };
+
     let syringe = Syringe::for_process(process);
     let boxed = Box::new(syringe);
     Box::into_raw(boxed)
 }
 
-/// Creates a new [`Syringe`] instance for a suspended process identified by PID.
+/// Creates a new `Syringe` instance for a suspended process identified by PID.
 ///
 /// # Arguments
 /// * `pid` - The PID of the target suspended process.
 ///
 /// # Returns
-/// A pointer to a [`Syringe`] instance, or null if the process could not be opened or initialized.
+/// A pointer to a `Syringe` instance, or null if the process could not be opened or initialized.
 ///
 /// # Note
-/// The returned instance has to freed using [`syringe_free`].
+/// The returned instance has to freed using `syringe_free`.
 #[no_mangle]
 pub extern "C" fn syringe_for_suspended_process(pid: u32) -> *mut Syringe {
-    let process = match OwnedProcess::from_pid(pid) {
-        Ok(process) => process,
-        Err(_) => return ptr::null_mut(),
+    let Ok(process) = OwnedProcess::from_pid(pid) else {
+        return ptr::null_mut();
     };
 
     match Syringe::for_suspended_process(process) {
@@ -51,14 +50,14 @@ pub extern "C" fn syringe_for_suspended_process(pid: u32) -> *mut Syringe {
     }
 }
 
-/// Injects a DLL into the target process associated with the given [`Syringe`].
+/// Injects a DLL into the target process associated with the given `Syringe`.
 ///
 /// # Arguments
-/// * `syringe` - A pointer to the [`Syringe`] instance.
+/// * `syringe` - A pointer to the `Syringe` instance.
 /// * `dll_path` - A C string path to the DLL to be injected.
 ///
 /// # Returns
-/// [`true`] if injection succeeded, otherwise [`false`].
+/// `true` if injection succeeded, otherwise `false`.
 ///
 /// # Safety
 /// The caller must ensure the given syringe pointer is valid.
@@ -77,7 +76,7 @@ pub unsafe extern "C" fn syringe_inject(syringe: *mut Syringe, dll_path: *const 
 /// Otherwise, it injects the DLL.
 ///
 /// # Arguments
-/// * `syringe` - A pointer to the [`Syringe`] instance.
+/// * `syringe` - A pointer to the `Syringe` instance.
 /// * `dll_path` - A C string path to the DLL to be injected.
 ///
 /// # Returns
@@ -86,7 +85,7 @@ pub unsafe extern "C" fn syringe_inject(syringe: *mut Syringe, dll_path: *const 
 /// # Safety
 /// The caller must ensure that the given syringe pointer is valid.
 #[no_mangle]
-pub unsafe extern "C" fn syringe_find_or_inject<'syringe>(
+pub unsafe extern "C" fn syringe_find_or_inject(
     syringe: *mut Syringe,
     dll_path: *const c_char,
 ) -> ModuleHandle {
@@ -103,11 +102,11 @@ pub unsafe extern "C" fn syringe_find_or_inject<'syringe>(
 /// Ejects a module from the target process.
 ///
 /// # Arguments
-/// * `syringe` - A pointer to the [`Syringe`] instance.
+/// * `syringe` - A pointer to the `Syringe` instance.
 /// * `module` - The base address of the module to be ejected.
 ///
 /// # Returns
-/// [`true`] if ejection succeeded, otherwise [`false`].
+/// `true` if ejection succeeded, otherwise `false`.
 ///
 /// # Safety
 /// The caller must ensure that the given syringe pointer is valid and
@@ -119,10 +118,10 @@ pub unsafe extern "C" fn syringe_eject(syringe: *mut Syringe, module: ModuleHand
     syringe.eject(module).is_ok()
 }
 
-/// Frees a [`Syringe`] instance.
+/// Frees a `Syringe` instance.
 ///
 /// # Arguments
-/// * `syringe` - A pointer to the [`Syringe`] instance to be freed.
+/// * `syringe` - A pointer to the `Syringe` instance to be freed.
 ///
 /// # Safety
 /// The caller must ensure that the given syringe pointer is valid or null.
