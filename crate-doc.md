@@ -34,22 +34,21 @@ syringe.eject(injected_payload).unwrap();
 ## Remote Procedure Calls (RPC)
 This crate supports two mechanisms for rpc. Both only work one-way for calling exported functions in the target process and are only intended for one-time initialization usage. For extended communication a dedicated rpc library should be used.
 
-|                  | `RemotePayloadProcedure`        | `RemoteRawProcedure` |
-| ---------------- | ------------------------------ | ------------------------------------------ |
-| Feature | `rpc-payload` | `rpc-raw` |
-| Argument and Return Requirements | `Serialize + DeserializeOwned` | `Copy`, Argument size has to be smaller than `usize` in target process |
-| Function Definition       | Using macro `payload_procedure!` | Any `extern "system"` or `extern "C"` with `#[no_mangle]` |
+|                                  | `RemotePayloadProcedure`         | `RemoteRawProcedure`                                                   |
+| -------------------------------- | -------------------------------- | ---------------------------------------------------------------------- |
+| Feature                          | `rpc-payload`                    | `rpc-raw`                                                              |
+| Argument and Return Requirements | `Serialize + DeserializeOwned`   | `Copy`, Argument size has to be smaller than `usize` in target process |
+| Function Definition              | Using macro `#[payload_procedure]` | Any `extern "system"` or `extern "C"` with `#[no_mangle]`              |
 
 ### RemotePayloadProcedure
 A rpc mechanism based on [`bincode`](https://crates.io/crates/bincode).
-The target procedure must be defined using the `payload_procedure!` macro (requires the `payload-utils` feature).
+The target procedure must be defined using the `#[payload_procedure]` macro (requires the `payload-utils` feature).
 
 The definition of an exported `add` function could look like this:
 ```rust
-dll_syringe::payload_procedure! {
-    fn add(a: f64, b: f64) -> f64 {
-        a + b
-    }
+#[payload_procedure]
+fn add(a: f64, b: f64) -> f64 {
+    a + b
 }
 ```
 

@@ -18,6 +18,7 @@
     clippy::wildcard_imports,
     clippy::redundant_closure_for_method_calls
 )]
+#![cfg_attr(feature = "doc-cfg", allow(clippy::doc_markdown))]
 #![cfg_attr(feature = "doc-cfg", doc = include_str!("../crate-doc.md"))]
 #![cfg_attr(not(feature = "doc-cfg"), allow(missing_docs))]
 #![cfg_attr(feature = "doc-cfg", feature(doc_cfg))]
