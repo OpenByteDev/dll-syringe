@@ -56,10 +56,10 @@ impl From<ExceptionCode> for RawRpcError {
 pub enum SerdeError {
     /// Variant representing an error during serialization.
     #[error("serialize error: {}", _0)]
-    Serialize(#[from] bincode::error::EncodeError),
+    Serialize(#[from] cu_bincode::error::EncodeError),
     /// Variant representing an error during deserialization.
     #[error("deserialize error: {}", _0)]
-    Deserialize(#[from] bincode::error::DecodeError),
+    Deserialize(#[from] cu_bincode::error::DecodeError),
 }
 
 #[derive(Debug, Error)]
@@ -90,15 +90,15 @@ pub enum PayloadRpcError {
 }
 
 #[cfg(feature = "rpc-payload")]
-impl From<bincode::error::EncodeError> for PayloadRpcError {
-    fn from(err: bincode::error::EncodeError) -> Self {
+impl From<cu_bincode::error::EncodeError> for PayloadRpcError {
+    fn from(err: cu_bincode::error::EncodeError) -> Self {
         Self::Serde(SerdeError::Serialize(err))
     }
 }
 
 #[cfg(feature = "rpc-payload")]
-impl From<bincode::error::DecodeError> for PayloadRpcError {
-    fn from(err: bincode::error::DecodeError) -> Self {
+impl From<cu_bincode::error::DecodeError> for PayloadRpcError {
+    fn from(err: cu_bincode::error::DecodeError) -> Self {
         Self::Serde(SerdeError::Deserialize(err))
     }
 }

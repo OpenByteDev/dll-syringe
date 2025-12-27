@@ -95,13 +95,13 @@ where
         &self,
         args: <F::Args as Tuple<'_>>::Refs,
     ) -> Result<F::Output, PayloadRpcError> {
-        let config = bincode::config::standard();
+        let config = cu_bincode::config::standard();
 
-        let mut size_writer = bincode::enc::write::SizeWriter::default();
-        bincode::serde::encode_into_writer(&args, &mut size_writer, config)?;
+        let mut size_writer = cu_bincode::enc::write::SizeWriter::default();
+        cu_bincode::serde::encode_into_writer(&args, &mut size_writer, config)?;
         let arg_bytes = size_writer.bytes_written;
         let mut local_arg_buf = ArrayOrVecBuf::<_, 512>::with_capacity(arg_bytes);
-        bincode::serde::encode_into_std_write(&args, &mut local_arg_buf.spare_writer(), config)?;
+        cu_bincode::serde::encode_into_std_write(&args, &mut local_arg_buf.spare_writer(), config)?;
         unsafe { local_arg_buf.set_len(arg_bytes) };
 
         // Allocate a buffer in the remote process to hold the argument.
@@ -151,7 +151,7 @@ where
                 String::from_utf8_unchecked(local_result_buf.into_vec())
             }))
         } else {
-            Ok(bincode::serde::decode_from_slice(&local_result_buf, config)?.0)
+            Ok(cu_bincode::serde::decode_from_slice(&local_result_buf, config)?.0)
         }
     }
 }
@@ -171,7 +171,7 @@ macro_rules! impl_call {
 
         impl <$($ty,)* Output> RemotePayloadProcedure<fn($($ty),*) -> Output> where $($ty: 'static + Serialize,)* Output: 'static + DeserializeOwned,  {
             /// Calls the remote procedure with the given arguments.
-            /// The arguments and the return value are serialized using [bincode](https://crates.io/crates/bincode).
+            /// The arguments and the return value are serialized using [`cu-bincode`](https://crates.io/crates/cu_bincode).
             #[allow(clippy::too_many_arguments)]
             pub fn call(&self, $($nm: &$ty),*) -> Result<Output, PayloadRpcError> {
                 self.call_with_args(($($nm,)*))
@@ -180,7 +180,7 @@ macro_rules! impl_call {
 
         impl <$($ty,)* Output> RemotePayloadProcedure<unsafe fn($($ty),*) -> Output> where $($ty: 'static + Serialize,)* Output: 'static + DeserializeOwned,  {
             /// Calls the remote procedure with the given arguments.
-            /// The arguments and the return value are serialized using [bincode](https://crates.io/crates/bincode).
+            /// The arguments and the return value are serialized using [`cu-bincode`](https://crates.io/crates/cu_bincode).
             ///
             /// # Safety
             /// The caller must ensure whatever the requirements of the underlying remote procedure are.

@@ -30,7 +30,7 @@ same-file = { version = "1.0", default-features = false }
 konst = { version = "0.4", default-features = false }
 fn-ptr = { version = "0.4", features = ["max-arity-12"], default-features = false }
 iced-x86 = { version = "1.21", features = ["std", "code_asm"], default-features = false, optional = true }
-bincode = { version = "2.0", features = ["std", "serde"], default-features = false, optional = true }
+cu-bincode = { version = "2.0", features = ["std", "serde"], default-features = false, optional = true }
 serde = { version = "1.0", default-features = false, optional = true }
 
 [target.'cfg(target_arch = "x86")'.dependencies]
@@ -47,10 +47,10 @@ default = ["syringe", "into-x86-from-x64", "rpc"]
 into-x86-from-x64 = ["syringe", "goblin"]
 rpc-core = ["syringe"]
 rpc-raw = ["rpc-core"]
-rpc-payload = ["rpc-raw", "bincode", "serde"]
+rpc-payload = ["rpc-raw", "cu-bincode", "serde"]
 rpc = ["rpc-raw", "rpc-payload"]
 process-memory = []
-payload-utils = ["bincode", "serde"]
+payload-utils = ["cu-bincode", "serde"]
 syringe = ["iced-x86"]
 full = ["into-x86-from-x64", "rpc", "process-memory", "payload-utils"]
 doc-cfg = ["full"]
