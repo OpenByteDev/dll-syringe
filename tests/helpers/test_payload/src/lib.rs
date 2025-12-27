@@ -31,6 +31,10 @@ pub extern "system" fn add_raw(a: u32, b: u32) -> u32 {
 }
 
 #[no_mangle]
+pub extern "system" fn add_raw_mixed(a: f32, b: u32) -> f32 {
+    a + b as f32
+}
+#[no_mangle]
 pub extern "C" fn add_raw_c(a: u32, b: u32) -> u32 {
     a + b
 }

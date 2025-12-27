@@ -179,7 +179,7 @@ where
     fn build_call_stub_x86(
         procedure: F,
         result_buf: *mut usize,
-        _float_mask: u32,
+        float_mask: u32,
     ) -> Result<Vec<u8>, IcedError> {
         assert!(!result_buf.is_null());
         assert_eq!(
@@ -196,7 +196,14 @@ where
         }
         asm.mov(eax, procedure.as_ptr() as u32)?; // load address of target function
         asm.call(eax)?; // call real_address
-        asm.mov(dword_ptr(result_buf as u32), eax)?; // write result to result buf
+
+        // write result to result buf
+        if float_mask & 0x8000_0000u32 != 0 {
+            asm.fstp(dword_ptr(result_buf as u32))?;
+        } else {
+            asm.mov(dword_ptr(result_buf as u32), eax)?;
+        }
+
         asm.mov(eax, 0)?; // return 0
 
         match F::ABI {
@@ -274,6 +281,7 @@ where
         if float_mask & 0x8000_0000u32 != 0 {
             asm.movq(rax, xmm0)?;
         }
+        asm.movq(rax, xmm0)?;
         asm.mov(qword_ptr(result_buf as u64), rax)?;
 
         asm.mov(rax, 0u64)?; // return 0
@@ -384,11 +392,23 @@ macro_rules! impl_call {
         }
 
         impl <$($ty,)* Output> BuildFloatMask for fn($($ty),*) -> Output where $($ty : 'static,)* Output: 'static {
+            #[allow(unused)]
             fn build_float_mask() -> u32 {
                 // calculate a mask denoting which arguments are floats
                 let mut float_mask = 0u32;
-                $(float_mask = (float_mask << 1) | if type_eq::<$ty, f32>() || type_eq::<$ty, f64>() { 1 } else { 0 };)*
-                float_mask |= if type_eq::<Output, f32>() || type_eq::<Output, f64>() { 0x8000_0000u32 } else { 0 };
+                let mut shift = 0;
+
+                $(
+                    if type_eq::<$ty, f32>() || type_eq::<$ty, f64>() {
+                        float_mask |= 1 << shift;
+                    }
+                    shift += 1;
+                )*
+                
+                // set highest bit if output is float
+                if type_eq::<Output, f32>() || type_eq::<Output, f64>() {
+                    float_mask |= 0x8000_0000;
+                }
 
                 float_mask
             }

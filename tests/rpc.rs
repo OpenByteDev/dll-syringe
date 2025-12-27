@@ -190,6 +190,20 @@ mod raw {
             let remote_sub = unsafe { syringe.get_raw_procedure::<extern "system" fn(f32, f32) -> f32>(module, "sub_float_raw") }.unwrap().unwrap();
             let sub_result = remote_sub.call(1.2, 0.2).unwrap();
             assert_eq!(sub_result, 1.0);
+
+    syringe_test! {
+        fn call_integral_and_float_mixed(
+            process: OwnedProcess,
+            payload_path: &Path,
+        ) {
+            let syringe = Syringe::for_process(process);
+            let module = syringe.inject(payload_path).unwrap();
+
+            let remote_add = unsafe { syringe.get_raw_procedure::<extern "system" fn(f32, u32) -> f32>(module, "add_raw_mixed") }.unwrap().unwrap();
+            let add_result = remote_add.call(1.1, 1).unwrap();
+            assert_eq!(add_result, 2.1);
+        }
+    }
         }
     }
 
