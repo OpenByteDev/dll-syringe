@@ -82,7 +82,7 @@ line_length = 100
 
 # The amount of spaces to indent by
 # default: 2
-tab_width = 2
+tab_width = 4
 
 # How the generated documentation should be commented.
 #

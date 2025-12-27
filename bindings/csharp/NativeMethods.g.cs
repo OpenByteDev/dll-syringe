@@ -8,63 +8,62 @@ using System;
 using System.Runtime.InteropServices;
 
 
-namespace dll_syringe.Net.Sys
+namespace DllSyringe.Net.Sys
 {
     public static unsafe partial class NativeMethods
     {
-        const string __DllName = "dll_syringe";
+        const string __DllName = "DllSyringe";
 
 
 
 
 
         /// <summary>
-        ///  Creates a new `Syringe` instance for a process identified by PID.
+        ///  Creates a new [`Syringe`] instance for a process identified by PID.
         ///
         ///  # Arguments
-        ///
         ///  * `pid` - The PID of the target process.
         ///
         ///  # Returns
+        ///  A pointer to a [`Syringe`] instance, or null if the process could not be opened.
         ///
-        ///  A pointer to a `CSyringe` instance, or null if the process could not be opened.
+        ///  # Note
+        ///  The returned instance has to freed using [`syringe_free`].
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_for_process", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern CSyringe* syringe_for_process(uint pid);
+        public static extern Syringe* syringe_for_process(uint pid);
 
         /// <summary>
-        ///  Creates a new `Syringe` instance for a suspended process identified by PID.
+        ///  Creates a new [`Syringe`] instance for a suspended process identified by PID.
         ///
         ///  # Arguments
-        ///
         ///  * `pid` - The PID of the target suspended process.
         ///
         ///  # Returns
+        ///  A pointer to a [`Syringe`] instance, or null if the process could not be opened or initialized.
         ///
-        ///  A pointer to a `CSyringe` instance, or null if the process could not be opened or initialized.
+        ///  # Note
+        ///  The returned instance has to freed using [`syringe_free`].
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_for_suspended_process", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern CSyringe* syringe_for_suspended_process(uint pid);
+        public static extern Syringe* syringe_for_suspended_process(uint pid);
 
         /// <summary>
-        ///  Injects a DLL into the target process associated with the given `Syringe`.
-        ///
-        ///  # Safety
-        ///
-        ///  This function is unsafe because it dereferences raw pointers.
+        ///  Injects a DLL into the target process associated with the given [`Syringe`].
         ///
         ///  # Arguments
-        ///
-        ///  * `c_syringe` - A pointer to the `CSyringe` instance.
+        ///  * `syringe` - A pointer to the [`Syringe`] instance.
         ///  * `dll_path` - A C string path to the DLL to be injected.
         ///
         ///  # Returns
+        ///  [`true`] if injection succeeded, otherwise [`false`].
         ///
-        ///  `true` if injection succeeded, otherwise `false`.
+        ///  # Safety
+        ///  The caller must ensure the given syringe pointer is valid.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_inject", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.U1)]
-        public static extern bool syringe_inject(CSyringe* c_syringe, byte* dll_path);
+        public static extern bool syringe_inject(Syringe* syringe, byte* dll_path);
 
         /// <summary>
         ///  Finds or injects a DLL into the target process.
@@ -72,85 +71,50 @@ namespace dll_syringe.Net.Sys
         ///  If the DLL is already present in the target process, it returns the existing module.
         ///  Otherwise, it injects the DLL.
         ///
-        ///  # Safety
-        ///
-        ///  This function is unsafe because it dereferences raw pointers.
-        ///
         ///  # Arguments
-        ///
-        ///  * `c_syringe` - A pointer to the `CSyringe` instance.
+        ///  * `syringe` - A pointer to the [`Syringe`] instance.
         ///  * `dll_path` - A C string path to the DLL to be injected.
         ///
         ///  # Returns
+        ///  The base address of the loaded DLL or `null` if the operation failed.
         ///
-        ///  A pointer to a `CProcessModule`, or null if the operation failed.
+        ///  # Safety
+        ///  The caller must ensure that the given syringe pointer is valid.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_find_or_inject", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern CProcessModule* syringe_find_or_inject(CSyringe* c_syringe, byte* dll_path);
+        public static extern ModuleHandle syringe_find_or_inject(Syringe* syringe, byte* dll_path);
 
         /// <summary>
         ///  Ejects a module from the target process.
         ///
         ///  # Arguments
-        ///
-        ///  * `c_syringe` - A pointer to the `CSyringe` instance.
-        ///  * `c_module` - A pointer to the `CProcessModule` to be ejected.
+        ///  * `syringe` - A pointer to the [`Syringe`] instance.
+        ///  * `module` - The base address of the module to be ejected.
         ///
         ///  # Returns
-        ///
-        ///  `true` if ejection succeeded, otherwise `false`.
+        ///  [`true`] if ejection succeeded, otherwise [`false`].
         ///
         ///  # Safety
-        ///  This is safe as long as it has a valid pointer to a Syringe and Module.
+        ///  The caller must ensure that the given syringe pointer is valid and
+        ///  the handle belongs to a module in the process of the syringe.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_eject", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.U1)]
-        public static extern bool syringe_eject(CSyringe* c_syringe, CProcessModule* c_module);
+        public static extern bool syringe_eject(Syringe* syringe, ModuleHandle module);
 
         /// <summary>
-        ///  Frees a `CSyringe` instance.
+        ///  Frees a [`Syringe`] instance.
         ///
         ///  # Arguments
-        ///
-        ///  * `c_syringe` - A pointer to the `CSyringe` instance to be freed.
+        ///  * `syringe` - A pointer to the [`Syringe`] instance to be freed.
         ///
         ///  # Safety
-        ///  This is safe as long as it has a valid pointer to a Syringe instance.
+        ///  The caller must ensure that the given syringe pointer is valid or null.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_free", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void syringe_free(CSyringe* c_syringe);
-
-        /// <summary>
-        ///  Frees a `CProcessModule` instance.
-        ///
-        ///  # Arguments
-        ///
-        ///  * `c_module` - A pointer to the `CProcessModule` to be freed.
-        ///
-        ///  # Safety
-        ///  This is safe as long as it has a valid pointer to a module
-        ///  created by this Syringe instance.
-        /// </summary>
-        [DllImport(__DllName, EntryPoint = "syringe_module_free", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void syringe_module_free(CProcessModule* c_module);
+        public static extern void syringe_free(Syringe* syringe);
 
 
-    }
-
-    /// <summary>
-    ///  Represents an instance of a Syringe for a target process.
-    /// </summary>
-    [StructLayout(LayoutKind.Sequential)]
-    public unsafe partial struct CSyringe
-    {
-    }
-
-    /// <summary>
-    ///  Represents a module within a process, allowing for ejection of a previously injected module.
-    /// </summary>
-    [StructLayout(LayoutKind.Sequential)]
-    public unsafe partial struct CProcessModule
-    {
     }
 
 

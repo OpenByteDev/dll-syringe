@@ -3,10 +3,20 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
-namespace dll_syringe.Net.Sys;
+namespace DllSyringe.Net.Sys;
 
 public static unsafe partial class NativeMethods
 {
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct Syringe {
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct ModuleHandle {
+        public IntPtr BaseAddress;
+    }
+
+
     // https://docs.microsoft.com/en-us/dotnet/standard/native-interop/cross-platform
     // Library path will search
     // win => __DllName, __DllName.dll
