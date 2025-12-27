@@ -1,13 +1,31 @@
+use dll_syringe::process::OwnedProcess;
+use dll_syringe::process::Process;
+use widestring::U16CString;
+use std::ffi::CString;
+use std::ffi::OsStr;
+use std::iter;
+use std::mem;
+use std::mem::MaybeUninit;
+use std::mem::zeroed;
+use std::os::windows::io::FromRawHandle;
+use std::os::windows::io::OwnedHandle;
+use std::os::windows::prelude::OsStrExt;
+use std::path::Path;
+use std::ptr;
 use std::{
     env::{current_dir, var},
     error::Error,
     fs::{canonicalize, remove_file, File},
     io::{copy, ErrorKind},
+    iter::once,
     path::PathBuf,
     process::{Command, Stdio},
     str::FromStr,
     sync::Mutex,
 };
+use winapi::um::processthreadsapi::{CreateProcessW, PROCESS_INFORMATION, STARTUPINFOW};
+use winapi::um::winbase::{CREATE_SUSPENDED};
+use winapi::shared::minwindef::FALSE;
 
 pub fn build_test_payload_x86() -> Result<PathBuf, Box<dyn Error>> {
     build_helper_crate("test_payload", &find_x86_variant_of_target(), false, "dll")
@@ -88,15 +106,59 @@ fn is_cross() -> bool {
     var("CROSS_SYSROOT").is_ok()
 }
 
+pub(crate) fn start_suspended_process(path: &Path) -> OwnedProcess {
+    let mut startup_info: STARTUPINFOW = unsafe { mem::zeroed() };
+    let mut process_info: PROCESS_INFORMATION = unsafe { mem::zeroed() };
+    startup_info.cb = mem::size_of::<STARTUPINFOW>() as u32;
+
+    let target_path_wide = U16CString::from_os_str(path).unwrap();
+
+    let result = unsafe { CreateProcessW(
+        target_path_wide.as_ptr(),
+        ptr::null_mut(), // Command line
+        ptr::null_mut(), // Process security attributes
+        ptr::null_mut(), // Thread security attributes
+        FALSE, // Inherit handles
+        CREATE_SUSPENDED, // Creation flags
+        ptr::null_mut(), // Environment
+        ptr::null_mut(), // Current directory
+        &mut startup_info,
+        &mut process_info,
+    ) };
+    if result == 0 {
+        panic!("Failed to create suspended process");
+    }
+    unsafe { OwnedProcess::from_handle_unchecked(OwnedHandle::from_raw_handle(process_info.hProcess.cast())) }
+}
+
+pub(crate) fn start_normal_process(path: &Path) -> OwnedProcess {
+    Command::new(path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn().unwrap()
+        .into()
+}
+
+#[macro_export]
+#[doc(hidden)]
+macro_rules! start_process {
+    (suspended $path:expr) => {
+        common::start_suspended_process($path)
+    };
+    ($path:expr) => {
+        common::start_normal_process($path)
+    }
+}
+
 #[macro_export]
 macro_rules! syringe_test {
-    (fn $test_name:ident ($process:ident : OwnedProcess, $payload_path:ident : &Path $(,)?) $body:block) => {
+    (fn $test_name:ident ($process:ident : OwnedProcess, $payload_path:ident : &Path $(,)?) $body:block $($suspended:ident)?) => {
         mod $test_name {
             use super::*;
             use dll_syringe::process::OwnedProcess;
             use std::{
                 path::Path,
-                process::{Command, Stdio},
             };
 
             #[test]
@@ -124,15 +186,9 @@ macro_rules! syringe_test {
                 payload_path: impl AsRef<Path>,
                 target_path: impl AsRef<Path>,
             ) {
-                let dummy_process: OwnedProcess = Command::new(target_path.as_ref())
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .spawn().unwrap()
-                    .into();
-
+                let target_path = target_path.as_ref();
+                let dummy_process = start_process!($($suspended)? target_path);
                 let _guard = dummy_process.try_clone().unwrap().kill_on_drop();
-
                 test(dummy_process, payload_path.as_ref())
             }
 
@@ -144,16 +200,14 @@ macro_rules! syringe_test {
     };
 }
 
+
 #[macro_export]
 macro_rules! process_test {
-    (fn $test_name:ident ($process:ident : OwnedProcess $(,)?) $body:block) => {
+    (fn $test_name:ident ($process:ident : OwnedProcess $(,)?) $body:block $($suspended:ident)?) => {
         mod $test_name {
             use super::*;
             use dll_syringe::process::OwnedProcess;
-            use std::{
-                path::Path,
-                process::{Command, Stdio},
-            };
+            use std::path::Path;
 
             #[test]
             #[cfg(any(
@@ -177,16 +231,9 @@ macro_rules! process_test {
             fn test_with_setup(
                 target_path: impl AsRef<Path>,
             ) {
-                let dummy_process: OwnedProcess = Command::new(target_path.as_ref())
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .spawn()
-                    .unwrap()
-                    .into();
-
+                let target_path = target_path.as_ref();
+                let dummy_process = start_process!($($suspended)? target_path);
                 let _guard = dummy_process.try_clone().unwrap().kill_on_drop();
-
                 test(dummy_process)
             }
 

@@ -1,14 +1,11 @@
 use iced_x86::{
-    code_asm::{
-        dword_ptr,
-        registers::{gpr32::*, gpr64::*},
-        CodeAssembler,
-    },
-    IcedError,
+    Code, IcedError, code_asm::{
+        CodeAssembler, dword_ptr, registers::{gpr32::*, gpr64::*}
+    }
 };
 use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
-use std::{cell::OnceCell, io, mem, path::Path};
+use std::{cell::OnceCell, io, mem, path::Path, ptr};
 use widestring::{u16cstr, U16CString};
 use winapi::shared::{
     minwindef::{BOOL, DWORD, FALSE, HMODULE},
@@ -118,6 +115,29 @@ impl Syringe {
             #[cfg(feature = "rpc-core")]
             get_proc_address_stub: OnceCell::new(),
         }
+    }
+
+    /// Creates a new syringe for the given suspended target process.
+    pub fn for_suspended_process(process: OwnedProcess) -> io::Result<Self> {
+        let syringe = Self::for_process(process);
+
+        // If we are injecting into a 'suspended' process, then said process is said to not be fully
+        // initialized. This means:
+        // - We can't use `EnumProcessModulesEx` and friends.
+        // - So we can't locate Kernel32.dll in 32-bit process (from 64-bit process)
+        // - And therefore calling LoadLibrary is not possible.
+
+        // Thankfully we can 'initialize' this suspended process without running any end user logic
+        // (e.g. a game's entry point) by creating a dummy method and invoking it.
+        let ret = Code::Retnq.op_code().op_code();
+        debug_assert_eq!(Code::Retnw.op_code().op_code(), Code::Retnq.op_code().op_code());
+        let dummy_fn = syringe.remote_allocator.alloc_and_copy(&ret)?;
+        syringe.process().run_remote_thread(
+            unsafe { mem::transmute(dummy_fn.as_raw_ptr()) },
+            ptr::null_mut::<u8>(),
+        )?;
+
+        Ok(syringe)
     }
 
     /// Returns the target process for this syringe.
