@@ -338,24 +338,25 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cast_ptr_alignment)]
     fn correct_align() {
         let process = BorrowedProcess::current();
         let memory = ProcessMemoryBuffer::allocate_page(process).unwrap();
         let mut allocator = FixedBufferAllocator::new(memory);
 
         let a1 = allocator.alloc(mem::size_of::<u8>()).unwrap();
-        assert_eq!(a1.as_raw_ptr() as usize % mem::align_of::<u8>(), 0);
+        assert!(is_aligned(a1.as_raw_ptr().cast::<u8>()));
         let a2 = allocator.alloc(mem::size_of::<u16>()).unwrap();
-        assert_eq!(a2.as_raw_ptr() as usize % mem::align_of::<u16>(), 0);
+        assert!(is_aligned(a2.as_raw_ptr().cast::<u16>()));
         let a3 = allocator.alloc(mem::size_of::<u32>()).unwrap();
-        assert_eq!(a3.as_raw_ptr() as usize % mem::align_of::<u32>(), 0);
+        assert!(is_aligned(a3.as_raw_ptr().cast::<u32>()));
         let a4 = allocator.alloc(mem::size_of::<u64>()).unwrap();
-        assert_eq!(a4.as_raw_ptr() as usize % mem::align_of::<u64>(), 0);
+        assert!(is_aligned(a4.as_raw_ptr().cast::<u64>()));
         let a5 = allocator.alloc(mem::size_of::<AlignTestStruct>()).unwrap();
-        assert_eq!(
-            a5.as_raw_ptr() as usize % mem::align_of::<AlignTestStruct>(),
-            0
-        );
+        assert!(is_aligned(a5.as_raw_ptr().cast::<AlignTestStruct>()));
+    }
+    fn is_aligned<T>(ptr: *const T) -> bool {
+        ptr.addr().is_multiple_of(mem::align_of::<T>())
     }
 
     #[test]
