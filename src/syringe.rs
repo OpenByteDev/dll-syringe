@@ -1,7 +1,10 @@
 use iced_x86::{
-    Code, IcedError, code_asm::{
-        CodeAssembler, dword_ptr, registers::{gpr32::*, gpr64::*}
-    }
+    code_asm::{
+        dword_ptr,
+        registers::{gpr32::*, gpr64::*},
+        CodeAssembler,
+    },
+    Code, IcedError,
 };
 use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
@@ -130,7 +133,10 @@ impl Syringe {
         // Thankfully we can 'initialize' this suspended process without running any end user logic
         // (e.g. a game's entry point) by creating a dummy method and invoking it.
         let ret = Code::Retnq.op_code().op_code();
-        debug_assert_eq!(Code::Retnw.op_code().op_code(), Code::Retnq.op_code().op_code());
+        debug_assert_eq!(
+            Code::Retnw.op_code().op_code(),
+            Code::Retnq.op_code().op_code()
+        );
         let dummy_fn = syringe.remote_allocator.alloc_and_copy(&ret)?;
         syringe.process().run_remote_thread(
             unsafe { mem::transmute(dummy_fn.as_raw_ptr()) },
