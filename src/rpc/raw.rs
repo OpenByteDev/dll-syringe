@@ -404,7 +404,7 @@ macro_rules! impl_call {
                     }
                     shift += 1;
                 )*
-                
+
                 // set highest bit if output is float
                 if type_eq::<Output, f32>() || type_eq::<Output, f64>() {
                     float_mask |= 0x8000_0000;

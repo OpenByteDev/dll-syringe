@@ -191,7 +191,10 @@ impl Syringe {
     ///
     /// # Panics
     /// This method panics if the given module was not loaded in the target process.
-    pub fn eject<'a>(&self, module: impl Into<BorrowedProcessModule<'a>>) -> Result<(), EjectError> {
+    pub fn eject<'a>(
+        &self,
+        module: impl Into<BorrowedProcessModule<'a>>,
+    ) -> Result<(), EjectError> {
         let module = module.into();
         assert!(
             module.process() == &self.process(),
