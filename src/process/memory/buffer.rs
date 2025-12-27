@@ -223,6 +223,8 @@ pub struct ProcessMemorySlice<'a> {
     data: PhantomData<&'a [u8]>,
 }
 
+unsafe impl Send for ProcessMemorySlice<'_> {}
+
 impl<'a> ProcessMemorySlice<'a> {
     /// Constructs a new slice from the given raw parts.
     ///

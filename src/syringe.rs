@@ -102,6 +102,11 @@ pub struct Syringe {
         OnceCell<crate::rpc::RemoteProcedureStub<crate::rpc::GetProcAddressParams, UntypedFnPtr>>,
 }
 
+const _: fn() = || {
+    fn assert_send<T: Send>() {}
+    assert_send::<Syringe>();
+};
+
 impl Syringe {
     /// Creates a new syringe for the given target process.
     #[must_use]
@@ -186,9 +191,9 @@ impl Syringe {
     ///
     /// # Panics
     /// This method panics if the given module was not loaded in the target process.
-    pub fn eject(&self, module: BorrowedProcessModule<'_>) -> Result<(), EjectError> {
+    pub fn eject<P: Process>(&self, module: &ProcessModule<P>) -> Result<(), EjectError> {
         assert!(
-            module.process() == &self.process(),
+            module.process().borrowed() == self.process(),
             "trying to eject a module from a different process"
         );
 
@@ -379,6 +384,8 @@ struct LoadLibraryWStub {
     code: RemoteAllocation,
     result: RemoteBox<ModuleHandle>,
 }
+
+unsafe impl Send for LoadLibraryWStub {}
 
 impl LoadLibraryWStub {
     fn build(

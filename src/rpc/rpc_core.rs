@@ -179,6 +179,8 @@ pub(crate) struct RemoteProcedureStub<A: Copy, R: Copy> {
     pub result: RemoteBox<R>,
 }
 
+unsafe impl<A: Copy, R: Copy> Send for RemoteProcedureStub<A, R> {}
+
 impl<A: Copy, R: Copy> RemoteProcedureStub<A, R> {
     #[allow(dead_code)]
     pub(crate) fn call(&self, args: &A) -> Result<R, RawRpcError> {
