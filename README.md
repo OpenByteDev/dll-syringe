@@ -9,6 +9,7 @@
 A windows dll injection library written in Rust.
 
 ## Supported scenarios
+
 | Injector Process | Target Process | Supported?                                 |
 | ---------------- | -------------- | ------------------------------------------ |
 | 32-bit           | 32-bit         | Yes                                        |

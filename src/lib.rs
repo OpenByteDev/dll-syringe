@@ -40,6 +40,11 @@ pub(crate) mod utils;
 
 /// Module containing the error enums used in this crate.
 pub mod error;
+
+/// C exports for the library.
+#[cfg(feature = "c-exports")]
+pub mod c_exports;
+
 #[cfg(feature = "payload-utils")]
 #[doc(hidden)]
 pub mod payload_utils;
@@ -47,6 +52,7 @@ pub mod payload_utils;
 #[cfg(any(feature = "payload-utils", feature = "rpc-payload"))]
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
+#[doc(hidden)]
 pub(crate) struct ArgAndResultBufInfo {
     pub data: u64,
     pub len: u64,
