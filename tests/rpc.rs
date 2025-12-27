@@ -188,8 +188,10 @@ mod raw {
             let module = syringe.inject(payload_path).unwrap();
 
             let remote_sub = unsafe { syringe.get_raw_procedure::<extern "system" fn(f32, f32) -> f32>(module, "sub_float_raw") }.unwrap().unwrap();
-            let sub_result = remote_sub.call(1.2, 0.2).unwrap();
-            assert_eq!(sub_result, 1.0);
+            let sub_result = remote_sub.call(1.2, 0.1).unwrap();
+            assert_eq!(sub_result, 1.1);
+        }
+    }
 
     syringe_test! {
         fn call_integral_and_float_mixed(
@@ -204,6 +206,19 @@ mod raw {
             assert_eq!(add_result, 2.1);
         }
     }
+
+    #[cfg(all(target_arch = "x86_64", not(feature = "into-x86-from-x64")))]
+    syringe_test! {
+        fn call_large_args(
+            process: OwnedProcess,
+            payload_path: &Path,
+        ) {
+            let syringe = Syringe::for_process(process);
+            let module = syringe.inject(payload_path).unwrap();
+
+            let remote_add = unsafe { syringe.get_raw_procedure::<extern "system" fn(u64, u64) -> u64>(module, "add_raw_large") }.unwrap().unwrap();
+            let add_result = remote_add.call(u64::MAX - 1, 1).unwrap();
+            assert_eq!(add_result, u64::MAX);
         }
     }
 
