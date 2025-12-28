@@ -1,6 +1,6 @@
 use core::mem::zeroed;
 use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
-use std::{ffi::CString, fs, mem, mem::size_of, time::Duration};
+use std::{ffi::CString, fs, mem, mem::size_of, process::Command, time::Duration};
 use winapi::um::{
     libloaderapi::{GetProcAddress, LoadLibraryA},
     winnt::OSVERSIONINFOW,
@@ -67,7 +67,7 @@ process_test! {
         process: OwnedProcess
     ) {
         let path = process.path().unwrap();
-        assert_eq!(path.components().last().unwrap().as_os_str().to_string_lossy().as_ref(), "test_target.exe");
+        assert_eq!(path.components().next_back().unwrap().as_os_str().to_string_lossy().as_ref(), "test_target.exe");
         assert!(path.exists());
     }
 }

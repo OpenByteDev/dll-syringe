@@ -1,9 +1,8 @@
-use iced_x86::{code_asm::*, IcedError};
-
+use iced_x86::code_asm::*;
 use std::{
     any::{self, TypeId},
     cell::OnceCell,
-    cmp, fmt, io, mem, slice,
+    cmp, fmt, io, mem, ptr, slice,
 };
 
 use crate::{
@@ -165,6 +164,7 @@ where
                 Self::build_call_stub_x64(self.ptr, result.as_ptr().as_ptr(), float_mask).unwrap()
             };
             let code = self.remote_allocator.alloc_and_copy_buf(code.as_slice())?;
+            #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
             code.memory().flush_instruction_cache()?;
 
             Ok(RemoteRawProcedureStub {
@@ -179,7 +179,7 @@ where
     fn build_call_stub_x86(
         procedure: F,
         result_buf: *mut usize,
-        _float_mask: u32,
+        float_mask: u32,
     ) -> Result<Vec<u8>, IcedError> {
         assert!(!result_buf.is_null());
         assert_eq!(
@@ -196,7 +196,14 @@ where
         }
         asm.mov(eax, procedure.as_ptr() as u32)?; // load address of target function
         asm.call(eax)?; // call real_address
-        asm.mov(dword_ptr(result_buf as u32), eax)?; // write result to result buf
+
+        // write result to result buf
+        if float_mask & 0x8000_0000u32 != 0 {
+            asm.fstp(dword_ptr(result_buf as u32))?;
+        } else {
+            asm.mov(dword_ptr(result_buf as u32), eax)?;
+        }
+
         asm.mov(eax, 0)?; // return 0
 
         match F::ABI {
@@ -363,7 +370,7 @@ macro_rules! impl_call {
                     );
 
                     let mut buf = [0u8; mem::size_of::<usize>()];
-                    let arg_bytes = unsafe { slice::from_raw_parts(&$nm as *const $ty as *const u8, mem::size_of::<$ty>()) };
+                    let arg_bytes = unsafe { slice::from_raw_parts(ptr::from_ref(&$nm).cast::<u8>(), mem::size_of::<$ty>()) };
                     let truncated_arg_len = cmp::min(mem::size_of::<$ty>(), target_pointer_size);
                     if cfg!(target_endian = "little") {
                         buf[..truncated_arg_len].copy_from_slice(&arg_bytes[..truncated_arg_len]);
@@ -384,11 +391,23 @@ macro_rules! impl_call {
         }
 
         impl <$($ty,)* Output> BuildFloatMask for fn($($ty),*) -> Output where $($ty : 'static,)* Output: 'static {
+            #[allow(unused)]
             fn build_float_mask() -> u32 {
                 // calculate a mask denoting which arguments are floats
                 let mut float_mask = 0u32;
-                $(float_mask = (float_mask << 1) | if type_eq::<$ty, f32>() || type_eq::<$ty, f64>() { 1 } else { 0 };)*
-                float_mask |= if type_eq::<Output, f32>() || type_eq::<Output, f64>() { 0x8000_0000u32 } else { 0 };
+                let mut shift = 0;
+
+                $(
+                    if type_eq::<$ty, f32>() || type_eq::<$ty, f64>() {
+                        float_mask |= 1 << shift;
+                    }
+                    shift += 1;
+                )*
+
+                // set highest bit if output is float
+                if type_eq::<Output, f32>() || type_eq::<Output, f64>() {
+                    float_mask |= 0x8000_0000;
+                }
 
                 float_mask
             }

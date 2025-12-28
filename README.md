@@ -9,6 +9,7 @@
 A windows dll injection library written in Rust.
 
 ## Supported scenarios
+
 | Injector Process | Target Process | Supported?                                 |
 | ---------------- | -------------- | ------------------------------------------ |
 | 32-bit           | 32-bit         | Yes                                        |
@@ -49,7 +50,7 @@ This crate supports two mechanisms for rpc. Both only work one-way for calling e
 | Function Definition              | Using macro `#[payload_procedure]` | Any `extern "system"` or `extern "C"` with `#[no_mangle]`              |
 
 ### RemotePayloadProcedure
-A rpc mechanism based on [`bincode`](https://crates.io/crates/bincode).
+A rpc mechanism based on [`cu-bincode`](https://crates.io/crates/cu_bincode).
 The target procedure must be defined using the `#[payload_procedure]` macro (requires the `payload-utils` feature).
 
 The definition of an exported `add` function could look like this:

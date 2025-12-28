@@ -48,9 +48,8 @@ pub fn __payload_procedure_helper<A: DeserializeOwned, R: Serialize>(
                 _ => unreachable!(),
             };
 
-            let mut error_buf = match allocate_local_process_memory(message.len()) {
-                Ok(buf) => buf,
-                Err(_) => return,
+            let Ok(mut error_buf) = allocate_local_process_memory(message.len()) else {
+                return;
             };
             unsafe {
                 (*buf_info_ptr).data = error_buf.as_ptr() as u64;
@@ -65,14 +64,14 @@ fn payload_procedure_helper_inner<A: DeserializeOwned, R: Serialize>(
     buf: &mut [u8],
     f: impl FnOnce(A) -> R,
 ) -> Result<&'_ mut [u8], PayloadProcedureHelperError> {
-    let config = bincode::config::standard();
+    let config = cu_bincode::config::standard();
 
-    let args = bincode::serde::decode_from_slice(buf, config)?.0;
+    let args = cu_bincode::serde::decode_from_slice(buf, config)?.0;
 
     let result = f(args);
 
-    let mut size_writer = bincode::enc::write::SizeWriter::default();
-    bincode::serde::encode_into_writer(&result, &mut size_writer, config)?;
+    let mut size_writer = cu_bincode::enc::write::SizeWriter::default();
+    cu_bincode::serde::encode_into_writer(&result, &mut size_writer, config)?;
     let required_buf_len = size_writer.bytes_written;
     let result_buf = if required_buf_len > buf.len() {
         allocate_local_process_memory(required_buf_len)?
@@ -80,7 +79,7 @@ fn payload_procedure_helper_inner<A: DeserializeOwned, R: Serialize>(
         buf
     };
 
-    bincode::serde::encode_into_slice(result, &mut *result_buf, config)?;
+    cu_bincode::serde::encode_into_slice(result, &mut *result_buf, config)?;
 
     Ok(result_buf)
 }
@@ -94,9 +93,9 @@ fn allocate_local_process_memory(len: usize) -> io::Result<&'static mut [u8]> {
 #[derive(Debug, Error)]
 enum PayloadProcedureHelperError {
     #[error("serializeerror: {0}")]
-    Serialize(#[from] bincode::error::EncodeError),
+    Serialize(#[from] cu_bincode::error::EncodeError),
     #[error("deserialize error: {0}")]
-    Deserialize(#[from] bincode::error::DecodeError),
+    Deserialize(#[from] cu_bincode::error::DecodeError),
     #[error("io error: {0}")]
     Io(#[from] io::Error),
 }

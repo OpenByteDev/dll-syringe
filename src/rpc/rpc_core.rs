@@ -79,6 +79,7 @@ impl Syringe {
                 .unwrap()
             };
             let function_stub = self.remote_allocator.alloc_and_copy_buf(code.as_slice())?;
+            #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
             function_stub.memory().flush_instruction_cache()?;
 
             Ok(RemoteProcedureStub {
@@ -178,6 +179,8 @@ pub(crate) struct RemoteProcedureStub<A: Copy, R: Copy> {
     pub parameter: RemoteBox<A>,
     pub result: RemoteBox<R>,
 }
+
+unsafe impl<A: Copy, R: Copy> Send for RemoteProcedureStub<A, R> {}
 
 impl<A: Copy, R: Copy> RemoteProcedureStub<A, R> {
     #[allow(dead_code)]

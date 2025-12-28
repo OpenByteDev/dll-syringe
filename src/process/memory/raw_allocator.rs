@@ -1,6 +1,5 @@
-use std::{collections::LinkedList, io, mem, ptr::NonNull};
-
 use crate::process::{memory::ProcessMemoryBuffer, BorrowedProcess, Process};
+use std::{collections::LinkedList, io, mem, ptr::NonNull};
 
 pub trait RawAllocator {
     type Error;
@@ -45,10 +44,11 @@ impl<'a> DynamicMultiBufferAllocator<'a> {
     }
 }
 
-impl<'a> RawAllocator for DynamicMultiBufferAllocator<'a> {
+impl RawAllocator for DynamicMultiBufferAllocator<'_> {
     type Error = io::Error;
     type Alloc = Allocation;
 
+    #[allow(clippy::needless_continue)]
     fn alloc(&mut self, size: usize) -> Result<Self::Alloc, Self::Error> {
         for page in &mut self.pages {
             match page.alloc(size) {
@@ -224,12 +224,17 @@ pub enum AllocError {
 }
 
 #[cfg(test)]
+struct AlignTestStruct {
+    _a: u8,
+    _b: u16,
+    _c: u32,
+    _d: u64,
+}
+
+#[cfg(test)]
 mod tests {
-    use std::mem;
-
-    use crate::process::memory::ProcessMemorySlice;
-
     use super::*;
+    use crate::process::memory::ProcessMemorySlice;
 
     #[test]
     fn single_alloc() {
@@ -278,21 +283,21 @@ mod tests {
 
         assert_eq!(allocator.count_allocated_bytes(), 0);
 
-        let a1 = _free_helper_alloc(&mut allocator, 32);
-        let a2 = _free_helper_alloc(&mut allocator, 128);
-        let a3 = _free_helper_alloc(&mut allocator, 256);
-        _free_helper_free(&mut allocator, a2);
-        let a4 = _free_helper_alloc(&mut allocator, 64);
-        let a5 = _free_helper_alloc(&mut allocator, 32);
-        _free_helper_free(&mut allocator, a3);
-        _free_helper_free(&mut allocator, a1);
-        _free_helper_free(&mut allocator, a5);
-        _free_helper_free(&mut allocator, a4);
+        let a1 = checked_alloc(&mut allocator, 32);
+        let a2 = checked_alloc(&mut allocator, 128);
+        let a3 = checked_alloc(&mut allocator, 256);
+        checked_free(&mut allocator, a2);
+        let a4 = checked_alloc(&mut allocator, 64);
+        let a5 = checked_alloc(&mut allocator, 32);
+        checked_free(&mut allocator, a3);
+        checked_free(&mut allocator, a1);
+        checked_free(&mut allocator, a5);
+        checked_free(&mut allocator, a4);
 
         assert_eq!(allocator.count_allocated_bytes(), 0);
     }
 
-    fn _free_helper_alloc(
+    fn checked_alloc(
         allocator: &mut FixedBufferAllocator<'_>,
         allocation_size: usize,
     ) -> Allocation {
@@ -311,7 +316,7 @@ mod tests {
         alloc
     }
 
-    fn _free_helper_free(allocator: &mut FixedBufferAllocator<'_>, allocation: Allocation) {
+    fn checked_free(allocator: &mut FixedBufferAllocator<'_>, allocation: Allocation) {
         let free_bytes = allocator.count_free_bytes();
         let allocated_bytes = allocator.count_allocated_bytes();
 
@@ -337,24 +342,25 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::cast_ptr_alignment)]
     fn correct_align() {
         let process = BorrowedProcess::current();
         let memory = ProcessMemoryBuffer::allocate_page(process).unwrap();
         let mut allocator = FixedBufferAllocator::new(memory);
 
-        let a = allocator.alloc(mem::size_of::<u8>()).unwrap();
-        assert_eq!(a.as_raw_ptr() as usize % mem::align_of::<u8>(), 0);
-        let b = allocator.alloc(mem::size_of::<u16>()).unwrap();
-        assert_eq!(b.as_raw_ptr() as usize % mem::align_of::<u16>(), 0);
-        let c = allocator.alloc(mem::size_of::<u32>()).unwrap();
-        assert_eq!(c.as_raw_ptr() as usize % mem::align_of::<u32>(), 0);
-        let d = allocator.alloc(mem::size_of::<u64>()).unwrap();
-        assert_eq!(d.as_raw_ptr() as usize % mem::align_of::<u64>(), 0);
-        let e = allocator.alloc(mem::size_of::<AlignTestStruct>()).unwrap();
-        assert_eq!(
-            e.as_raw_ptr() as usize % mem::align_of::<AlignTestStruct>(),
-            0
-        );
+        let a1 = allocator.alloc(mem::size_of::<u8>()).unwrap();
+        assert!(is_aligned(a1.as_raw_ptr().cast::<u8>()));
+        let a2 = allocator.alloc(mem::size_of::<u16>()).unwrap();
+        assert!(is_aligned(a2.as_raw_ptr().cast::<u16>()));
+        let a3 = allocator.alloc(mem::size_of::<u32>()).unwrap();
+        assert!(is_aligned(a3.as_raw_ptr().cast::<u32>()));
+        let a4 = allocator.alloc(mem::size_of::<u64>()).unwrap();
+        assert!(is_aligned(a4.as_raw_ptr().cast::<u64>()));
+        let a5 = allocator.alloc(mem::size_of::<AlignTestStruct>()).unwrap();
+        assert!(is_aligned(a5.as_raw_ptr().cast::<AlignTestStruct>()));
+    }
+    fn is_aligned<T>(ptr: *const T) -> bool {
+        ptr.addr().is_multiple_of(mem::align_of::<T>())
     }
 
     #[test]
@@ -366,12 +372,11 @@ mod tests {
         let alloc = allocator.alloc(page_size + 1).unwrap();
         assert!(alloc.len > page_size);
     }
-}
 
-#[cfg(test)]
-struct AlignTestStruct {
-    _a: u8,
-    _b: u16,
-    _c: u32,
-    _d: u64,
+    struct AlignTestStruct {
+        _a: u8,
+        _b: u16,
+        _c: u32,
+        _d: u64,
+    }
 }

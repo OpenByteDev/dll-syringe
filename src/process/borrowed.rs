@@ -59,7 +59,7 @@ impl AsHandle for BorrowedProcess<'_> {
     }
 }
 
-impl<'a, 'b> PartialEq<BorrowedProcess<'a>> for BorrowedProcess<'b> {
+impl<'a> PartialEq<BorrowedProcess<'a>> for BorrowedProcess<'_> {
     fn eq(&self, other: &BorrowedProcess<'a>) -> bool {
         // TODO: (unsafe { CompareObjectHandles(self.handle(), other.handle()) }) != FALSE
 
@@ -205,7 +205,7 @@ impl<'a> Process for BorrowedProcess<'a> {
     }
 }
 
-impl<'a> BorrowedProcess<'a> {
+impl BorrowedProcess<'_> {
     /// Tries to create a new [`OwnedProcess`] instance for this process.
     pub fn try_to_owned(&self) -> Result<OwnedProcess, io::Error> {
         let raw_handle = self.as_raw_handle();
@@ -234,8 +234,9 @@ impl<'a> BorrowedProcess<'a> {
     /// If the process is currently starting up and has not yet loaded all its modules, the returned list may be incomplete.
     /// This can be worked around by repeatedly calling this method.
     pub fn module_handles(&self) -> Result<impl ExactSizeIterator<Item = ModuleHandle>, io::Error> {
-        let mut module_buf = ArrayOrVecBuf::<ModuleHandle, 1024>::new_uninit_array();
         const HANDLE_SIZE: u32 = mem::size_of::<HMODULE>() as _;
+
+        let mut module_buf = ArrayOrVecBuf::<ModuleHandle, 1024>::new_uninit_array();
         let mut module_buf_byte_size = HANDLE_SIZE * module_buf.capacity() as u32;
         let mut bytes_needed_new = MaybeUninit::uninit();
         loop {
@@ -250,7 +251,7 @@ impl<'a> BorrowedProcess<'a> {
             };
             if result == 0 {
                 let err = io::Error::last_os_error();
-                if err.raw_os_error() == Some(ERROR_PARTIAL_COPY as _) && self.is_alive() {
+                if err.raw_os_error() == Some(ERROR_PARTIAL_COPY.cast_signed()) && self.is_alive() {
                     continue;
                 }
                 return Err(err);

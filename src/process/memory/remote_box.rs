@@ -1,4 +1,11 @@
-use std::{cell::RefCell, io, marker::PhantomData, mem, ptr::NonNull, rc::Rc, slice};
+use std::{
+    io,
+    marker::PhantomData,
+    mem,
+    ptr::NonNull,
+    slice,
+    sync::{Arc, Mutex},
+};
 
 use crate::process::{
     memory::{Allocation, DynamicMultiBufferAllocator, ProcessMemorySlice, RawAllocator},
@@ -6,18 +13,18 @@ use crate::process::{
 };
 
 #[derive(Debug, Clone)]
-pub struct RemoteBoxAllocator(pub(crate) Rc<RemoteBoxAllocatorInner>);
+pub struct RemoteBoxAllocator(pub(crate) Arc<RemoteBoxAllocatorInner>);
 
 #[derive(Debug)]
 pub(crate) struct RemoteBoxAllocatorInner {
     pub(crate) process: OwnedProcess,
-    pub(crate) allocator: RefCell<DynamicMultiBufferAllocator<'static>>,
+    pub(crate) allocator: Mutex<DynamicMultiBufferAllocator<'static>>,
 }
 
 impl RemoteBoxAllocator {
     pub fn new(process: OwnedProcess) -> Self {
-        Self(Rc::new(RemoteBoxAllocatorInner {
-            allocator: RefCell::new(DynamicMultiBufferAllocator::new(unsafe {
+        Self(Arc::new(RemoteBoxAllocatorInner {
+            allocator: Mutex::new(DynamicMultiBufferAllocator::new(unsafe {
                 process.borrowed_static()
             })),
             process,
@@ -30,7 +37,7 @@ impl RemoteBoxAllocator {
 
     pub fn alloc_raw(&self, size: usize) -> Result<RemoteAllocation, io::Error> {
         // TODO: optimize empty allocations
-        let allocation = self.0.allocator.borrow_mut().alloc(size)?;
+        let allocation = self.0.allocator.lock().unwrap().alloc(size)?;
         Ok(RemoteAllocation::new(self.clone(), allocation))
     }
     pub fn alloc_uninit<T: Copy>(&self) -> Result<RemoteBox<T>, io::Error> {
@@ -52,14 +59,14 @@ impl RemoteBoxAllocator {
     }
     pub fn alloc_and_copy_buf<T: Copy>(&self, buf: &[T]) -> Result<RemoteAllocation, io::Error> {
         let bytes =
-            unsafe { slice::from_raw_parts(buf.as_ptr() as *const u8, std::mem::size_of_val(buf)) };
+            unsafe { slice::from_raw_parts(buf.as_ptr().cast::<u8>(), std::mem::size_of_val(buf)) };
         let allocation = self.alloc_raw(bytes.len())?;
         allocation.write_bytes(bytes)?;
         Ok(allocation)
     }
 
     fn free(&self, allocation: &Allocation) {
-        self.0.allocator.borrow_mut().free(allocation);
+        self.0.allocator.lock().unwrap().free(allocation);
     }
 }
 

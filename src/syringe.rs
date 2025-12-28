@@ -4,11 +4,11 @@ use iced_x86::{
         registers::{gpr32::*, gpr64::*},
         CodeAssembler,
     },
-    IcedError,
+    Code, IcedError,
 };
 use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
-use std::{cell::OnceCell, io, mem, path::Path};
+use std::{cell::OnceCell, io, mem, path::Path, ptr};
 use widestring::{u16cstr, U16CString};
 use winapi::shared::{
     minwindef::{BOOL, DWORD, FALSE, HMODULE},
@@ -26,7 +26,7 @@ use crate::{
 #[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
 use {
     goblin::pe::PE,
-    std::{convert::TryInto, fs, mem::MaybeUninit, path::PathBuf, time::Duration},
+    std::{fs, mem::MaybeUninit, path::PathBuf, time::Duration},
     widestring::U16Str,
     winapi::{shared::minwindef::MAX_PATH, um::wow64apiset::GetSystemWow64DirectoryW},
 };
@@ -102,6 +102,11 @@ pub struct Syringe {
         OnceCell<crate::rpc::RemoteProcedureStub<crate::rpc::GetProcAddressParams, UntypedFnPtr>>,
 }
 
+const _: fn() = || {
+    fn assert_send<T: Send>() {}
+    assert_send::<Syringe>();
+};
+
 impl Syringe {
     /// Creates a new syringe for the given target process.
     #[must_use]
@@ -113,6 +118,32 @@ impl Syringe {
             #[cfg(feature = "rpc-core")]
             get_proc_address_stub: OnceCell::new(),
         }
+    }
+
+    /// Creates a new syringe for the given suspended target process.
+    pub fn for_suspended_process(process: OwnedProcess) -> io::Result<Self> {
+        let syringe = Self::for_process(process);
+
+        // If we are injecting into a 'suspended' process, then said process is said to not be fully
+        // initialized. This means:
+        // - We can't use `EnumProcessModulesEx` and friends.
+        // - So we can't locate Kernel32.dll in 32-bit process (from 64-bit process)
+        // - And therefore calling LoadLibrary is not possible.
+
+        // Thankfully we can 'initialize' this suspended process without running any end user logic
+        // (e.g. a game's entry point) by creating a dummy method and invoking it.
+        let ret = Code::Retnq.op_code().op_code();
+        debug_assert_eq!(
+            Code::Retnw.op_code().op_code(),
+            Code::Retnq.op_code().op_code()
+        );
+        let dummy_fn = syringe.remote_allocator.alloc_and_copy(&ret)?;
+        syringe.process().run_remote_thread(
+            unsafe { mem::transmute(dummy_fn.as_raw_ptr()) },
+            ptr::null_mut::<u8>(),
+        )?;
+
+        Ok(syringe)
     }
 
     /// Returns the target process for this syringe.
@@ -186,7 +217,11 @@ impl Syringe {
     ///
     /// # Panics
     /// This method panics if the given module was not loaded in the target process.
-    pub fn eject(&self, module: BorrowedProcessModule<'_>) -> Result<(), EjectError> {
+    pub fn eject<'a>(
+        &self,
+        module: impl Into<BorrowedProcessModule<'a>>,
+    ) -> Result<(), EjectError> {
+        let module = module.into();
         assert!(
             module.process() == &self.process(),
             "trying to eject a module from a different process"
@@ -197,11 +232,11 @@ impl Syringe {
             .get_or_try_init(|| Self::load_inject_help_data_for_process(self.process()))?;
 
         if !module.guess_is_loaded() {
-            if self.process().is_alive() {
-                return Err(EjectError::ModuleInaccessible);
+            return if self.process().is_alive() {
+                Err(EjectError::ModuleInaccessible)
             } else {
-                return Err(EjectError::ProcessInaccessible);
-            }
+                Err(EjectError::ProcessInaccessible)
+            };
         }
 
         let exit_code = self.process().run_remote_thread(
@@ -379,6 +414,8 @@ struct LoadLibraryWStub {
     code: RemoteAllocation,
     result: RemoteBox<ModuleHandle>,
 }
+
+unsafe impl Send for LoadLibraryWStub {}
 
 impl LoadLibraryWStub {
     fn build(

@@ -13,6 +13,9 @@ resolver = "2"
 categories = []
 keywords = ["dll-injection", "dll", "injector", "windows", "rpc"]
 
+[lib]
+crate-type = ["rlib", "cdylib", "staticlib"]
+
 [dependencies]
 dll-syringe-macros = { path = "dll-syringe-macros", version = "0.1" }
 winapi = { version = "0.3", features = [
@@ -29,9 +32,12 @@ shrinkwraprs = { version = "0.3", default-features = false }
 same-file = { version = "1.0", default-features = false }
 konst = { version = "0.4", default-features = false }
 fn-ptr = { version = "0.4", features = ["max-arity-12"], default-features = false }
-iced-x86 = { version = "1.21", features = ["std", "code_asm"], default-features = false, optional = true }
-bincode = { version = "2.0", features = ["std", "serde"], default-features = false, optional = true }
+iced-x86 = { version = "1.21", features = ["std", "code_asm", "op_code_info"], default-features = false, optional = true }
+cu-bincode = { version = "2.0", features = ["std", "serde"], default-features = false, optional = true }
 serde = { version = "1.0", default-features = false, optional = true }
+
+[build-dependencies]
+csbindgen = "1.9.0"
 
 [target.'cfg(target_arch = "x86")'.dependencies]
 
@@ -47,13 +53,27 @@ default = ["syringe", "into-x86-from-x64", "rpc"]
 into-x86-from-x64 = ["syringe", "goblin"]
 rpc-core = ["syringe"]
 rpc-raw = ["rpc-core"]
-rpc-payload = ["rpc-raw", "bincode", "serde"]
+rpc-payload = ["rpc-raw", "cu-bincode", "serde"]
 rpc = ["rpc-raw", "rpc-payload"]
 process-memory = []
-payload-utils = ["bincode", "serde"]
+payload-utils = ["cu-bincode", "serde"]
 syringe = ["iced-x86"]
 full = ["into-x86-from-x64", "rpc", "process-memory", "payload-utils"]
 doc-cfg = ["full"]
+c-exports = ["syringe"]
+
+[profile.profile]
+inherits = "release"
+debug = true
+codegen-units = 1
+lto = true
+strip = false
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+panic = "abort"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]

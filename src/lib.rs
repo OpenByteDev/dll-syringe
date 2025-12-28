@@ -1,29 +1,24 @@
 #![cfg(windows)]
-#![feature(maybe_uninit_slice, linked_list_cursors)]
+#![feature(linked_list_cursors)]
 #![cfg_attr(feature = "syringe", feature(once_cell_try))]
 #![cfg_attr(feature = "rpc-core", feature(min_specialization))]
 #![warn(
-    unsafe_op_in_unsafe_fn,
-    missing_docs,
-    missing_debug_implementations,
-    missing_copy_implementations,
-    rust_2018_idioms,
-    clippy::todo,
-    clippy::manual_assert,
-    clippy::must_use_candidate,
-    clippy::inconsistent_struct_constructor,
-    clippy::wrong_self_convention,
-    clippy::new_without_default,
+    clippy::pedantic,
     rustdoc::broken_intra_doc_links,
     rustdoc::private_intra_doc_links
 )]
 #![allow(
     clippy::module_inception,
-    clippy::module_name_repetitions,
     clippy::missing_errors_doc,
-    clippy::borrow_as_ptr,
-    clippy::missing_transmute_annotations
+    clippy::missing_panics_doc,
+    clippy::missing_transmute_annotations,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::needless_pass_by_value,
+    clippy::wildcard_imports,
+    clippy::redundant_closure_for_method_calls
 )]
+#![cfg_attr(feature = "doc-cfg", allow(clippy::doc_markdown))]
 #![cfg_attr(feature = "doc-cfg", doc = include_str!("../crate-doc.md"))]
 #![cfg_attr(not(feature = "doc-cfg"), allow(missing_docs))]
 #![cfg_attr(feature = "doc-cfg", feature(doc_cfg))]
@@ -45,6 +40,11 @@ pub(crate) mod utils;
 
 /// Module containing the error enums used in this crate.
 pub mod error;
+
+/// C exports for the library.
+#[cfg(feature = "c-exports")]
+pub mod c_exports;
+
 #[cfg(feature = "payload-utils")]
 #[doc(hidden)]
 pub mod payload_utils;
@@ -52,6 +52,7 @@ pub mod payload_utils;
 #[cfg(any(feature = "payload-utils", feature = "rpc-payload"))]
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
+#[doc(hidden)]
 pub(crate) struct ArgAndResultBufInfo {
     pub data: u64,
     pub len: u64,
