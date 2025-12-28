@@ -13,6 +13,9 @@ resolver = "2"
 categories = []
 keywords = ["dll-injection", "dll", "injector", "windows", "rpc"]
 
+[lib]
+crate-type = ["rlib", "cdylib", "staticlib"]
+
 [dependencies]
 dll-syringe-macros = { path = "dll-syringe-macros", version = "0.1" }
 winapi = { version = "0.3", features = [
@@ -59,21 +62,19 @@ full = ["into-x86-from-x64", "rpc", "process-memory", "payload-utils"]
 doc-cfg = ["full"]
 c-exports = ["syringe"]
 
-[package.metadata.docs.rs]
-targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
-features = ["doc-cfg"]
-
-# Profile Build
 [profile.profile]
 inherits = "release"
 debug = true
 codegen-units = 1
 lto = true
-strip = false  # No stripping!!
+strip = false
 
-# Optimized Release Build
 [profile.release]
 codegen-units = 1
 lto = true
-strip = true  # Automatically strip symbols from the binary.
+strip = true
 panic = "abort"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+features = ["doc-cfg"]
