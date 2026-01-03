@@ -1,9 +1,9 @@
-#![cfg(feature = "c-exports")]
+#![cfg(feature = "c-api")]
 
 #[allow(unused)]
 mod common;
 
-use dll_syringe::{c_exports::*, process::Process};
+use dll_syringe::{c_api::*, process::Process};
 use std::ffi::CString;
 
 syringe_test! {

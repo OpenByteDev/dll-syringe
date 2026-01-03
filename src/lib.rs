@@ -42,8 +42,8 @@ pub(crate) mod utils;
 pub mod error;
 
 /// C exports for the library.
-#[cfg(feature = "c-exports")]
-pub mod c_exports;
+#[cfg(feature = "c-api")]
+pub mod c_api;
 
 #[cfg(feature = "payload-utils")]
 #[doc(hidden)]

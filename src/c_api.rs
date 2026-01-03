@@ -1,8 +1,16 @@
-use crate::{
-    process::{BorrowedProcessModule, ModuleHandle, OwnedProcess},
-    Syringe,
-};
-use std::{ffi::CStr, os::raw::c_char, path::Path, ptr};
+use crate::{process::{BorrowedProcessModule, OwnedProcess}};
+use std::{ffi::{CStr, c_void}, os::raw::c_char, path::Path, ptr};
+
+/// cbindgen:ignore
+pub(crate) type InnerSyringe = crate::Syringe;
+/// cbindgen:ignore
+pub(crate) type InnerModuleHandle = crate::process::ModuleHandle;
+
+/// An injector that can inject modules (.dll's) into a target process.
+pub extern type Syringe;
+
+/// A handle to a process module.
+pub type ModuleHandle = *mut c_void;
 
 /// Creates a new `Syringe` instance for a process identified by PID.
 ///
@@ -16,13 +24,16 @@ use std::{ffi::CStr, os::raw::c_char, path::Path, ptr};
 /// The returned instance has to freed using `syringe_free`.
 #[no_mangle]
 pub extern "C" fn syringe_for_process(pid: u32) -> *mut Syringe {
-    let Ok(process) = OwnedProcess::from_pid(pid) else {
-        return ptr::null_mut();
-    };
+    fn core(pid: u32) -> *mut InnerSyringe {
+        let Ok(process) = OwnedProcess::from_pid(pid) else {
+            return ptr::null_mut();
+        };
 
-    let syringe = Syringe::for_process(process);
-    let boxed = Box::new(syringe);
-    Box::into_raw(boxed)
+        let syringe = InnerSyringe::for_process(process);
+        Box::into_raw(Box::new(syringe))
+    }
+
+    core(pid).cast()
 }
 
 /// Creates a new `Syringe` instance for a suspended process identified by PID.
@@ -37,17 +48,18 @@ pub extern "C" fn syringe_for_process(pid: u32) -> *mut Syringe {
 /// The returned instance has to freed using `syringe_free`.
 #[no_mangle]
 pub extern "C" fn syringe_for_suspended_process(pid: u32) -> *mut Syringe {
-    let Ok(process) = OwnedProcess::from_pid(pid) else {
-        return ptr::null_mut();
-    };
+    fn core(pid: u32) -> *mut InnerSyringe {
+        let Ok(process) = OwnedProcess::from_pid(pid) else {
+            return ptr::null_mut();
+        };
 
-    match Syringe::for_suspended_process(process) {
-        Ok(syringe) => {
-            let boxed = Box::new(syringe);
-            Box::into_raw(boxed)
+        match InnerSyringe::for_suspended_process(process) {
+            Ok(syringe) => Box::into_raw(Box::new(syringe)),
+            Err(_) => ptr::null_mut(),
         }
-        Err(_) => ptr::null_mut(),
     }
+
+    core(pid).cast()
 }
 
 /// Injects a DLL into the target process associated with the given `Syringe`.
@@ -63,11 +75,18 @@ pub extern "C" fn syringe_for_suspended_process(pid: u32) -> *mut Syringe {
 /// The caller must ensure the given syringe pointer is valid.
 #[no_mangle]
 pub unsafe extern "C" fn syringe_inject(syringe: *mut Syringe, dll_path: *const c_char) -> bool {
-    let syringe = unsafe { &mut *syringe };
-    let Ok(path_str) = unsafe { CStr::from_ptr(dll_path) }.to_str() else {
-        return false;
-    };
-    syringe.inject(Path::new(path_str)).is_ok()
+    fn core(
+        syringe: *mut InnerSyringe,
+        dll_path: *const c_char,
+    ) -> bool {
+        let syringe = unsafe { &mut *syringe };
+        let Ok(path_str) = unsafe { CStr::from_ptr(dll_path) }.to_str() else {
+            return false;
+        };
+        syringe.inject(Path::new(path_str)).is_ok()
+    }
+
+    core(syringe.cast(), dll_path)
 }
 
 /// Finds or injects a DLL into the target process.
@@ -89,14 +108,22 @@ pub unsafe extern "C" fn syringe_find_or_inject(
     syringe: *mut Syringe,
     dll_path: *const c_char,
 ) -> ModuleHandle {
-    let syringe = unsafe { &mut *syringe };
-    let Ok(path_str) = unsafe { CStr::from_ptr(dll_path) }.to_str() else {
-        return ptr::null_mut();
-    };
-    match syringe.find_or_inject(Path::new(path_str)) {
-        Ok(module) => module.handle(),
-        Err(_) => ptr::null_mut(),
+    fn core(
+        syringe: *mut InnerSyringe,
+        dll_path: *const c_char,
+    ) -> InnerModuleHandle {
+        let syringe = unsafe { &mut *syringe };
+        let Ok(path_str) = unsafe { CStr::from_ptr(dll_path) }.to_str() else {
+            return ptr::null_mut();
+        };
+
+        match syringe.find_or_inject(Path::new(path_str)) {
+            Ok(module) => module.handle(),
+            Err(_) => ptr::null_mut(),
+        }
     }
+
+    core(syringe.cast(), dll_path).cast()
 }
 
 /// Ejects a module from the target process.
@@ -113,9 +140,17 @@ pub unsafe extern "C" fn syringe_find_or_inject(
 /// the handle belongs to a module in the process of the syringe.
 #[no_mangle]
 pub unsafe extern "C" fn syringe_eject(syringe: *mut Syringe, module: ModuleHandle) -> bool {
-    let syringe = unsafe { &mut *syringe };
-    let module = unsafe { BorrowedProcessModule::new_unchecked(module, syringe.process()) };
-    syringe.eject(module).is_ok()
+    fn core(
+        syringe: *mut InnerSyringe,
+        module: InnerModuleHandle,
+    ) -> bool {
+        let syringe = unsafe { &mut *syringe };
+        let module =
+            unsafe { BorrowedProcessModule::new_unchecked(module, syringe.process()) };
+        syringe.eject(module).is_ok()
+    }
+
+    core(syringe.cast(), module.cast())
 }
 
 /// Frees a `Syringe` instance.
@@ -127,9 +162,11 @@ pub unsafe extern "C" fn syringe_eject(syringe: *mut Syringe, module: ModuleHand
 /// The caller must ensure that the given syringe pointer is valid or null.
 #[no_mangle]
 pub unsafe extern "C" fn syringe_free(syringe: *mut Syringe) {
-    if !syringe.is_null() {
-        unsafe {
-            drop(Box::from_raw(syringe));
+    fn core(syringe: *mut crate::Syringe) {
+        if !syringe.is_null() {
+            unsafe { drop(Box::from_raw(syringe)) }
         }
     }
+
+    core(syringe.cast());
 }

@@ -60,8 +60,8 @@ payload-utils = ["cu-bincode", "serde"]
 syringe = ["iced-x86"]
 full = ["into-x86-from-x64", "rpc", "process-memory", "payload-utils"]
 doc-cfg = ["full"]
-c-exports = ["syringe"]
 try-clone = ["dep:try-clone"]
+c-api = ["syringe"]
 
 [profile.profile]
 inherits = "release"
