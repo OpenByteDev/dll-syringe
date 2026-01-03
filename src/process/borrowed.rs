@@ -94,6 +94,25 @@ impl<'a> From<&'a OwnedProcess> for BorrowedProcess<'a> {
     }
 }
 
+#[cfg(feature = "try-clone")]
+impl try_clone::TryClone for BorrowedProcess<'_> {
+    type Error = core::convert::Infallible;
+
+    fn try_clone(&self) -> Result<Self, Self::Error> {
+       BorrowedProcess::try_clone(self)
+    }
+}
+
+#[cfg(feature = "try-clone")]
+impl try_clone::TryCloneToOwned for BorrowedProcess<'_> {
+    type Owned = OwnedProcess;
+    type Error = io::Error;
+
+    fn try_clone_to_owned(&self) -> Result<Self::Owned, Self::Error> {
+        self.try_to_owned()
+    }
+}
+
 impl<'a> Process for BorrowedProcess<'a> {
     type Handle = BorrowedHandle<'a>;
 

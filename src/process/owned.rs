@@ -86,6 +86,15 @@ impl Hash for OwnedProcess {
     }
 }
 
+#[cfg(feature = "try-clone")]
+impl try_clone::TryClone for OwnedProcess {
+    type Error = io::Error;
+
+    fn try_clone(&self) -> Result<Self, Self::Error> {
+        OwnedProcess::try_clone(self)
+    }
+}
+
 impl Process for OwnedProcess {
     type Handle = OwnedHandle;
 
@@ -96,7 +105,6 @@ impl Process for OwnedProcess {
     fn try_clone(&self) -> Result<Self, io::Error> {
         self.borrowed().try_to_owned()
     }
-
     fn into_handle(self) -> Self::Handle {
         self.0
     }
