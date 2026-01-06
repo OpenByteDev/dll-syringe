@@ -13,7 +13,7 @@ use std::{
     time::Duration,
 };
 
-use winapi::{shared::minwindef::FALSE, um::processthreadsapi::OpenProcess};
+use windows_sys::Win32::{Foundation::FALSE, System::Threading::OpenProcess};
 
 use crate::process::{BorrowedProcess, OwnedProcessModule, Process, PROCESS_INJECTION_ACCESS};
 

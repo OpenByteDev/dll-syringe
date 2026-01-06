@@ -20,12 +20,9 @@ use std::{
     sync::Mutex,
 };
 use widestring::U16CString;
-use winapi::{
-    shared::minwindef::FALSE,
-    um::{
-        processthreadsapi::{CreateProcessW, PROCESS_INFORMATION, STARTUPINFOW},
-        winbase::CREATE_SUSPENDED,
-    },
+use windows_sys::Win32::{
+    Foundation::FALSE,
+    System::Threading::{CreateProcessW, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOW},
 };
 
 pub fn build_test_payload_x86() -> Result<PathBuf, Box<dyn Error>> {
@@ -124,7 +121,7 @@ pub(crate) fn start_suspended_process(path: &Path) -> OwnedProcess {
             CREATE_SUSPENDED, // Creation flags
             ptr::null_mut(),  // Environment
             ptr::null_mut(),  // Current directory
-            &mut startup_info,
+            &startup_info,
             &mut process_info,
         )
     };

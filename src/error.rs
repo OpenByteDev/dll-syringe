@@ -5,22 +5,19 @@ use std::{
 
 use num_enum::{IntoPrimitive, TryFromPrimitive, TryFromPrimitiveError};
 use thiserror::Error;
-use winapi::um::{
-    minwinbase::{
-        EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EXCEPTION_BREAKPOINT,
-        EXCEPTION_DATATYPE_MISALIGNMENT, EXCEPTION_FLT_DENORMAL_OPERAND,
-        EXCEPTION_FLT_DIVIDE_BY_ZERO, EXCEPTION_FLT_INEXACT_RESULT,
-        EXCEPTION_FLT_INVALID_OPERATION, EXCEPTION_FLT_OVERFLOW, EXCEPTION_FLT_STACK_CHECK,
-        EXCEPTION_FLT_UNDERFLOW, EXCEPTION_GUARD_PAGE, EXCEPTION_ILLEGAL_INSTRUCTION,
-        EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW, EXCEPTION_INVALID_DISPOSITION,
-        EXCEPTION_INVALID_HANDLE, EXCEPTION_IN_PAGE_ERROR, EXCEPTION_NONCONTINUABLE_EXCEPTION,
-        EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP, EXCEPTION_STACK_OVERFLOW,
-    },
-    winnt::STATUS_UNWIND_CONSOLIDATE,
+use windows_sys::Win32::Foundation::{
+    EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EXCEPTION_BREAKPOINT,
+    EXCEPTION_DATATYPE_MISALIGNMENT, EXCEPTION_FLT_DENORMAL_OPERAND, EXCEPTION_FLT_DIVIDE_BY_ZERO,
+    EXCEPTION_FLT_INEXACT_RESULT, EXCEPTION_FLT_INVALID_OPERATION, EXCEPTION_FLT_OVERFLOW,
+    EXCEPTION_FLT_STACK_CHECK, EXCEPTION_FLT_UNDERFLOW, EXCEPTION_GUARD_PAGE,
+    EXCEPTION_ILLEGAL_INSTRUCTION, EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW,
+    EXCEPTION_INVALID_DISPOSITION, EXCEPTION_INVALID_HANDLE, EXCEPTION_IN_PAGE_ERROR,
+    EXCEPTION_NONCONTINUABLE_EXCEPTION, EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP,
+    EXCEPTION_STACK_OVERFLOW, STATUS_UNWIND_CONSOLIDATE,
 };
 
 #[cfg(feature = "syringe")]
-use winapi::shared::winerror::ERROR_PARTIAL_COPY;
+use windows_sys::Win32::Foundation::ERROR_PARTIAL_COPY;
 
 #[derive(Debug, Error)]
 /// Error enum representing either a windows api error or a nul error from an invalid interior nul.
@@ -52,7 +49,7 @@ pub enum GetLocalProcedureAddressError {
 #[derive(
     Debug, TryFromPrimitive, IntoPrimitive, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash,
 )]
-#[repr(u32)]
+#[repr(i32)]
 /// Codes for unhandled windows exceptions from [msdn](https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode).
 pub enum ExceptionCode {
     /// The thread attempts to read from or write to a virtual address for which it does not have access.
@@ -111,12 +108,12 @@ pub enum ExceptionCode {
 
 impl ExceptionCode {
     /// Try to interpret the given code as a windows exception code.
-    pub fn try_from_code(code: u32) -> Result<Self, TryFromPrimitiveError<Self>> {
+    pub fn try_from_code(code: i32) -> Result<Self, TryFromPrimitiveError<Self>> {
         Self::try_from_primitive(code)
     }
     /// Returns the underlying windows exception code.
     #[must_use]
-    pub fn code(self) -> u32 {
+    pub fn code(self) -> i32 {
         self.into()
     }
 }

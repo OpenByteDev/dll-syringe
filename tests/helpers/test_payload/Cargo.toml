@@ -5,7 +5,7 @@ edition = "2021"
 resolver = "2"
 
 [dependencies]
-winapi = { version = "0.3", features = ["minwindef"], default-features = false }
+windows-sys = { version = "0.61", features = ["Win32_Foundation"], default-features = false }
 dll-syringe = { path = "../../..", features = ["payload-utils"], default-features = false }
 serde = { version = "1.0", default-features = false }
 cu-bincode = { version = "2.0", default-features = false }

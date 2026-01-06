@@ -9,30 +9,25 @@ use std::{
     time::Duration,
 };
 
-use winapi::{
-    shared::{
-        minwindef::{DWORD, FALSE},
-        winerror::{ERROR_CALL_NOT_IMPLEMENTED, ERROR_INSUFFICIENT_BUFFER},
+use windows_sys::Win32::{
+    Foundation::{
+        ERROR_CALL_NOT_IMPLEMENTED, ERROR_INSUFFICIENT_BUFFER, FALSE, STILL_ACTIVE, WAIT_FAILED,
     },
-    um::{
-        minwinbase::STILL_ACTIVE,
-        processthreadsapi::{
+    System::{
+        SystemInformation::GetSystemWow64DirectoryA,
+        Threading::{
             CreateRemoteThread, GetCurrentProcess, GetExitCodeProcess, GetExitCodeThread,
-            GetProcessId, TerminateProcess,
+            GetProcessId, IsWow64Process, QueryFullProcessImageNameW, TerminateProcess,
+            WaitForSingleObject, INFINITE, PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION,
+            PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE,
         },
-        synchapi::WaitForSingleObject,
-        winbase::{QueryFullProcessImageNameW, INFINITE, WAIT_FAILED},
-        winnt::{
-            PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION,
-            PROCESS_VM_READ, PROCESS_VM_WRITE,
-        },
-        wow64apiset::{GetSystemWow64DirectoryA, IsWow64Process},
     },
 };
 
 use crate::{
     process::{BorrowedProcess, ProcessModule},
     utils::{win_fill_path_buf_helper, FillPathBufResult},
+    win_defs::DWORD,
 };
 
 /// A handle to a running process.
@@ -115,7 +110,7 @@ pub trait Process: AsHandle + AsRawHandle {
         let mut exit_code = MaybeUninit::uninit();
         let result =
             unsafe { GetExitCodeProcess(self.as_raw_handle().cast(), exit_code.as_mut_ptr()) };
-        result != FALSE && unsafe { exit_code.assume_init() } == STILL_ACTIVE
+        result != FALSE && unsafe { exit_code.assume_init() } == STILL_ACTIVE.cast_unsigned()
     }
 
     /// Returns the id of this process.
@@ -218,8 +213,7 @@ pub trait Process: AsHandle + AsRawHandle {
             return Err(io::Error::last_os_error());
         }
         debug_assert_ne!(
-            result,
-            STILL_ACTIVE.cast_signed(),
+            result, STILL_ACTIVE,
             "GetExitCodeThread returned STILL_ACTIVE after WaitForSingleObject"
         );
 

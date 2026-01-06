@@ -1,6 +1,6 @@
 use std::{cmp, io, mem::MaybeUninit, path::PathBuf};
 
-use winapi::shared::minwindef::MAX_PATH;
+use crate::win_defs::MAX_PATH;
 
 use super::ArrayBuf;
 

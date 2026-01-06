@@ -1,12 +1,14 @@
+use std::ffi::c_void;
+
 use dll_syringe::payload_utils::payload_procedure;
-use winapi::shared::minwindef::{BOOL, DWORD, HINSTANCE, LPVOID};
+use windows_sys::Win32::Foundation::HINSTANCE;
 
 #[no_mangle]
 extern "system" fn DllMain(
     _hinst_dll: HINSTANCE, // handle to DLL module
-    _fdw_reason: DWORD,    // reason for calling function
-    _lp_reserved: LPVOID,
-) -> BOOL {
+    _fdw_reason: u32,      // reason for calling function
+    _lp_reserved: *mut c_void,
+) -> i32 {
     1
 }
 

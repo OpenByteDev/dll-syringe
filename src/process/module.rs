@@ -9,21 +9,17 @@ use std::{
 use crate::{
     error::{GetLocalProcedureAddressError, IoOrNulError},
     process::{BorrowedProcess, OwnedProcess, Process},
-    utils::{win_fill_path_buf_helper, FillPathBufResult},
+    utils::{FillPathBufResult, win_fill_path_buf_helper}, win_defs::HINSTANCE__,
 };
 use fn_ptr::{FnPtr, UntypedFnPtr};
 use path_absolutize::Absolutize;
 use widestring::{U16CStr, U16CString};
-use winapi::{
-    shared::{
-        minwindef::{HINSTANCE__, HMODULE},
-        winerror::{ERROR_INSUFFICIENT_BUFFER, ERROR_MOD_NOT_FOUND},
-    },
-    um::{
-        libloaderapi::{GetModuleFileNameW, GetModuleHandleW, GetProcAddress},
-        memoryapi::VirtualQueryEx,
-        psapi::{GetModuleBaseNameW, GetModuleFileNameExW},
-        winnt::{MEMORY_BASIC_INFORMATION, PAGE_NOACCESS},
+use windows_sys::Win32::{
+    Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_MOD_NOT_FOUND, HMODULE},
+    System::{
+        LibraryLoader::{GetModuleFileNameW, GetModuleHandleW, GetProcAddress},
+        Memory::{VirtualQueryEx, MEMORY_BASIC_INFORMATION, PAGE_NOACCESS},
+        ProcessStatus::{GetModuleBaseNameW, GetModuleFileNameExW},
     },
 };
 
@@ -333,9 +329,9 @@ impl<P: Process> ProcessModule<P> {
     ) -> Result<UntypedFnPtr, io::Error> {
         assert!(self.is_local());
 
-        let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ptr()) };
-        if let Some(fn_ptr) = NonNull::new(fn_ptr) {
-            Ok(fn_ptr.as_ptr().cast())
+        let fn_ptr = unsafe { GetProcAddress(self.handle(), proc_name.as_ptr().cast()) };
+        if let Some(fn_ptr) = fn_ptr {
+            Ok(fn_ptr.as_ptr())
         } else {
             Err(io::Error::last_os_error())
         }

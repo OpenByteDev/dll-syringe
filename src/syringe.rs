@@ -1,3 +1,4 @@
+use fn_ptr::FnPtr;
 use iced_x86::{
     code_asm::{
         dword_ptr,
@@ -10,9 +11,9 @@ use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
 use std::{cell::OnceCell, io, mem, path::Path, ptr};
 use widestring::{u16cstr, U16CString};
-use winapi::shared::{
-    minwindef::{BOOL, DWORD, FALSE, HMODULE},
-    ntdef::LPCWSTR,
+use windows_sys::{
+    core::PCWSTR,
+    Win32::Foundation::{FALSE, HMODULE},
 };
 
 use crate::{
@@ -21,27 +22,26 @@ use crate::{
         memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, ModuleHandle, OwnedProcess, Process, ProcessModule,
     },
+    win_defs::{BOOL, DWORD},
 };
 
 #[cfg(all(target_arch = "x86_64", feature = "into-x86-from-x64"))]
 use {
+    crate::win_defs::MAX_PATH,
     goblin::pe::PE,
     std::{convert::TryInto, fs, mem::MaybeUninit, path::PathBuf, time::Duration},
     widestring::U16Str,
-    winapi::{shared::minwindef::MAX_PATH, um::wow64apiset::GetSystemWow64DirectoryW},
+    windows_sys::Win32::System::SystemInformation::GetSystemWow64DirectoryW,
 };
 
 #[cfg(feature = "rpc-core")]
-use {
-    fn_ptr::UntypedFnPtr,
-    winapi::shared::{minwindef::FARPROC, ntdef::LPCSTR},
-};
+use {fn_ptr::UntypedFnPtr, windows_sys::core::PCSTR, windows_sys::Win32::Foundation::FARPROC};
 
-type LoadLibraryWFn = unsafe extern "system" fn(LPCWSTR) -> HMODULE;
+type LoadLibraryWFn = unsafe extern "system" fn(PCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;
 type GetLastErrorFn = unsafe extern "system" fn() -> DWORD;
 #[cfg(feature = "rpc-core")]
-pub(crate) type GetProcAddressFn = unsafe extern "system" fn(HMODULE, LPCSTR) -> FARPROC;
+pub(crate) type GetProcAddressFn = unsafe extern "system" fn(HMODULE, PCSTR) -> FARPROC;
 
 #[derive(Debug, Clone)]
 pub(crate) struct InjectHelpData {
@@ -57,17 +57,41 @@ unsafe impl Send for InjectHelpData {}
 
 impl InjectHelpData {
     pub fn get_load_library_fn_ptr(&self) -> LoadLibraryWFn {
-        unsafe { mem::transmute(self.kernel32_module as usize + self.load_library_offset) }
+        unsafe {
+            FnPtr::from_ptr(
+                self.kernel32_module
+                    .byte_add(self.load_library_offset)
+                    .cast(),
+            )
+        }
     }
     pub fn get_free_library_fn_ptr(&self) -> FreeLibraryFn {
-        unsafe { mem::transmute(self.kernel32_module as usize + self.free_library_offset) }
+        unsafe {
+            FnPtr::from_ptr(
+                self.kernel32_module
+                    .byte_add(self.free_library_offset)
+                    .cast(),
+            )
+        }
     }
     pub fn get_get_last_error(&self) -> GetLastErrorFn {
-        unsafe { mem::transmute(self.kernel32_module as usize + self.get_last_error_offset) }
+        unsafe {
+            FnPtr::from_ptr(
+                self.kernel32_module
+                    .byte_add(self.get_last_error_offset)
+                    .cast(),
+            )
+        }
     }
     #[cfg(feature = "rpc-core")]
     pub fn get_proc_address_fn_ptr(&self) -> GetProcAddressFn {
-        unsafe { mem::transmute(self.kernel32_module as usize + self.get_proc_address_offset) }
+        unsafe {
+            FnPtr::from_ptr(
+                self.kernel32_module
+                    .byte_add(self.get_proc_address_offset)
+                    .cast(),
+            )
+        }
     }
 }
 
@@ -139,7 +163,7 @@ impl Syringe {
         );
         let dummy_fn = syringe.remote_allocator.alloc_and_copy(&ret)?;
         syringe.process().run_remote_thread(
-            unsafe { mem::transmute(dummy_fn.as_raw_ptr()) },
+            unsafe { FnPtr::from_ptr(dummy_fn.as_raw_ptr().cast()) },
             ptr::null_mut::<u8>(),
         )?;
 
@@ -251,7 +275,7 @@ impl Syringe {
                 "failed to eject module from process",
             )));
         }
-        if let Ok(exception) = ExceptionCode::try_from_primitive(exit_code) {
+        if let Ok(exception) = ExceptionCode::try_from_primitive(free_library_result) {
             return Err(EjectError::RemoteException(exception));
         }
 
@@ -287,7 +311,7 @@ impl Syringe {
             return Ok(exit_code);
         }
 
-        match ExceptionCode::try_from_primitive(exit_code) {
+        match ExceptionCode::try_from_primitive(exit_code.cast_signed()) {
             Ok(exception) => Err(exception),
             Err(_) => Ok(exit_code),
         }
@@ -300,7 +324,7 @@ impl Syringe {
             return Ok(());
         }
 
-        match ExceptionCode::try_from_primitive(exit_code) {
+        match ExceptionCode::try_from_primitive(exit_code.cast_signed()) {
             Ok(exception) => Err(ExceptionOrIoError::Exception(exception)),
             Err(_) => Err(ExceptionOrIoError::Io(io::Error::from_raw_os_error(
                 exit_code as _,

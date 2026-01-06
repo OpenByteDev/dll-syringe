@@ -37,6 +37,7 @@ pub mod process;
 pub mod rpc;
 
 pub(crate) mod utils;
+pub(crate) mod win_defs;
 
 /// Module containing the error enums used in this crate.
 pub mod error;
