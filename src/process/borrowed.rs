@@ -99,7 +99,7 @@ impl try_clone::TryClone for BorrowedProcess<'_> {
     type Error = core::convert::Infallible;
 
     fn try_clone(&self) -> Result<Self, Self::Error> {
-       BorrowedProcess::try_clone(self)
+        Ok(*self)
     }
 }
 
