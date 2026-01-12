@@ -1,6 +1,6 @@
 use iced_x86::code_asm::*;
 use std::{
-    any::{self, TypeId},
+    any,
     cell::OnceCell,
     cmp, fmt, io, mem, ptr, slice,
 };
@@ -14,7 +14,7 @@ use crate::{
     rpc::error::RawRpcError,
     Syringe,
 };
-use fn_ptr::{make_non_extern, Abi, FnPtr, UntypedFnPtr};
+use fn_ptr::{AbiValue, FnPtr, UntypedFnPtr, with_abi};
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
 impl Syringe {
@@ -157,7 +157,7 @@ where
             let parameter = self.remote_allocator.alloc_buf::<usize>(F::ARITY)?;
             let result = self.remote_allocator.alloc_uninit::<usize>()?;
 
-            let float_mask = <make_non_extern!(F)>::build_float_mask();
+            let float_mask = <with_abi!("Rust", F)>::build_float_mask();
             let code = if self.process().is_x86()? {
                 Self::build_call_stub_x86(self.ptr, result.as_ptr().as_ptr(), float_mask).unwrap()
             } else {
@@ -207,10 +207,10 @@ where
         asm.mov(eax, 0)?; // return 0
 
         match F::ABI {
-            Abi::C => {
+            AbiValue::C { .. } => {
                 asm.add(esp, (mem::size_of::<u32>() * F::ARITY) as u32)?;
             }
-            Abi::System => {}
+            AbiValue::System { .. } => {}
             _ => unreachable!(),
         }
 
@@ -304,8 +304,8 @@ where
     }
 }
 
-fn type_eq<T: ?Sized + 'static, U: ?Sized + 'static>() -> bool {
-    TypeId::of::<T>() == TypeId::of::<U>()
+fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+    typeid::of::<T>() == typeid::of::<U>()
 }
 
 /// Helper trait for building a mask of which arguments and results are passed in floating point registers.
@@ -390,7 +390,7 @@ macro_rules! impl_call {
             }
         }
 
-        impl <$($ty,)* Output> BuildFloatMask for fn($($ty),*) -> Output where $($ty : 'static,)* Output: 'static {
+        impl <$($ty,)* Output> BuildFloatMask for fn($($ty),*) -> Output {
             #[allow(unused)]
             fn build_float_mask() -> u32 {
                 // calculate a mask denoting which arguments are floats

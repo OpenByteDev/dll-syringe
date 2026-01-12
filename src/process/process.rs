@@ -1,7 +1,7 @@
 use std::{
     ffi::OsString,
     io,
-    mem::{self, MaybeUninit},
+    mem::MaybeUninit,
     num::NonZeroU32,
     os::windows::prelude::{AsHandle, AsRawHandle, FromRawHandle, OwnedHandle},
     path::{Path, PathBuf},
@@ -9,25 +9,25 @@ use std::{
     time::Duration,
 };
 
+use fn_ptr::FnPtr;
 use winapi::{
-    shared::{
+    ctypes::c_void, shared::{
         minwindef::{DWORD, FALSE},
         winerror::{ERROR_CALL_NOT_IMPLEMENTED, ERROR_INSUFFICIENT_BUFFER},
-    },
-    um::{
+    }, um::{
         minwinbase::STILL_ACTIVE,
         processthreadsapi::{
             CreateRemoteThread, GetCurrentProcess, GetExitCodeProcess, GetExitCodeThread,
             GetProcessId, TerminateProcess,
         },
         synchapi::WaitForSingleObject,
-        winbase::{QueryFullProcessImageNameW, INFINITE, WAIT_FAILED},
+        winbase::{INFINITE, QueryFullProcessImageNameW, WAIT_FAILED},
         winnt::{
             PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION,
             PROCESS_VM_READ, PROCESS_VM_WRITE,
         },
         wow64apiset::{GetSystemWow64DirectoryA, IsWow64Process},
-    },
+    }
 };
 
 use crate::{
@@ -239,7 +239,7 @@ pub trait Process: AsHandle + AsRawHandle {
                 self.as_raw_handle().cast(),
                 ptr::null_mut(),
                 0,
-                Some(mem::transmute(remote_fn)),
+                Some(remote_fn.with_args::<(*mut c_void,)>()),
                 parameter.cast(),
                 0, // RUN_IMMEDIATELY
                 ptr::null_mut(),

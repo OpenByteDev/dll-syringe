@@ -30,7 +30,7 @@ thiserror = { version = "2.0", default-features = false }
 num_enum = { version = "0.7", default-features = false }
 shrinkwraprs = { version = "0.3", default-features = false }
 same-file = { version = "1.0", default-features = false }
-fn-ptr = { version = "0.4", features = ["max-arity-12"], default-features = false }
+fn-ptr = { version = "0.9", features = ["max-arity-12"], default-features = false }
 try-clone = { version = "0.2", default-features = false, optional = true }
 iced-x86 = { version = "1.21", features = ["std", "code_asm", "op_code_info"], default-features = false, optional = true }
 cu-bincode = { version = "2.0", features = ["std", "serde"], default-features = false, optional = true }
@@ -38,6 +38,7 @@ serde = { version = "1.0", default-features = false, optional = true }
 
 [build-dependencies]
 csbindgen = "1.9.0"
+typeid = { version = "1.0", default-features = false, optional = true }
 
 [target.'cfg(target_arch = "x86")'.dependencies]
 
@@ -52,7 +53,7 @@ tempfile = { version = "3.23", default-features = false }
 default = ["syringe", "into-x86-from-x64", "rpc"]
 into-x86-from-x64 = ["syringe", "goblin"]
 rpc-core = ["syringe"]
-rpc-raw = ["rpc-core"]
+rpc-raw = ["rpc-core", "typeid"]
 rpc-payload = ["rpc-raw", "cu-bincode", "serde"]
 rpc = ["rpc-raw", "rpc-payload"]
 process-memory = []

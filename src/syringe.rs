@@ -1,3 +1,4 @@
+use fn_ptr::FnPtr;
 use iced_x86::{
     code_asm::{
         dword_ptr,
@@ -240,7 +241,7 @@ impl Syringe {
         }
 
         let exit_code = self.process().run_remote_thread(
-            unsafe { mem::transmute(inject_data.get_free_library_fn_ptr()) },
+            unsafe { inject_data.get_free_library_fn_ptr().with_output::<u32>().as_safe() },
             module.handle(),
         )?;
 
