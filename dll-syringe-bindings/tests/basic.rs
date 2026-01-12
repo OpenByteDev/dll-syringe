@@ -2,8 +2,8 @@
 #[allow(unexpected_cfgs, unused)]
 mod common;
 
-use dll_syringe_bindings::*;
 use dll_syringe::process::Process;
+use dll_syringe_bindings::*;
 use std::ffi::CString;
 
 syringe_test! {

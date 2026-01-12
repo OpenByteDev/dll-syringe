@@ -241,7 +241,12 @@ impl Syringe {
         }
 
         let exit_code = self.process().run_remote_thread(
-            unsafe { inject_data.get_free_library_fn_ptr().with_output::<u32>().as_safe() },
+            unsafe {
+                inject_data
+                    .get_free_library_fn_ptr()
+                    .with_output::<u32>()
+                    .as_safe()
+            },
             module.handle(),
         )?;
 

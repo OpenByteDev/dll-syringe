@@ -11,23 +11,25 @@ use std::{
 
 use fn_ptr::FnPtr;
 use winapi::{
-    ctypes::c_void, shared::{
+    ctypes::c_void,
+    shared::{
         minwindef::{DWORD, FALSE},
         winerror::{ERROR_CALL_NOT_IMPLEMENTED, ERROR_INSUFFICIENT_BUFFER},
-    }, um::{
+    },
+    um::{
         minwinbase::STILL_ACTIVE,
         processthreadsapi::{
             CreateRemoteThread, GetCurrentProcess, GetExitCodeProcess, GetExitCodeThread,
             GetProcessId, TerminateProcess,
         },
         synchapi::WaitForSingleObject,
-        winbase::{INFINITE, QueryFullProcessImageNameW, WAIT_FAILED},
+        winbase::{QueryFullProcessImageNameW, INFINITE, WAIT_FAILED},
         winnt::{
             PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION,
             PROCESS_VM_READ, PROCESS_VM_WRITE,
         },
         wow64apiset::{GetSystemWow64DirectoryA, IsWow64Process},
-    }
+    },
 };
 
 use crate::{

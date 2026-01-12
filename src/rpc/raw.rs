@@ -1,9 +1,5 @@
 use iced_x86::code_asm::*;
-use std::{
-    any,
-    cell::OnceCell,
-    cmp, fmt, io, mem, ptr, slice,
-};
+use std::{any, cell::OnceCell, cmp, fmt, io, mem, ptr, slice};
 
 use crate::{
     error::LoadProcedureError,
@@ -14,7 +10,7 @@ use crate::{
     rpc::error::RawRpcError,
     Syringe,
 };
-use fn_ptr::{AbiValue, FnPtr, UntypedFnPtr, with_abi};
+use fn_ptr::{with_abi, AbiValue, FnPtr, UntypedFnPtr};
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
 impl Syringe {
