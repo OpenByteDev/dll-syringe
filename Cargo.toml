@@ -35,9 +35,6 @@ try-clone = { version = "0.2", default-features = false, optional = true }
 iced-x86 = { version = "1.21", features = ["std", "code_asm", "op_code_info"], default-features = false, optional = true }
 cu-bincode = { version = "2.0", features = ["std", "serde"], default-features = false, optional = true }
 serde = { version = "1.0", default-features = false, optional = true }
-
-[build-dependencies]
-csbindgen = "1.9.0"
 typeid = { version = "1.0", default-features = false, optional = true }
 
 [target.'cfg(target_arch = "x86")'.dependencies]
@@ -62,20 +59,6 @@ syringe = ["iced-x86"]
 full = ["into-x86-from-x64", "rpc", "process-memory", "payload-utils"]
 doc-cfg = ["full"]
 try-clone = ["dep:try-clone"]
-c-api = ["syringe"]
-
-[profile.profile]
-inherits = "release"
-debug = true
-codegen-units = 1
-lto = true
-strip = false
-
-[profile.release]
-codegen-units = 1
-lto = true
-strip = true
-panic = "abort"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]

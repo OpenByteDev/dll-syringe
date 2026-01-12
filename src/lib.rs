@@ -40,11 +40,6 @@ pub(crate) mod utils;
 
 /// Module containing the error enums used in this crate.
 pub mod error;
-
-/// C exports for the library.
-#[cfg(feature = "c-api")]
-pub mod c_api;
-
 #[cfg(feature = "payload-utils")]
 #[doc(hidden)]
 pub mod payload_utils;

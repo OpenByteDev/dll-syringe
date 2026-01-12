@@ -9,22 +9,15 @@ language = "C"
 
 # An optional string of text to output at the beginning of the generated file
 # default: doesn't emit anything
-header = """
-#ifdef _MSC_VER
-#define PACKED
-    #pragma pack(push, 1)
-#else
-    #define PACKED __attribute__((packed))
-#endif
-"""
+header = ""
 
 # An optional string of text to output at the end of the generated file
 # default: doesn't emit anything
-trailer = "/* Text to put at the end of the generated file */"
+trailer = ""
 
 # An optional name to use as an include guard
 # default: doesn't emit an include guard
-include_guard = "dll_syringe"
+include_guard = "DLL_SYRINGE_H"
 
 # An optional string of text to output between major sections of the generated
 # file as a warning against manual editing
@@ -441,7 +434,7 @@ include = []
 
 # A black list of crate names that are not allowed to be parsed.
 # default: []
-exclude = []
+exclude = ["dll-syringe"]
 
 # Whether to use a new temporary target directory when running `rustc --pretty=expanded`.
 # This may be required for some build processes.
@@ -483,4 +476,4 @@ default_features = true
 # appropriate features in its dependencies
 #
 # default: []
-features = ["cbindgen"]
+features = ["c"]

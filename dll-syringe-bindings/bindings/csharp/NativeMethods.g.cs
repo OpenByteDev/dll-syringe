@@ -82,7 +82,7 @@ namespace DllSyringe.Net.Sys
         ///  The caller must ensure that the given syringe pointer is valid.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_find_or_inject", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern ModuleHandle syringe_find_or_inject(Syringe* syringe, byte* dll_path);
+        public static extern void* syringe_find_or_inject(Syringe* syringe, byte* dll_path);
 
         /// <summary>
         ///  Ejects a module from the target process.
@@ -100,7 +100,7 @@ namespace DllSyringe.Net.Sys
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_eject", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.U1)]
-        public static extern bool syringe_eject(Syringe* syringe, ModuleHandle module);
+        public static extern bool syringe_eject(Syringe* syringe, void* module);
 
         /// <summary>
         ///  Frees a `Syringe` instance.
@@ -117,6 +117,13 @@ namespace DllSyringe.Net.Sys
 
     }
 
+
+    /// <summary>
+    ///  An injector that can inject modules (.dll's) into a target process.
+    /// </summary>
+    public enum Syringe
+    {
+    }
 
 
 }

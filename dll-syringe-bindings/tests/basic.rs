@@ -1,9 +1,9 @@
-#![cfg(feature = "c-api")]
-
-#[allow(unused)]
+#[path = "../../tests/common/mod.rs"]
+#[allow(unexpected_cfgs, unused)]
 mod common;
 
-use dll_syringe::{c_api::*, process::Process};
+use dll_syringe_bindings::*;
+use dll_syringe::process::Process;
 use std::ffi::CString;
 
 syringe_test! {
