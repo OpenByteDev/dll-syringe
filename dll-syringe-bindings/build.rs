@@ -22,9 +22,9 @@ fn build_c() {
 fn build_csharp() {
     csbindgen::Builder::default()
         .input_extern_file("src/lib.rs")
-        .csharp_dll_name("DllSyringe")
-        .csharp_class_accessibility("public")
-        .csharp_namespace("DllSyringe.Net.Sys")
+        .csharp_dll_name("dll_syringe_bindings")
+        .csharp_class_accessibility("internal")
+        .csharp_namespace("DllSyringe.Sys")
         .generate_csharp_file("bindings/csharp/NativeMethods.g.cs")
         .unwrap();
 }

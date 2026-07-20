@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="../../bindings/csharp/DllSyringe.csproj" />
+  <Project Path="Test.csproj" />
+</Solution>

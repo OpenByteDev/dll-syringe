@@ -8,11 +8,11 @@ using System;
 using System.Runtime.InteropServices;
 
 
-namespace DllSyringe.Net.Sys
+namespace DllSyringe.Sys
 {
-    public static unsafe partial class NativeMethods
+    internal static unsafe partial class NativeMethods
     {
-        const string __DllName = "DllSyringe";
+        const string __DllName = "dll_syringe_bindings";
 
 
 
@@ -31,7 +31,7 @@ namespace DllSyringe.Net.Sys
         ///  The returned instance has to freed using `syringe_free`.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_for_process", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern Syringe* syringe_for_process(uint pid);
+        internal static extern Syringe* syringe_for_process(uint pid);
 
         /// <summary>
         ///  Creates a new `Syringe` instance for a suspended process identified by PID.
@@ -46,7 +46,7 @@ namespace DllSyringe.Net.Sys
         ///  The returned instance has to freed using `syringe_free`.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_for_suspended_process", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern Syringe* syringe_for_suspended_process(uint pid);
+        internal static extern Syringe* syringe_for_suspended_process(uint pid);
 
         /// <summary>
         ///  Injects a DLL into the target process associated with the given `Syringe`.
@@ -63,7 +63,7 @@ namespace DllSyringe.Net.Sys
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_inject", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.U1)]
-        public static extern bool syringe_inject(Syringe* syringe, byte* dll_path);
+        internal static extern bool syringe_inject(Syringe* syringe, byte* dll_path);
 
         /// <summary>
         ///  Finds or injects a DLL into the target process.
@@ -82,7 +82,7 @@ namespace DllSyringe.Net.Sys
         ///  The caller must ensure that the given syringe pointer is valid.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_find_or_inject", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void* syringe_find_or_inject(Syringe* syringe, byte* dll_path);
+        internal static extern void* syringe_find_or_inject(Syringe* syringe, byte* dll_path);
 
         /// <summary>
         ///  Ejects a module from the target process.
@@ -100,7 +100,7 @@ namespace DllSyringe.Net.Sys
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_eject", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.U1)]
-        public static extern bool syringe_eject(Syringe* syringe, void* module);
+        internal static extern bool syringe_eject(Syringe* syringe, void* module);
 
         /// <summary>
         ///  Frees a `Syringe` instance.
@@ -112,7 +112,7 @@ namespace DllSyringe.Net.Sys
         ///  The caller must ensure that the given syringe pointer is valid or null.
         /// </summary>
         [DllImport(__DllName, EntryPoint = "syringe_free", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void syringe_free(Syringe* syringe);
+        internal static extern void syringe_free(Syringe* syringe);
 
 
     }
@@ -121,7 +121,7 @@ namespace DllSyringe.Net.Sys
     /// <summary>
     ///  An injector that can inject modules (.dll's) into a target process.
     /// </summary>
-    public enum Syringe
+    internal enum Syringe
     {
     }
 

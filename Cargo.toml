@@ -13,9 +13,6 @@ resolver = "2"
 categories = []
 keywords = ["dll-injection", "dll", "injector", "windows", "rpc"]
 
-[lib]
-crate-type = ["rlib", "cdylib", "staticlib"]
-
 [dependencies]
 dll-syringe-macros = { path = "dll-syringe-macros", version = "0.1" }
 winapi = { version = "0.3", features = [
@@ -37,25 +34,23 @@ cu-bincode = { version = "2.0", features = ["std", "serde"], default-features = 
 serde = { version = "1.0", default-features = false, optional = true }
 typeid = { version = "1.0", default-features = false, optional = true }
 
-[target.'cfg(target_arch = "x86")'.dependencies]
-
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 goblin = { version = "0.10", optional = true, features = ["std", "pe32"], default-features = false }
 
 [dev-dependencies]
 current_platform = { version = "0.2", default-features = false }
 tempfile = { version = "3.23", default-features = false }
- 
+
 [features]
 default = ["syringe", "into-x86-from-x64", "rpc"]
-into-x86-from-x64 = ["syringe", "goblin"]
+into-x86-from-x64 = ["syringe", "dep:goblin"]
 rpc-core = ["syringe"]
-rpc-raw = ["rpc-core", "typeid"]
-rpc-payload = ["rpc-raw", "cu-bincode", "serde"]
+rpc-raw = ["rpc-core", "dep:typeid"]
+rpc-payload = ["rpc-raw", "dep:cu-bincode", "dep:serde"]
 rpc = ["rpc-raw", "rpc-payload"]
 process-memory = []
-payload-utils = ["cu-bincode", "serde"]
-syringe = ["iced-x86"]
+payload-utils = ["dep:cu-bincode", "dep:serde"]
+syringe = ["dep:iced-x86"]
 full = ["into-x86-from-x64", "rpc", "process-memory", "payload-utils"]
 doc-cfg = ["full"]
 try-clone = ["dep:try-clone"]

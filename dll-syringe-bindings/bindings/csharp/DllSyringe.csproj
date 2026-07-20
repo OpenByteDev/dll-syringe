@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <AssemblyName>DllSyringe.Net.Sys</AssemblyName>
-    <RootNamespace>DllSyringe.Net.Sys</RootNamespace>
+    <AssemblyName>DllSyringe</AssemblyName>
+    <RootNamespace>DllSyringe</RootNamespace>
     <PackageProjectUrl>https://github.com/OpenByteDev/dll-syringe</PackageProjectUrl>
     <Description>A windows dll injection library written in Rust. (Raw C# Bindings).</Description>
     <Version>0.17.1</Version>
@@ -12,6 +12,7 @@
 
     <!-- Common Settings -->
     <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -26,7 +27,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)/../../LICENSE">
+    <None Include="$(MSBuildThisFileDirectory)/../../../LICENSE">
       <Pack>True</Pack>
       <PackagePath>/</PackagePath>
     </None>
@@ -36,7 +37,7 @@
       <PackagePath>/</PackagePath>
     </None>
     -->
-    <None Include="runtimes\**\*" Pack="true" PackagePath="runtimes" />
+    <None Include="runtimes\**\*" Pack="true" PackagePath="runtimes" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

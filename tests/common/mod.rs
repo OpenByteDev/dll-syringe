@@ -1,14 +1,12 @@
 use dll_syringe::process::{OwnedProcess, Process};
 use std::{
-    env::{current_dir, var},
+    env::{self, current_dir},
     error::Error,
     ffi::{CString, OsStr},
-    fs::{File, canonicalize, remove_file},
-    io::{ErrorKind, copy},
-    iter,
-    iter::once,
-    mem,
-    mem::{MaybeUninit, zeroed},
+    fs::{canonicalize, remove_file, File},
+    io::{copy, ErrorKind},
+    iter::{self, once},
+    mem::{self, zeroed, MaybeUninit},
     os::windows::{
         io::{FromRawHandle, OwnedHandle},
         prelude::OsStrExt,
@@ -58,7 +56,14 @@ pub fn build_helper_crate(
     release: bool,
     ext: &str,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    let payload_crate_path = PathBuf::from_str(".\\tests\\helpers")?
+    let base_path = if env::var("CARGO_PKG_NAME").unwrap() == "dll-syringe" {
+        "."
+    } else {
+        ".."
+    };
+    let payload_crate_path = PathBuf::from_str(base_path)?
+        .join("tests")
+        .join("helpers")
         .join(crate_name)
         .canonicalize()?;
 
@@ -104,7 +109,7 @@ pub fn build_helper_crate(
 ///
 /// So as a compromise, we build the test binaries outside for testing from Linux.
 fn is_cross() -> bool {
-    var("CROSS_SYSROOT").is_ok()
+    env::var("CROSS_SYSROOT").is_ok()
 }
 
 pub(crate) fn start_suspended_process(path: &Path) -> OwnedProcess {

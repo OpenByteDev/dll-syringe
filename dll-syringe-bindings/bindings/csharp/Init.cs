@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using DllSyringe.Net.Sys;
+using DllSyringe.Sys;
 
 internal class Init {
     [ModuleInitializer]

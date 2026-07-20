@@ -1,5 +1,5 @@
-#[path = "../../tests/common/mod.rs"]
-#[allow(unexpected_cfgs, unused)]
+#![allow(unexpected_cfgs)]
+
 mod common;
 
 use dll_syringe::process::Process;
@@ -49,7 +49,7 @@ syringe_test! {
 }
 
 syringe_test! {
-    fn test_csyringe_find_or_inject(
+    fn test_syringe_find_or_inject(
         process: OwnedProcess,
         payload_path: &Path,
     ) {
@@ -68,7 +68,7 @@ syringe_test! {
 }
 
 syringe_test! {
-    fn test_csyringe_eject(
+    fn test_syringe_eject(
         process: OwnedProcess,
         payload_path: &Path,
     ) {

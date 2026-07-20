@@ -6,8 +6,7 @@ license = "MIT"
 edition = "2024"
 
 [lib]
-name = "dll_syringe"
-crate-type = ["cdylib", "staticlib"]
+crate-type = ["lib", "cdylib", "staticlib"]
 
 [dependencies]
 dll-syringe = { path = "..", default-features = false, features = ["syringe", "into-x86-from-x64"] }
@@ -15,6 +14,17 @@ dll-syringe = { path = "..", default-features = false, features = ["syringe", "i
 [build-dependencies]
 cbindgen = { version = "0.29", default-features = false, optional = true }
 csbindgen = { version = "1.9", default-features = false, optional = true }
+
+[dev-dependencies]
+find-msvc-tools = { version = "0.1", default-features = false }
+winapi = { version = "0.3", features = [
+    "processthreadsapi", "libloaderapi", "memoryapi", 
+    "wow64apiset", "sysinfoapi", "winerror", 
+    "handleapi", "psapi", "synchapi", "winbase"], default-features = false }
+widestring = { version = "1.2", features = ["std", "alloc"], default-features = false }
+current_platform = { version = "0.2", default-features = false }
+tempfile = { version = "3.23", default-features = false }
+path-absolutize = { version = "1.0", default-features = false }
 
 [profile.release]
 codegen-units = 1
