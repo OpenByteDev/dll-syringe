@@ -143,60 +143,65 @@ jobs:
     - name: Format check
       run: cargo fmt --all -- --check
 
-  build-c-libs:
+  bindings:
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            use_cross: false
-            features: "c-exports,into-x86-from-x64"
-          - os: windows-latest
-            target: i686-pc-windows-msvc
-            use_cross: false
-            features: "c-exports"
-    runs-on: ${{ matrix.os }}
+        target: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
-      - id: build-libs
-        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/build-c-library@v1
+      - name: Install latest rust nightly for ${{ matrix.target }}
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          target: ${{ matrix.target }}
-          use_pgo: false
-          use_cross: ${{ matrix.use_cross }}
-          features:  ${{ matrix.features }}
-          no_default_features: true
+          targets: ${{ matrix.target }}
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build bindings crate (generates C header + C# NativeMethods.g.cs)
+        run: cargo build --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --release --features c,csharp
+      - name: Test bindings crate
+        run: cargo test --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --features c,csharp -- --nocapture
+      - name: Upload native libs + C header
+        uses: actions/upload-artifact@v4
+        with:
+          name: dll-syringe-bindings-${{ matrix.target }}
+          path: |
+            dll-syringe-bindings/target/${{ matrix.target }}/release/dll_syringe_bindings.dll
+            dll-syringe-bindings/target/${{ matrix.target }}/release/dll_syringe_bindings.lib
+            dll-syringe-bindings/bindings/c/dll-syringe.h
 
-  build-c-headers:
-    runs-on: ubuntu-latest
+  pack-dotnet:
+    needs: bindings
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Generate C++ bindings
-        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/generate-bindings@v1
+      - name: Install latest rust nightly
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          config_file: cbindgen_cpp.toml
-          header_file: bindings_cpp.hpp
-      - name: Generate C bindings
-        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/generate-bindings@v1
+          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          config_file: cbindgen_c.toml
-          header_file: bindings_c.h
-
-  build-dotnet-library:
-    needs: build-c-libs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - name: Build and Package .NET Library
-        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/build-dotnet-library@dotnet-bindings
+          dotnet-version: '10.0.x'
+      - name: Build native libs for both architectures
+        run: ./build-libs-for-csharp.ps1
+        working-directory: dll-syringe-bindings
+        shell: pwsh
+      - name: Pack .NET library
+        run: dotnet pack bindings/csharp/DllSyringe.csproj -c Release -o ../../nupkgs
+        working-directory: dll-syringe-bindings
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
         with:
-          targets: 'x86_64-pc-windows-msvc,i686-pc-windows-msvc'
+          name: dll-syringe-nuget
+          path: nupkgs
 
   publish-crate:
     permissions:
       contents: write
-    needs: [test,build-c-libs,build-c-headers,test-on-wine,build-dotnet-library,arm-build,hack,documentation]
+    needs: [test,bindings,test-on-wine,pack-dotnet,arm-build,hack,documentation]
     if: startsWith(github.ref, 'refs/tags/') 
     runs-on: ubuntu-latest
     steps:
@@ -244,6 +249,10 @@ jobs:
           files: |
             artifacts/*
       - name: Publish to crates.io
-        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/publish-crate@v1
-        with:
-          token: ${{ secrets.CRATES_IO_TOKEN }}
+        shell: bash
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          # dll-syringe-macros often hasn't changed between releases; ignore "already published"
+          cargo publish --manifest-path dll-syringe-macros/Cargo.toml || true
+          cargo publish
