@@ -23,7 +23,7 @@ use winapi::{
             GetProcessId, TerminateProcess,
         },
         synchapi::WaitForSingleObject,
-        winbase::{QueryFullProcessImageNameW, INFINITE, WAIT_FAILED},
+        winbase::{INFINITE, QueryFullProcessImageNameW, WAIT_FAILED},
         winnt::{
             PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION,
             PROCESS_VM_READ, PROCESS_VM_WRITE,
@@ -34,7 +34,7 @@ use winapi::{
 
 use crate::{
     process::{BorrowedProcess, ProcessModule},
-    utils::{win_fill_path_buf_helper, FillPathBufResult},
+    utils::{FillPathBufResult, win_fill_path_buf_helper},
 };
 
 /// A handle to a running process.

@@ -1,4 +1,4 @@
-use crate::process::{memory::ProcessMemoryBuffer, BorrowedProcess, Process};
+use crate::process::{BorrowedProcess, Process, memory::ProcessMemoryBuffer};
 use std::{collections::LinkedList, io, mem, ptr::NonNull};
 
 pub trait RawAllocator {

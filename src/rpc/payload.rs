@@ -1,16 +1,16 @@
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use std::marker::PhantomData;
 
 use crate::{
+    ArgAndResultBufInfo, Syringe,
     error::LoadProcedureError,
     process::{
-        memory::{ProcessMemoryBuffer, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, ModuleHandle,
+        memory::{ProcessMemoryBuffer, RemoteBoxAllocator},
     },
-    rpc::{error::PayloadRpcError, RemoteRawProcedure, Truncate},
+    rpc::{RemoteRawProcedure, Truncate, error::PayloadRpcError},
     utils::ArrayOrVecBuf,
-    ArgAndResultBufInfo, Syringe,
 };
 use fn_ptr::{FnPtr, UntypedFnPtr};
 

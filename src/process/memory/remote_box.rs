@@ -8,8 +8,8 @@ use std::{
 };
 
 use crate::process::{
-    memory::{Allocation, DynamicMultiBufferAllocator, ProcessMemorySlice, RawAllocator},
     BorrowedProcess, OwnedProcess, Process,
+    memory::{Allocation, DynamicMultiBufferAllocator, ProcessMemorySlice, RawAllocator},
 };
 
 #[derive(Debug, Clone)]

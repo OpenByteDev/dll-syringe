@@ -5,12 +5,12 @@ use std::{
     slice,
 };
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
 use crate::{
-    process::{memory::ProcessMemoryBuffer, BorrowedProcess, Process},
     ArgAndResultBufInfo,
+    process::{BorrowedProcess, Process, memory::ProcessMemoryBuffer},
 };
 
 /// A macro for defining an exported function that can be used with [`RemotePayloadProcedure`](crate::rpc::RemotePayloadProcedure).

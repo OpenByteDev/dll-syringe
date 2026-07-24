@@ -1,6 +1,6 @@
 #![cfg(feature = "syringe")]
 
-use dll_syringe::{error::InjectError, process::Process, Syringe};
+use dll_syringe::{Syringe, error::InjectError, process::Process};
 
 #[allow(unused)]
 mod common;

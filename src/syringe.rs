@@ -1,16 +1,15 @@
 use fn_ptr::FnPtr;
 use iced_x86::{
-    code_asm::{
-        dword_ptr,
-        registers::{gpr32::*, gpr64::*},
-        CodeAssembler,
-    },
     Code, IcedError,
+    code_asm::{
+        CodeAssembler, dword_ptr,
+        registers::{gpr32::*, gpr64::*},
+    },
 };
 use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
 use std::{cell::OnceCell, io, mem, path::Path, ptr};
-use widestring::{u16cstr, U16CString};
+use widestring::{U16CString, u16cstr};
 use winapi::shared::{
     minwindef::{BOOL, DWORD, FALSE, HMODULE},
     ntdef::LPCWSTR,
@@ -19,8 +18,8 @@ use winapi::shared::{
 use crate::{
     error::{EjectError, ExceptionCode, ExceptionOrIoError, InjectError, LoadInjectHelpDataError},
     process::{
-        memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, ModuleHandle, OwnedProcess, Process, ProcessModule,
+        memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
     },
 };
 

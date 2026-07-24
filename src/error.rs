@@ -12,9 +12,10 @@ use winapi::um::{
         EXCEPTION_FLT_DIVIDE_BY_ZERO, EXCEPTION_FLT_INEXACT_RESULT,
         EXCEPTION_FLT_INVALID_OPERATION, EXCEPTION_FLT_OVERFLOW, EXCEPTION_FLT_STACK_CHECK,
         EXCEPTION_FLT_UNDERFLOW, EXCEPTION_GUARD_PAGE, EXCEPTION_ILLEGAL_INSTRUCTION,
-        EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW, EXCEPTION_INVALID_DISPOSITION,
-        EXCEPTION_INVALID_HANDLE, EXCEPTION_IN_PAGE_ERROR, EXCEPTION_NONCONTINUABLE_EXCEPTION,
-        EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP, EXCEPTION_STACK_OVERFLOW,
+        EXCEPTION_IN_PAGE_ERROR, EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW,
+        EXCEPTION_INVALID_DISPOSITION, EXCEPTION_INVALID_HANDLE,
+        EXCEPTION_NONCONTINUABLE_EXCEPTION, EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP,
+        EXCEPTION_STACK_OVERFLOW,
     },
     winnt::STATUS_UNWIND_CONSOLIDATE,
 };
@@ -131,7 +132,10 @@ impl Display for ExceptionCode {
             Self::AccessViolation => write!(f, "Invalid access to memory location."),
             Self::ArrayBoundsExceeded => write!(f, "Array bounds exceeded."),
             Self::Breakpoint => write!(f, "A breakpoint has been reached."),
-            Self::DatatypeMisalignment => write!(f, "A datatype misalignment was detected in a load or store instruction."),
+            Self::DatatypeMisalignment => write!(
+                f,
+                "A datatype misalignment was detected in a load or store instruction."
+            ),
             Self::FltDenormalOperand => write!(f, "Floating-point denormal operand."),
             Self::FltDivideByZero => write!(f, "Floating-point division by zero."),
             Self::FltInexactResult => write!(f, "Floating-point inexact result."),
@@ -139,16 +143,29 @@ impl Display for ExceptionCode {
             Self::FltOverflow => write!(f, "Floating-point overflow."),
             Self::FltStackCheck => write!(f, "Floating-point stack check."),
             Self::FltUnderflow => write!(f, "Floating-point underflow."),
-            Self::GuardPage => write!(f, "A page of memory that marks the end of a data structure, such as a stack or an array, has been accessed."),
-            Self::IllegalInstruction => write!(f, "An attempt was made to execute an illegal instruction."),
+            Self::GuardPage => write!(
+                f,
+                "A page of memory that marks the end of a data structure, such as a stack or an array, has been accessed."
+            ),
+            Self::IllegalInstruction => {
+                write!(f, "An attempt was made to execute an illegal instruction.")
+            }
             Self::InPageError => write!(f, "Error performing inpage operation."),
             Self::IntegerDivideByZero => write!(f, "Integer division by zero."),
             Self::IntegerOverflow => write!(f, "Integer overflow."),
-            Self::InvalidDisposition => write!(f, "An invalid exception disposition was returned by an exception handler."),
+            Self::InvalidDisposition => write!(
+                f,
+                "An invalid exception disposition was returned by an exception handler."
+            ),
             Self::InvalidHandle => write!(f, "The handle is invalid."),
-            Self::NoncontinuableException => write!(f, "Windows cannot continue from this exception."),
+            Self::NoncontinuableException => {
+                write!(f, "Windows cannot continue from this exception.")
+            }
             Self::PrivilegedInstruction => write!(f, "Privileged instruction."),
-            Self::SingleStep => write!(f, "A single step or trace operation has just been completed."),
+            Self::SingleStep => write!(
+                f,
+                "A single step or trace operation has just been completed."
+            ),
             Self::StackOverflow => write!(f, "Recursion too deep; the stack overflowed."),
             Self::UnwindConsolidate => write!(f, "A frame consolidation has been executed."),
         }

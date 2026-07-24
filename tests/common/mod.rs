@@ -3,10 +3,10 @@ use std::{
     env::{self, current_dir},
     error::Error,
     ffi::{CString, OsStr},
-    fs::{canonicalize, remove_file, File},
-    io::{copy, ErrorKind},
+    fs::{File, canonicalize, remove_file},
+    io::{ErrorKind, copy},
     iter::{self, once},
-    mem::{self, zeroed, MaybeUninit},
+    mem::{self, MaybeUninit, zeroed},
     os::windows::{
         io::{FromRawHandle, OwnedHandle},
         prelude::OsStrExt,

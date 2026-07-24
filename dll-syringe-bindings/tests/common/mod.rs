@@ -1,7 +1,11 @@
 mod other;
 pub use other::*;
 
-use std::{env, path::PathBuf, process::{Command, ExitStatus}};
+use std::{
+    env,
+    path::PathBuf,
+    process::{Command, ExitStatus},
+};
 
 fn env_var_path(key: &str) -> PathBuf {
     let s = env::var_os(key).expect(&format!("env var {key} not found"));
@@ -17,14 +21,14 @@ pub fn build_rust_lib() -> PathBuf {
         "i686-pc-windows-msvc"
     };
     let is_debug = cfg!(debug_assertions);
-    let profile = if is_debug {
-        "debug"
-    } else {
-        "release"
-    };
+    let profile = if is_debug { "debug" } else { "release" };
     let cargo = env_var_path("CARGO");
     let mut command = Command::new(cargo);
-    command.arg("build").arg("--lib").arg("--target").arg(target);
+    command
+        .arg("build")
+        .arg("--lib")
+        .arg("--target")
+        .arg(target);
     if !is_debug {
         command.arg("--release");
     }
@@ -33,9 +37,6 @@ pub fn build_rust_lib() -> PathBuf {
 
     // Get lib path
     let manifest_dir = env_var_path("CARGO_MANIFEST_DIR");
-    let build_dir = manifest_dir
-        .join("target")
-        .join(target)
-        .join(profile);
+    let build_dir = manifest_dir.join("target").join(target).join(profile);
     build_dir.join("dll_syringe_bindings.lib")
 }

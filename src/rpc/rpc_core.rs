@@ -1,15 +1,15 @@
-use iced_x86::{code_asm::*, IcedError};
+use iced_x86::{IcedError, code_asm::*};
 
 use std::{ffi::CString, mem, ptr};
 
 use crate::{
+    GetProcAddressFn, Syringe,
     error::LoadProcedureError,
     process::{
-        memory::{RemoteAllocation, RemoteBox},
         BorrowedProcessModule, Process,
+        memory::{RemoteAllocation, RemoteBox},
     },
     rpc::error::RawRpcError,
-    GetProcAddressFn, Syringe,
 };
 use fn_ptr::{FnPtr, UntypedFnPtr};
 

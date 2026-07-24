@@ -27,7 +27,7 @@ use winapi::{
 
 use crate::{
     process::{ModuleHandle, OwnedProcess, Process, ProcessModule},
-    utils::{retry_faillable_until_some_with_timeout, ArrayOrVecBuf},
+    utils::{ArrayOrVecBuf, retry_faillable_until_some_with_timeout},
 };
 
 /// A struct representing a running process.

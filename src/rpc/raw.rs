@@ -2,15 +2,15 @@ use iced_x86::code_asm::*;
 use std::{any, cell::OnceCell, cmp, fmt, io, mem, ptr, slice};
 
 use crate::{
+    Syringe,
     error::LoadProcedureError,
     process::{
-        memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, ModuleHandle, Process, ProcessModule,
+        memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
     },
     rpc::error::RawRpcError,
-    Syringe,
 };
-use fn_ptr::{with_abi, AbiValue, FnPtr, UntypedFnPtr};
+use fn_ptr::{AbiValue, FnPtr, UntypedFnPtr, with_abi};
 
 #[cfg_attr(feature = "doc-cfg", doc(cfg(feature = "rpc-raw")))]
 impl Syringe {

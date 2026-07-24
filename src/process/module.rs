@@ -9,7 +9,7 @@ use std::{
 use crate::{
     error::{GetLocalProcedureAddressError, IoOrNulError},
     process::{BorrowedProcess, OwnedProcess, Process},
-    utils::{win_fill_path_buf_helper, FillPathBufResult},
+    utils::{FillPathBufResult, win_fill_path_buf_helper},
 };
 use fn_ptr::{FnPtr, UntypedFnPtr};
 use path_absolutize::Absolutize;

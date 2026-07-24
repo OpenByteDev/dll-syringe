@@ -15,7 +15,7 @@ use std::{
 
 use winapi::{shared::minwindef::FALSE, um::processthreadsapi::OpenProcess};
 
-use crate::process::{BorrowedProcess, OwnedProcessModule, Process, PROCESS_INJECTION_ACCESS};
+use crate::process::{BorrowedProcess, OwnedProcessModule, PROCESS_INJECTION_ACCESS, Process};
 
 /// A struct representing a running process.
 /// This struct owns the underlying process handle (see also [`BorrowedProcess`] for a borrowed version).

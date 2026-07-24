@@ -1,6 +1,6 @@
 #![cfg(feature = "rpc-core")]
 
-use dll_syringe::{process::Process, Syringe};
+use dll_syringe::{Syringe, process::Process};
 
 #[allow(unused)]
 mod common;
