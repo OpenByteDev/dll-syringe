@@ -100,8 +100,10 @@ jobs:
           targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
       - name: cargo install cargo-hack
         uses: taiki-e/install-action@cargo-hack
-      - name: cargo hack
+      - name: cargo hack main
         run: cargo hack --feature-powerset check
+      - name: cargo hack bindings
+        run: cargo hack --manifest-path dll-syringe-bindings/Cargo.toml --feature-powerset check
         
   documentation:
     runs-on: windows-latest
@@ -111,12 +113,22 @@ jobs:
       uses: dtolnay/rust-toolchain@nightly
       with:
           targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
-    - name: Generate documentation
+    - name: Generate documentation for main
       run: cargo doc --all-features
+    - name: Generate documentation for macros
+      run: cargo doc --manifest-path dll-syringe-macros/Cargo.toml
+    - name: Generate documentation for bindings
+      run: cargo doc --manifest-path dll-syringe-bindings/Cargo.toml --all-features
     - name: Install cargo-deadlinks
       run: cargo install cargo-deadlinks
     - name: Check dead links in doc
       run: cargo deadlinks
+    - name: Check dead links in macros
+      run: cargo deadlinks
+      working-directory: dll-syringe-macros
+    - name: Check dead links in bindings
+      run: cargo deadlinks
+      working-directory: dll-syringe-bindings
 
   clippy:
     runs-on: windows-latest
@@ -129,7 +141,15 @@ jobs:
             components: clippy
       - name: Clippy check
         run: cargo clippy --all-features
-  
+      - name: Clippy check macros
+        run: cargo clippy --manifest-path dll-syringe-macros/Cargo.toml
+      - name: Clippy check bindings
+        run: cargo clippy --manifest-path dll-syringe-bindings/Cargo.toml --all-features
+      - name: Clippy check test_target
+        run: cargo clippy --manifest-path tests/helpers/test_target/Cargo.toml --all-targets
+      - name: Clippy check test_payload
+        run: cargo clippy --manifest-path tests/helpers/test_payload/Cargo.toml --all-targets --all-features
+
   fmt:
     runs-on: windows-latest
     steps:
@@ -141,6 +161,14 @@ jobs:
           components: rustfmt
     - name: Format check
       run: cargo fmt --all -- --check
+    - name: Format check macros
+      run: cargo fmt --manifest-path dll-syringe-macros/Cargo.toml --all -- --check
+    - name: Format check bindings
+      run: cargo fmt --manifest-path dll-syringe-bindings/Cargo.toml --all -- --check
+    - name: Format check test_target
+      run: cargo fmt --manifest-path tests/helpers/test_target/Cargo.toml --all -- --check
+    - name: Format check test_payload
+      run: cargo fmt --manifest-path tests/helpers/test_payload/Cargo.toml --all -- --check
 
   bindings:
     strategy:
@@ -229,7 +257,7 @@ jobs:
           }
           Get-ChildItem $dir
       - name: GitHub Release Artifacts
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             artifacts/*
