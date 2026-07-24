@@ -12,7 +12,7 @@ namespace DllSyringe.Sys
 {
     internal static unsafe partial class NativeMethods
     {
-        const string __DllName = "dll_syringe_bindings";
+        const string __DllName = "dll-syringe.native";
 
 
 

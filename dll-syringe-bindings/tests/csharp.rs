@@ -46,12 +46,18 @@ pub fn build_csharp_binary() -> PathBuf {
         .unwrap();
 
     let project_path = project_file_path.parent().unwrap();
+    let platform_target = if cfg!(target_arch = "x86_64") {
+        "x64"
+    } else {
+        "x86"
+    };
 
     Command::new("dotnet")
         .arg("build")
         .arg(&project_file_path)
         .arg("--framework")
         .arg(NETCORE_VERSION)
+        .arg(format!("-p:PlatformTarget={platform_target}"))
         .current_dir(project_path)
         .spawn()
         .expect("dotnet build failed")
