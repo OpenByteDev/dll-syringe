@@ -1,6 +1,6 @@
 use std::ffi::c_void;
 
-use dll_syringe::payload_utils::payload_procedure;
+use dll_syringe::payload_procedure;
 use windows_sys::Win32::Foundation::HINSTANCE;
 
 #[no_mangle]

@@ -45,6 +45,8 @@ pub mod error;
 #[cfg(feature = "payload-utils")]
 #[doc(hidden)]
 pub mod payload_utils;
+#[cfg(feature = "payload-utils")]
+pub use payload_utils::payload_procedure;
 
 #[cfg(any(feature = "payload-utils", feature = "rpc-payload"))]
 #[derive(Debug, Clone, Copy)]

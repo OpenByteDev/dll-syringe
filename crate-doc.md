@@ -46,7 +46,7 @@ The target procedure must be defined using the `#[payload_procedure]` macro (req
 
 The definition of an exported `add` function could look like this:
 ```rust
-#[payload_procedure]
+#[dll_syringe::payload_procedure]
 fn add(a: f64, b: f64) -> f64 {
     a + b
 }
