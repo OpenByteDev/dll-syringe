@@ -19,9 +19,9 @@ winapi = { version = "0.3", features = [
     "processthreadsapi", "libloaderapi", "memoryapi", 
     "wow64apiset", "sysinfoapi", "winerror", 
     "handleapi", "psapi", "synchapi", "winbase"], default-features = false }
-sysinfo = { version = "0.37", features = ["system"], default-features = false }
+sysinfo = { version = "0.39", features = ["system"], default-features = false }
 widestring = { version = "1.2", features = ["std", "alloc"], default-features = false }
-path-absolutize = { version = "3.1", default-features = false }
+path-absolutize = { version = "4.0", default-features = false }
 stopwatch2 = { version = "2.0", default-features = false }
 thiserror = { version = "2.0", default-features = false }
 num_enum = { version = "0.7", default-features = false }
@@ -39,7 +39,7 @@ goblin = { version = "0.10", optional = true, features = ["std", "pe32"], defaul
 
 [dev-dependencies]
 current_platform = { version = "0.2", default-features = false }
-tempfile = { version = "3.23", default-features = false }
+tempfile = { version = "3.27", default-features = false }
 
 [features]
 default = ["syringe", "into-x86-from-x64", "rpc"]
