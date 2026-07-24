@@ -23,7 +23,7 @@ jobs:
           - target: x86_64-pc-windows-msvc
             target32: i686-pc-windows-msvc
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     
     - name: Install latest rust ${{ matrix.toolchain }} for ${{ matrix.target }}
       uses: dtolnay/rust-toolchain@nightly
@@ -54,7 +54,7 @@ jobs:
   test-on-wine:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install latest rust nightly
         uses: dtolnay/rust-toolchain@nightly
       - name: Add windows rust targets
@@ -77,7 +77,7 @@ jobs:
   arm-build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install latest rust nightly for aarch64-pc-windows-msvc
         uses: dtolnay/rust-toolchain@nightly
@@ -93,7 +93,7 @@ jobs:
   hack:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install latest nightly
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -108,7 +108,7 @@ jobs:
   documentation:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install latest nightly
       uses: dtolnay/rust-toolchain@nightly
       with:
@@ -133,7 +133,7 @@ jobs:
   clippy:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install latest nightly
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -153,7 +153,7 @@ jobs:
   fmt:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install latest nightly
       uses: dtolnay/rust-toolchain@nightly
       with:
@@ -182,7 +182,7 @@ jobs:
             arch: x86
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install latest rust nightly for ${{ matrix.target }}
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -197,7 +197,7 @@ jobs:
       - name: Test bindings crate
         run: cargo test --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --features c,csharp -- --nocapture
       - name: Upload native libs + C header
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dll-syringe-bindings-${{ matrix.target }}
           path: |
@@ -209,7 +209,7 @@ jobs:
     needs: bindings
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install latest rust nightly
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -229,7 +229,7 @@ jobs:
         run: dotnet pack bindings/csharp/DllSyringe.csproj -c Release -o ../nupkgs --no-build
         working-directory: dll-syringe-bindings
       - name: Upload NuGet packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dll-syringe-nuget
           path: nupkgs
@@ -241,9 +241,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/') 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Download Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
       - name: Upload to NuGet
