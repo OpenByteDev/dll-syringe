@@ -224,6 +224,7 @@ jobs:
         shell: pwsh
       - name: Build .NET library
         run: dotnet build bindings/csharp/DllSyringe.csproj -c Release
+        working-directory: dll-syringe-bindings
       - name: Pack .NET library
         run: dotnet pack bindings/csharp/DllSyringe.csproj -c Release -o ../nupkgs --no-build
         working-directory: dll-syringe-bindings
