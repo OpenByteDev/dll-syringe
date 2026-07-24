@@ -165,7 +165,7 @@ fn is_running_under_wine() -> bool {
 
 // winapi crate doesn't have this.
 // This is in ntdll, so already loaded for every Windows process.
-extern "system" {
+unsafe extern "system" {
     fn RtlGetVersion(lpVersionInformation: &mut OSVERSIONINFOW) -> u32;
 }
 

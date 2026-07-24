@@ -312,7 +312,8 @@ pub trait Process: AsHandle + AsRawHandle {
     where
         Self: Sized,
     {
-        let module_handles = self.borrowed().module_handles()?;
+        let borrowed = self.borrowed();
+        let module_handles = borrowed.module_handles()?;
         let mut modules = Vec::with_capacity(module_handles.len());
         for module_handle in module_handles {
             modules.push(unsafe { ProcessModule::new_unchecked(module_handle, self.try_clone()?) });
