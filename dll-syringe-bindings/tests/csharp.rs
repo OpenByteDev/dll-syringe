@@ -3,16 +3,47 @@
 
 mod common;
 
-use std::{path::PathBuf, str::FromStr, process::Command};
+use common::build_rust_lib;
 use dll_syringe::process::Process;
 use path_absolutize::Absolutize;
-use common::build_rust_lib;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+    str::FromStr,
+};
 
 const NETCORE_VERSION: &str = "net10.0";
 
+// Copy rust dll to where c# expects it
+fn stage_native_lib(lib_path: &Path) {
+    let arch = if cfg!(target_arch = "x86_64") {
+        "x64"
+    } else {
+        "x86"
+    };
+    let native_dll_path = lib_path.parent().unwrap().join("dll_syringe_bindings.dll");
+    let runtimes_dir = PathBuf::from_str(&format!("bindings/csharp/runtimes/win-{arch}/native"))
+        .unwrap()
+        .absolutize()
+        .unwrap();
+    fs::create_dir_all(&runtimes_dir).expect("Failed to create runtimes dir");
+    fs::copy(
+        &native_dll_path,
+        runtimes_dir.join("dll_syringe_bindings.dll"),
+    )
+    .expect("Failed to copy native dll into runtimes dir");
+}
+
 pub fn build_csharp_binary() -> PathBuf {
-    let project_file_path = PathBuf::from_str("tests/csharp/Test.csproj").unwrap().absolutize().unwrap();
-    let dll_path = PathBuf::from_str("tests/csharp/bin/Debug/net10.0/Test.exe").unwrap().absolutize().unwrap();
+    let project_file_path = PathBuf::from_str("tests/csharp/Test.csproj")
+        .unwrap()
+        .absolutize()
+        .unwrap();
+    let dll_path = PathBuf::from_str("tests/csharp/bin/Debug/net10.0/Test.exe")
+        .unwrap()
+        .absolutize()
+        .unwrap();
 
     let project_path = project_file_path.parent().unwrap();
 
@@ -35,7 +66,8 @@ syringe_test! {
         process: OwnedProcess,
         payload_path: &Path,
     ) {
-        build_rust_lib();
+        let lib_path = build_rust_lib();
+        stage_native_lib(&lib_path);
         let csharp_bin_path = build_csharp_binary();
 
         // Execute c# program
@@ -45,7 +77,7 @@ syringe_test! {
             .arg(payload_path)
             .status()
             .expect("Failed to run C# executable");
-        
+
         assert!(run_status.success());
     }
 }
