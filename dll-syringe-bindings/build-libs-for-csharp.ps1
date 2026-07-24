@@ -21,7 +21,7 @@ foreach ($Target in $Targets) {
 
     # 4. Copy Artifact
     $Source = "target/$Target/release/dll_syringe_bindings.dll"
-    $Destination = Join-Path $RidPath "dll_syringe_bindings.dll"
+    $Destination = Join-Path $RidPath "dll-syringe.native.dll"
     
     Write-Host "Exporting to: $Destination" -ForegroundColor Green
     Copy-Item -Path $Source -Destination $Destination -Force
