@@ -65,10 +65,9 @@ jobs:
         run: cargo install cargo-xwin
       - name: Install Wine
         run: |
-          sudo apt-get install ppa-purge && sudo ppa-purge -y ppa:ubuntu-toolchain-r/test
           sudo dpkg --add-architecture i386
           sudo mkdir -pm755 /etc/apt/keyrings && sudo wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
-          sudo wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources
+          sudo wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/noble/winehq-noble.sources
           sudo apt-get update
           sudo apt install --install-recommends winehq-stable
       - name: Run tests on Wine
@@ -143,60 +142,67 @@ jobs:
     - name: Format check
       run: cargo fmt --all -- --check
 
-  build-c-libs:
+  bindings:
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            use_cross: false
-            features: "c-exports,into-x86-from-x64"
-          - os: windows-latest
-            target: i686-pc-windows-msvc
-            use_cross: false
-            features: "c-exports"
-    runs-on: ${{ matrix.os }}
+        target: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
-      - id: build-libs
-        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/build-c-library@v1
+      - name: Install latest rust nightly for ${{ matrix.target }}
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          target: ${{ matrix.target }}
-          use_pgo: false
-          use_cross: ${{ matrix.use_cross }}
-          features:  ${{ matrix.features }}
-          no_default_features: true
+          targets: ${{ matrix.target }}
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build bindings crate (generates C header + C# NativeMethods.g.cs)
+        run: cargo build --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --release --features c,csharp
+      - name: Test bindings crate
+        run: cargo test --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --features c,csharp -- --nocapture
+      - name: Upload native libs + C header
+        uses: actions/upload-artifact@v4
+        with:
+          name: dll-syringe-bindings-${{ matrix.target }}
+          path: |
+            dll-syringe-bindings/target/${{ matrix.target }}/release/dll_syringe_bindings.dll
+            dll-syringe-bindings/target/${{ matrix.target }}/release/dll_syringe_bindings.lib
+            dll-syringe-bindings/bindings/c/dll-syringe.h
 
-  build-c-headers:
-    runs-on: ubuntu-latest
+  pack-dotnet:
+    needs: bindings
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Generate C++ bindings
-        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/generate-bindings@v1
+      - name: Install latest rust nightly
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          config_file: cbindgen_cpp.toml
-          header_file: bindings_cpp.hpp
-      - name: Generate C bindings
-        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/generate-bindings@v1
+          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          config_file: cbindgen_c.toml
-          header_file: bindings_c.h
-
-  build-dotnet-library:
-    needs: build-c-libs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      - name: Build and Package .NET Library
-        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/build-dotnet-library@dotnet-bindings
+          dotnet-version: '10.0.x'
+      - name: Build native libs for both architectures
+        run: ./build-libs-for-csharp.ps1
+        working-directory: dll-syringe-bindings
+        shell: pwsh
+      - name: Build .NET library
+        run: dotnet build bindings/csharp/DllSyringe.csproj -c Release
+      - name: Pack .NET library
+        run: dotnet pack bindings/csharp/DllSyringe.csproj -c Release -o ../nupkgs --no-build
+        working-directory: dll-syringe-bindings
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
         with:
-          targets: 'x86_64-pc-windows-msvc,i686-pc-windows-msvc'
+          name: dll-syringe-nuget
+          path: nupkgs
 
   publish-crate:
     permissions:
       contents: write
-    needs: [test,build-c-libs,build-c-headers,test-on-wine,build-dotnet-library,arm-build,hack,documentation]
+    needs: [test,bindings,test-on-wine,pack-dotnet,arm-build,hack,documentation]
     if: startsWith(github.ref, 'refs/tags/') 
     runs-on: ubuntu-latest
     steps:
@@ -207,43 +213,35 @@ jobs:
           path: artifacts
       - name: Upload to NuGet
         shell: pwsh
-        run: |
-          $items = Get-ChildItem -Path "artifacts/**.nupkg" -Recurse
-          Foreach ($item in $items)
-          {
-              Write-Host "Pushing $item"
-              dotnet nuget push "$item" -k "${{ secrets.NUGET_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
-          }
-
-          $items = Get-ChildItem -Path "artifacts/**.snupkg" -Recurse
-          Foreach ($item in $items)
-          {
-              Write-Host "Pushing Symbol Package $item"
-              dotnet nuget push "$item" -k "${{ secrets.NUGET_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
-          }
+        run: dotnet nuget push "artifacts/**/*.nupkg" -k "${{ secrets.NUGET_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
       - name: Compress Artifacts
-        shell: bash
+        shell: pwsh
         run: |
-          dir="artifacts"
-          if [ ! -d "$dir" ]; then
-            echo "Directory $dir does not exist. No artifacts found."
+          $dir = "artifacts"
+          if (-not (Test-Path $dir)) {
+            Write-Host "Directory $dir does not exist. No artifacts found."
             exit 0
-          fi
+          }
 
-          for subdir in "$dir"/*; do
-            if [ -d "$subdir" ]; then
-              base=$(basename "$subdir")
-              zip -r "$dir/$base.zip" "$subdir"
-              rm -r "$subdir"
-            fi
-          done
-          ls -A ./artifacts
+          Get-ChildItem -Path $dir -Directory | ForEach-Object {
+            Compress-Archive -Path $_.FullName -DestinationPath (Join-Path $dir "$($_.Name).zip")
+            Remove-Item -Recurse -Force $_.FullName
+          }
+          Get-ChildItem $dir
       - name: GitHub Release Artifacts
         uses: softprops/action-gh-release@v1
         with:
           files: |
             artifacts/*
       - name: Publish to crates.io
-        uses: Reloaded-Project/reloaded-project-configurations-rust/.github/actions/publish-crate@v1
-        with:
-          token: ${{ secrets.CRATES_IO_TOKEN }}
+        shell: pwsh
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: |
+          $output = cargo publish --manifest-path dll-syringe-macros/Cargo.toml 2>&1 | Out-String
+          Write-Host $output
+          if ($LASTEXITCODE -ne 0 -and $output -notmatch "already (uploaded|exists)") {
+            exit $LASTEXITCODE
+          }
+          cargo publish
+
