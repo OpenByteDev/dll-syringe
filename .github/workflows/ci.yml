@@ -215,7 +215,7 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - name: Build native libs for both architectures
