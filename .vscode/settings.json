@@ -5,6 +5,8 @@
     },
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
+        "dll-syringe-macros/Cargo.toml",
+        "dll-syringe-bindings/Cargo.toml",
         "tests/helpers/test_payload/Cargo.toml",
         "tests/helpers/test_target/Cargo.toml",
     ],
