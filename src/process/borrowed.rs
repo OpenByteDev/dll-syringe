@@ -12,16 +12,11 @@ use std::{
     time::Duration,
 };
 
-use winapi::{
-    shared::{
-        minwindef::{FALSE, HMODULE},
-        winerror::ERROR_PARTIAL_COPY,
-    },
-    um::{
-        handleapi::DuplicateHandle,
-        processthreadsapi::GetCurrentProcess,
-        psapi::{EnumProcessModulesEx, LIST_MODULES_ALL},
-        winnt::DUPLICATE_SAME_ACCESS,
+use windows_sys::Win32::{
+    Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS, ERROR_PARTIAL_COPY, FALSE, HMODULE},
+    System::{
+        ProcessStatus::{EnumProcessModulesEx, LIST_MODULES_ALL},
+        Threading::GetCurrentProcess,
     },
 };
 

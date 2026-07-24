@@ -1,9 +1,9 @@
 use core::mem::zeroed;
 use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
 use std::{ffi::CString, fs, mem, mem::size_of, process::Command, time::Duration};
-use winapi::um::{
-    libloaderapi::{GetProcAddress, LoadLibraryA},
-    winnt::OSVERSIONINFOW,
+use windows_sys::Win32::System::{
+    LibraryLoader::{GetProcAddress, LoadLibraryA},
+    SystemInformation::OSVERSIONINFOW,
 };
 
 #[allow(unused)]
@@ -152,11 +152,11 @@ fn current_pseudo_process_eq_current_process() {
 fn is_running_under_wine() -> bool {
     unsafe {
         let ntdll = CString::new("ntdll.dll").unwrap();
-        let lib = LoadLibraryA(ntdll.as_ptr());
+        let lib = LoadLibraryA(ntdll.as_ptr().cast());
         if !lib.is_null() {
             let func_name = CString::new("wine_get_version").unwrap();
-            let func = GetProcAddress(lib, func_name.as_ptr());
-            !func.is_null()
+            let func = GetProcAddress(lib, func_name.as_ptr().cast());
+            func.is_some()
         } else {
             false
         }

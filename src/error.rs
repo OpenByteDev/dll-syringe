@@ -5,23 +5,19 @@ use std::{
 
 use num_enum::{IntoPrimitive, TryFromPrimitive, TryFromPrimitiveError};
 use thiserror::Error;
-use winapi::um::{
-    minwinbase::{
-        EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EXCEPTION_BREAKPOINT,
-        EXCEPTION_DATATYPE_MISALIGNMENT, EXCEPTION_FLT_DENORMAL_OPERAND,
-        EXCEPTION_FLT_DIVIDE_BY_ZERO, EXCEPTION_FLT_INEXACT_RESULT,
-        EXCEPTION_FLT_INVALID_OPERATION, EXCEPTION_FLT_OVERFLOW, EXCEPTION_FLT_STACK_CHECK,
-        EXCEPTION_FLT_UNDERFLOW, EXCEPTION_GUARD_PAGE, EXCEPTION_ILLEGAL_INSTRUCTION,
-        EXCEPTION_IN_PAGE_ERROR, EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW,
-        EXCEPTION_INVALID_DISPOSITION, EXCEPTION_INVALID_HANDLE,
-        EXCEPTION_NONCONTINUABLE_EXCEPTION, EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP,
-        EXCEPTION_STACK_OVERFLOW,
-    },
-    winnt::STATUS_UNWIND_CONSOLIDATE,
+use windows_sys::Win32::Foundation::{
+    EXCEPTION_ACCESS_VIOLATION, EXCEPTION_ARRAY_BOUNDS_EXCEEDED, EXCEPTION_BREAKPOINT,
+    EXCEPTION_DATATYPE_MISALIGNMENT, EXCEPTION_FLT_DENORMAL_OPERAND, EXCEPTION_FLT_DIVIDE_BY_ZERO,
+    EXCEPTION_FLT_INEXACT_RESULT, EXCEPTION_FLT_INVALID_OPERATION, EXCEPTION_FLT_OVERFLOW,
+    EXCEPTION_FLT_STACK_CHECK, EXCEPTION_FLT_UNDERFLOW, EXCEPTION_GUARD_PAGE,
+    EXCEPTION_ILLEGAL_INSTRUCTION, EXCEPTION_INT_DIVIDE_BY_ZERO, EXCEPTION_INT_OVERFLOW,
+    EXCEPTION_INVALID_DISPOSITION, EXCEPTION_INVALID_HANDLE, EXCEPTION_IN_PAGE_ERROR,
+    EXCEPTION_NONCONTINUABLE_EXCEPTION, EXCEPTION_PRIV_INSTRUCTION, EXCEPTION_SINGLE_STEP,
+    EXCEPTION_STACK_OVERFLOW, STATUS_UNWIND_CONSOLIDATE,
 };
 
 #[cfg(feature = "syringe")]
-use winapi::shared::winerror::ERROR_PARTIAL_COPY;
+use windows_sys::Win32::Foundation::ERROR_PARTIAL_COPY;
 
 #[derive(Debug, Error)]
 /// Error enum representing either a windows api error or a nul error from an invalid interior nul.
@@ -53,7 +49,7 @@ pub enum GetLocalProcedureAddressError {
 #[derive(
     Debug, TryFromPrimitive, IntoPrimitive, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash,
 )]
-#[repr(u32)]
+#[repr(i32)]
 /// Codes for unhandled windows exceptions from [msdn](https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode).
 pub enum ExceptionCode {
     /// The thread attempts to read from or write to a virtual address for which it does not have access.
@@ -112,12 +108,12 @@ pub enum ExceptionCode {
 
 impl ExceptionCode {
     /// Try to interpret the given code as a windows exception code.
-    pub fn try_from_code(code: u32) -> Result<Self, TryFromPrimitiveError<Self>> {
+    pub fn try_from_code(code: i32) -> Result<Self, TryFromPrimitiveError<Self>> {
         Self::try_from_primitive(code)
     }
     /// Returns the underlying windows exception code.
     #[must_use]
-    pub fn code(self) -> u32 {
+    pub fn code(self) -> i32 {
         self.into()
     }
 }
@@ -132,10 +128,7 @@ impl Display for ExceptionCode {
             Self::AccessViolation => write!(f, "Invalid access to memory location."),
             Self::ArrayBoundsExceeded => write!(f, "Array bounds exceeded."),
             Self::Breakpoint => write!(f, "A breakpoint has been reached."),
-            Self::DatatypeMisalignment => write!(
-                f,
-                "A datatype misalignment was detected in a load or store instruction."
-            ),
+            Self::DatatypeMisalignment => write!(f, "A datatype misalignment was detected in a load or store instruction."),
             Self::FltDenormalOperand => write!(f, "Floating-point denormal operand."),
             Self::FltDivideByZero => write!(f, "Floating-point division by zero."),
             Self::FltInexactResult => write!(f, "Floating-point inexact result."),
@@ -143,29 +136,16 @@ impl Display for ExceptionCode {
             Self::FltOverflow => write!(f, "Floating-point overflow."),
             Self::FltStackCheck => write!(f, "Floating-point stack check."),
             Self::FltUnderflow => write!(f, "Floating-point underflow."),
-            Self::GuardPage => write!(
-                f,
-                "A page of memory that marks the end of a data structure, such as a stack or an array, has been accessed."
-            ),
-            Self::IllegalInstruction => {
-                write!(f, "An attempt was made to execute an illegal instruction.")
-            }
+            Self::GuardPage => write!(f, "A page of memory that marks the end of a data structure, such as a stack or an array, has been accessed."),
+            Self::IllegalInstruction => write!(f, "An attempt was made to execute an illegal instruction."),
             Self::InPageError => write!(f, "Error performing inpage operation."),
             Self::IntegerDivideByZero => write!(f, "Integer division by zero."),
             Self::IntegerOverflow => write!(f, "Integer overflow."),
-            Self::InvalidDisposition => write!(
-                f,
-                "An invalid exception disposition was returned by an exception handler."
-            ),
+            Self::InvalidDisposition => write!(f, "An invalid exception disposition was returned by an exception handler."),
             Self::InvalidHandle => write!(f, "The handle is invalid."),
-            Self::NoncontinuableException => {
-                write!(f, "Windows cannot continue from this exception.")
-            }
+            Self::NoncontinuableException => write!(f, "Windows cannot continue from this exception."),
             Self::PrivilegedInstruction => write!(f, "Privileged instruction."),
-            Self::SingleStep => write!(
-                f,
-                "A single step or trace operation has just been completed."
-            ),
+            Self::SingleStep => write!(f, "A single step or trace operation has just been completed."),
             Self::StackOverflow => write!(f, "Recursion too deep; the stack overflowed."),
             Self::UnwindConsolidate => write!(f, "A frame consolidation has been executed."),
         }

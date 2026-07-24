@@ -7,19 +7,19 @@ use std::{
     ptr, slice,
 };
 
-use winapi::{
-    shared::minwindef::DWORD,
-    um::{
-        memoryapi::{ReadProcessMemory, VirtualAllocEx, VirtualFreeEx, WriteProcessMemory},
-        processthreadsapi::FlushInstructionCache,
-        sysinfoapi::GetSystemInfo,
-        winnt::{MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PAGE_READWRITE},
+use windows_sys::Win32::System::{
+    Diagnostics::Debug::{FlushInstructionCache, ReadProcessMemory, WriteProcessMemory},
+    Memory::{
+        VirtualAllocEx, VirtualFreeEx, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
+        PAGE_EXECUTE_READWRITE, PAGE_READWRITE,
     },
+    SystemInformation::GetSystemInfo,
 };
 
 use crate::{
     process::{BorrowedProcess, Process},
     utils,
+    win_defs::DWORD,
 };
 
 /// A owned buffer in the memory space of a (remote) process.
