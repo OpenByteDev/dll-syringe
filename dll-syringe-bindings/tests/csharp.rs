@@ -28,8 +28,11 @@ fn stage_native_lib(lib_path: &Path) {
         .absolutize()
         .unwrap();
     fs::create_dir_all(&runtimes_dir).expect("Failed to create runtimes dir");
-    fs::copy(&native_dll_path, runtimes_dir.join("dll-syringe.native.dll"))
-        .expect("Failed to copy native dll into runtimes dir");
+    fs::copy(
+        &native_dll_path,
+        runtimes_dir.join("dll-syringe.native.dll"),
+    )
+    .expect("Failed to copy native dll into runtimes dir");
 }
 
 pub fn build_csharp_binary() -> PathBuf {
