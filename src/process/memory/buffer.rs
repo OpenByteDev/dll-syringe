@@ -10,8 +10,8 @@ use std::{
 use windows_sys::Win32::System::{
     Diagnostics::Debug::{FlushInstructionCache, ReadProcessMemory, WriteProcessMemory},
     Memory::{
-        VirtualAllocEx, VirtualFreeEx, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
-        PAGE_EXECUTE_READWRITE, PAGE_READWRITE,
+        MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PAGE_READWRITE,
+        VirtualAllocEx, VirtualFreeEx,
     },
     SystemInformation::GetSystemInfo,
 };

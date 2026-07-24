@@ -1,26 +1,25 @@
 use fn_ptr::FnPtr;
 use iced_x86::{
-    code_asm::{
-        dword_ptr,
-        registers::{gpr32::*, gpr64::*},
-        CodeAssembler,
-    },
     Code, IcedError,
+    code_asm::{
+        CodeAssembler, dword_ptr,
+        registers::{gpr32::*, gpr64::*},
+    },
 };
 use num_enum::TryFromPrimitive;
 use path_absolutize::Absolutize;
 use std::{cell::OnceCell, io, mem, path::Path, ptr};
-use widestring::{u16cstr, U16CString};
+use widestring::{U16CString, u16cstr};
 use windows_sys::{
-    core::PCWSTR,
     Win32::Foundation::{FALSE, HMODULE},
+    core::PCWSTR,
 };
 
 use crate::{
     error::{EjectError, ExceptionCode, ExceptionOrIoError, InjectError, LoadInjectHelpDataError},
     process::{
-        memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
         BorrowedProcess, BorrowedProcessModule, ModuleHandle, OwnedProcess, Process, ProcessModule,
+        memory::{RemoteAllocation, RemoteBox, RemoteBoxAllocator},
     },
     win_defs::{BOOL, DWORD},
 };
@@ -35,7 +34,7 @@ use {
 };
 
 #[cfg(feature = "rpc-core")]
-use {fn_ptr::UntypedFnPtr, windows_sys::core::PCSTR, windows_sys::Win32::Foundation::FARPROC};
+use {fn_ptr::UntypedFnPtr, windows_sys::Win32::Foundation::FARPROC, windows_sys::core::PCSTR};
 
 type LoadLibraryWFn = unsafe extern "system" fn(PCWSTR) -> HMODULE;
 type FreeLibraryFn = unsafe extern "system" fn(HMODULE) -> BOOL;

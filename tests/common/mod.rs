@@ -20,7 +20,7 @@ use std::{
 use widestring::U16CString;
 use windows_sys::Win32::{
     Foundation::FALSE,
-    System::Threading::{CreateProcessW, CREATE_SUSPENDED, PROCESS_INFORMATION, STARTUPINFOW},
+    System::Threading::{CREATE_SUSPENDED, CreateProcessW, PROCESS_INFORMATION, STARTUPINFOW},
 };
 
 pub fn build_test_payload_x86() -> Result<PathBuf, Box<dyn Error>> {

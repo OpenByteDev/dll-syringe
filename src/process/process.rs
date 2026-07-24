@@ -17,16 +17,16 @@ use windows_sys::Win32::{
         SystemInformation::GetSystemWow64DirectoryA,
         Threading::{
             CreateRemoteThread, GetCurrentProcess, GetExitCodeProcess, GetExitCodeThread,
-            GetProcessId, IsWow64Process, QueryFullProcessImageNameW, TerminateProcess,
-            WaitForSingleObject, INFINITE, PROCESS_CREATE_THREAD, PROCESS_QUERY_INFORMATION,
-            PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE,
+            GetProcessId, INFINITE, IsWow64Process, PROCESS_CREATE_THREAD,
+            PROCESS_QUERY_INFORMATION, PROCESS_VM_OPERATION, PROCESS_VM_READ, PROCESS_VM_WRITE,
+            QueryFullProcessImageNameW, TerminateProcess, WaitForSingleObject,
         },
     },
 };
 
 use crate::{
     process::{BorrowedProcess, ProcessModule},
-    utils::{win_fill_path_buf_helper, FillPathBufResult},
+    utils::{FillPathBufResult, win_fill_path_buf_helper},
     win_defs::DWORD,
 };
 

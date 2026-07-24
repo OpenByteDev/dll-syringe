@@ -13,7 +13,7 @@ use std::{
 };
 
 use windows_sys::Win32::{
-    Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS, ERROR_PARTIAL_COPY, FALSE, HMODULE},
+    Foundation::{DUPLICATE_SAME_ACCESS, DuplicateHandle, ERROR_PARTIAL_COPY, FALSE, HMODULE},
     System::{
         ProcessStatus::{EnumProcessModulesEx, LIST_MODULES_ALL},
         Threading::GetCurrentProcess,
