@@ -1,9 +1,12 @@
 use core::mem::zeroed;
 use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
 use std::{ffi::CString, fs, mem, mem::size_of, process::Command, time::Duration};
-use windows_sys::Win32::System::{
-    LibraryLoader::{GetProcAddress, LoadLibraryA},
-    SystemInformation::OSVERSIONINFOW,
+use windows_sys::Win32::{
+    RtlGetVersion,
+    System::{
+        LibraryLoader::{GetProcAddress, LoadLibraryA},
+        SystemInformation::OSVERSIONINFOW,
+    },
 };
 
 #[allow(unused)]
@@ -161,12 +164,6 @@ fn is_running_under_wine() -> bool {
             false
         }
     }
-}
-
-// winapi crate doesn't have this.
-// This is in ntdll, so already loaded for every Windows process.
-unsafe extern "system" {
-    fn RtlGetVersion(lpVersionInformation: &mut OSVERSIONINFOW) -> u32;
 }
 
 fn is_older_than_windows_10() -> bool {
