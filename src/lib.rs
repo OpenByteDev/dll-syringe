@@ -41,6 +41,7 @@ pub(crate) mod win_defs;
 
 /// Module containing the error enums used in this crate.
 pub mod error;
+
 #[cfg(feature = "payload-utils")]
 #[doc(hidden)]
 pub mod payload_utils;

@@ -92,7 +92,7 @@ fn allocate_local_process_memory(len: usize) -> io::Result<&'static mut [u8]> {
 
 #[derive(Debug, Error)]
 enum PayloadProcedureHelperError {
-    #[error("serializeerror: {0}")]
+    #[error("serialize error: {0}")]
     Serialize(#[from] cu_bincode::error::EncodeError),
     #[error("deserialize error: {0}")]
     Deserialize(#[from] cu_bincode::error::DecodeError),

@@ -90,7 +90,7 @@ pub fn build_helper_crate(
     assert!(
         &payload_artifact_path.exists(),
         "Artifact doesn't exist! {:?}",
-        &payload_artifact_path
+        payload_artifact_path
     );
 
     Ok(payload_artifact_path)
