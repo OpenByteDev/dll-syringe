@@ -1,6 +1,6 @@
 [package]
 name = "dll-syringe-bindings"
-version = "0.17.1"
+version = "0.18.0"
 description = "C and C# bindings for dll-syringe."
 license = "MIT"
 edition = "2024"
