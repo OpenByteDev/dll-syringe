@@ -17,11 +17,8 @@ csbindgen = { version = "1.9", default-features = false, optional = true }
 
 [dev-dependencies]
 find-msvc-tools = { version = "0.1", default-features = false }
-winapi = { version = "0.3", features = [
-    "processthreadsapi", "libloaderapi", "memoryapi", 
-    "wow64apiset", "sysinfoapi", "winerror", 
-    "handleapi", "psapi", "synchapi", "winbase"], default-features = false }
 widestring = { version = "1.2", features = ["std", "alloc"], default-features = false }
+windows-sys = { version = ">=0.59, <=0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Threading"], default-features = false }
 current_platform = { version = "0.2", default-features = false }
 tempfile = { version = "3.23", default-features = false }
 path-absolutize = { version = "1.0", default-features = false }
