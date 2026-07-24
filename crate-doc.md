@@ -80,7 +80,7 @@ This means that even Win32 functions can be called directly.
 
 The definition of an exported `add` function could look like this:
 ```rust
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn add(a: f64, b: f64) -> f64 {
     a + b
 }
