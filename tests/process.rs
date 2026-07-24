@@ -1,9 +1,9 @@
 use core::mem::zeroed;
 use dll_syringe::process::{BorrowedProcess, OwnedProcess, Process};
 use std::{ffi::CString, fs, mem, mem::size_of, process::Command, time::Duration};
-use windows_sys::Win32::{
-    RtlGetVersion,
-    System::{
+use windows_sys::{
+    Wdk::System::SystemServices::RtlGetVersion,
+    Win32::System::{
         LibraryLoader::{GetProcAddress, LoadLibraryA},
         SystemInformation::OSVERSIONINFOW,
     },

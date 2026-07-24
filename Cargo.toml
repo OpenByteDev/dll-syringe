@@ -15,7 +15,7 @@ keywords = ["dll-injection", "dll", "injector", "windows", "rpc"]
 
 [dependencies]
 dll-syringe-macros = { path = "dll-syringe-macros", version = "0.1" }
-windows-sys = { version = ">=0.59, <=0.61", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_Security", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_Diagnostics_Debug"], default-features = false }
+windows-sys = { version = ">=0.59, <=0.61", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_Security", "Win32_System_ProcessStatus", "Win32_System_SystemInformation", "Win32_System_Diagnostics_Debug", "Wdk_System_SystemServices"], default-features = false }
 sysinfo = { version = "0.39", features = ["system"], default-features = false }
 widestring = { version = "1.2", features = ["std", "alloc"], default-features = false }
 path-absolutize = { version = "4.0", default-features = false }
