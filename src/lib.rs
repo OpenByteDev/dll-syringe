@@ -1,5 +1,5 @@
 #![cfg(windows)]
-#![feature(linked_list_cursors)]
+#![cfg_attr(feature = "syringe", feature(linked_list_cursors))]
 #![cfg_attr(feature = "syringe", feature(once_cell_try))]
 #![cfg_attr(feature = "rpc-core", feature(min_specialization))]
 #![warn(
