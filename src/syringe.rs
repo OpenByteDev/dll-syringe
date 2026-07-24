@@ -276,7 +276,7 @@ impl Syringe {
         process: BorrowedProcess<'_>,
     ) -> Result<InjectHelpData, LoadInjectHelpDataError> {
         let is_target_x64 = process.is_x64()?;
-        let is_self_x64 = cfg!(target_arch = "x86_64");
+        let is_self_x64 = cfg!(target_pointer_width = "64");
 
         match (is_target_x64, is_self_x64) {
             (true, true) | (false, false) => Self::load_inject_help_data_for_current_target(),
