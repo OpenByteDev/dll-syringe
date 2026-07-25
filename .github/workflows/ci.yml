@@ -238,8 +238,9 @@ jobs:
         working-directory: dll-syringe-bindings
         run: |
           New-Item -ItemType Directory -Path release-assets -Force | Out-Null
-          Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.dll" "release-assets/dll-syringe.native.${{ matrix.arch }}.dll"
-          Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.lib" "release-assets/dll-syringe.native.${{ matrix.arch }}.lib"
+          Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.dll" "release-assets/dll-syringe.${{ matrix.arch }}.dll"
+          Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.dll.lib" "release-assets/dll-syringe.${{ matrix.arch }}.lib"
+          Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.lib" "release-assets/dll-syringe.${{ matrix.arch }}.static.lib"
       - name: Stage C header
         if: matrix.arch == 'x64'
         shell: pwsh
