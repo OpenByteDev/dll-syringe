@@ -194,9 +194,41 @@ jobs:
           dotnet-version: '10.0.x'
           architecture: ${{ matrix.arch }}
       - name: Build bindings crate (generates C header + C# NativeMethods.g.cs)
-        run: cargo build --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --release --features c,csharp
+        run: cargo build --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --features c,csharp
       - name: Test bindings crate
         run: cargo test --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --features c,csharp -- --nocapture
+
+  build-csharp-bindings:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
+        include:
+          - target: x86_64-pc-windows-msvc
+            arch: x64
+          - target: i686-pc-windows-msvc
+            arch: x86
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install latest rust nightly for ${{ matrix.target }}
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: ${{ matrix.target }}
+      - name: Build bindings crate (release, generates C header)
+        run: cargo build --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --release --features c,csharp
+      - name: Stage native lib for .NET packaging
+        shell: pwsh
+        working-directory: dll-syringe-bindings
+        run: |
+          $dest = "bindings/csharp/runtimes/win-${{ matrix.arch }}/native"
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.dll" (Join-Path $dest "dll-syringe.native.dll")
+      - name: Upload native lib for .NET packaging
+        uses: actions/upload-artifact@v7
+        with:
+          name: dll-syringe-native-${{ matrix.target }}
+          path: dll-syringe-bindings/bindings/csharp/runtimes
       - name: Upload native libs + C header
         uses: actions/upload-artifact@v7
         with:
@@ -207,22 +239,24 @@ jobs:
             dll-syringe-bindings/bindings/c/dll-syringe.h
 
   pack-dotnet:
-    needs: bindings
+    needs: build-csharp-bindings
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Install latest rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-        with:
-          targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
-      - name: Build native libs for both architectures
-        run: ./build-libs-for-csharp.ps1
-        working-directory: dll-syringe-bindings
-        shell: pwsh
+      - name: Download native lib (x64)
+        uses: actions/download-artifact@v8
+        with:
+          name: dll-syringe-native-x86_64-pc-windows-msvc
+          path: dll-syringe-bindings/bindings/csharp/runtimes
+      - name: Download native lib (x86)
+        uses: actions/download-artifact@v8
+        with:
+          name: dll-syringe-native-i686-pc-windows-msvc
+          path: dll-syringe-bindings/bindings/csharp/runtimes
       - name: Build .NET library
         run: dotnet build bindings/csharp/DllSyringe.csproj -c Release
         working-directory: dll-syringe-bindings
@@ -239,7 +273,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
-    needs: [test,bindings,test-on-wine,pack-dotnet,arm-build,hack,documentation]
+    needs: [test,bindings,build-csharp-bindings,test-on-wine,pack-dotnet,arm-build,hack,documentation]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
     steps:
