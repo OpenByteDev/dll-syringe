@@ -26,8 +26,9 @@ public class Syringe : IDisposable {
 
     private static RawSyringe CreateRaw(Process process) {
         var pid = (uint)process.Id;
+        var thread = process.Threads[0];
         RawSyringe? raw;
-        if (process.Threads[0].WaitReason == ThreadWaitReason.Suspended) {
+        if (thread.ThreadState == System.Diagnostics.ThreadState.Wait && thread.WaitReason == ThreadWaitReason.Suspended) {
             raw = RawSyringe.ForSuspendedProcess(pid);
         } else {
             raw = RawSyringe.ForProcess(pid);
