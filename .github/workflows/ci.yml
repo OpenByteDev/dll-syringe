@@ -313,7 +313,9 @@ jobs:
           user: OpenByteDev
       - name: Upload to NuGet
         shell: pwsh
-        run: dotnet nuget push "release-assets/*.nupkg" -k "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          dotnet nuget push "release-assets/DllSyringe.$version.nupkg" -k "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
       - name: GitHub Release Artifacts
         uses: softprops/action-gh-release@v3
         with:
