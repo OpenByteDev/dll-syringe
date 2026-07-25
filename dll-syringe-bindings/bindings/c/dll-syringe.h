@@ -22,6 +22,10 @@ typedef struct Syringe Syringe;
  */
 typedef void *ModuleHandle;
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 /**
  * Creates a new `Syringe` instance for a process identified by PID.
  *
@@ -109,6 +113,10 @@ typedef void *ModuleHandle;
  * The caller must ensure that the given syringe pointer is valid or null.
  */
  void syringe_free(struct Syringe *syringe) ;
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  /* DLL_SYRINGE_H */
 

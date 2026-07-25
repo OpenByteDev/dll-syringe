@@ -5,6 +5,11 @@
 # default: "C++"
 language = "C"
 
+# Whether to add C++ compatibility features, i.e. wrap the header in
+# `extern "C"` when compiled with a C++ compiler.
+# default: false
+cpp_compat = true
+
 # Options for wrapping the contents of the header:
 
 # An optional string of text to output at the beginning of the generated file
@@ -31,7 +36,7 @@ include_version = true
 
 # An optional namespace to output around the generated bindings
 # default: doesn't emit a namespace
-namespace = "dll_syringe"
+#namespace = "dll_syringe"
 
 # An optional list of namespaces to output around the generated bindings
 # default: []
