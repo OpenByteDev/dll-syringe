@@ -1,6 +1,6 @@
 [package]
 name = "dll-syringe-macros"
-version = "0.1.0"
+version = "0.1.1"
 description = "Macros for dll-syringe"
 repository = "https://github.com/OpenByteDev/dll-syringe" 
 homepage = "https://github.com/OpenByteDev/dll-syringe"
