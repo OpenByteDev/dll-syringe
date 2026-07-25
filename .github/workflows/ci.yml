@@ -229,14 +229,19 @@ jobs:
         with:
           name: dll-syringe-native-${{ matrix.target }}
           path: dll-syringe-bindings/bindings/csharp/runtimes
-      - name: Upload native libs + C header
+      - name: Stage release assets
+        shell: pwsh
+        working-directory: dll-syringe-bindings
+        run: |
+          New-Item -ItemType Directory -Path release-assets -Force | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.dll" "release-assets/dll-syringe.native.${{ matrix.arch }}.dll"
+          Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.lib" "release-assets/dll-syringe.native.${{ matrix.arch }}.lib"
+          Copy-Item "bindings/c/dll-syringe.h" "release-assets/dll-syringe.h"
+      - name: Upload release assets
         uses: actions/upload-artifact@v7
         with:
-          name: dll-syringe-bindings-${{ matrix.target }}
-          path: |
-            dll-syringe-bindings/target/${{ matrix.target }}/release/dll_syringe_bindings.dll
-            dll-syringe-bindings/target/${{ matrix.target }}/release/dll_syringe_bindings.lib
-            dll-syringe-bindings/bindings/c/dll-syringe.h
+          name: dll-syringe-release-${{ matrix.target }}
+          path: dll-syringe-bindings/release-assets
 
   pack-dotnet:
     needs: build-csharp-bindings
@@ -282,10 +287,21 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           targets: x86_64-pc-windows-msvc, i686-pc-windows-msvc
-      - name: Download Artifacts
+      - name: Download NuGet packages
         uses: actions/download-artifact@v8
         with:
-          path: artifacts
+          name: dll-syringe-nuget
+          path: release-assets
+      - name: Download release assets (x64)
+        uses: actions/download-artifact@v8
+        with:
+          name: dll-syringe-release-x86_64-pc-windows-msvc
+          path: release-assets
+      - name: Download release assets (x86)
+        uses: actions/download-artifact@v8
+        with:
+          name: dll-syringe-release-i686-pc-windows-msvc
+          path: release-assets
       - name: NuGet login (OIDC)
         uses: NuGet/login@v1
         id: nuget-login
@@ -293,26 +309,12 @@ jobs:
           user: OpenByteDev
       - name: Upload to NuGet
         shell: pwsh
-        run: dotnet nuget push "artifacts/**/*.nupkg" -k "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
-      - name: Compress Artifacts
-        shell: pwsh
-        run: |
-          $dir = "artifacts"
-          if (-not (Test-Path $dir)) {
-            Write-Host "Directory $dir does not exist. No artifacts found."
-            exit 0
-          }
-
-          Get-ChildItem -Path $dir -Directory | ForEach-Object {
-            Compress-Archive -Path $_.FullName -DestinationPath (Join-Path $dir "$($_.Name).zip")
-            Remove-Item -Recurse -Force $_.FullName
-          }
-          Get-ChildItem $dir
+        run: dotnet nuget push "release-assets/*.nupkg" -k "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" -s "https://api.nuget.org/v3/index.json" --skip-duplicate
       - name: GitHub Release Artifacts
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            artifacts/*
+            release-assets/*
       - name: crates.io login (OIDC)
         id: crates-io-login
         uses: rust-lang/crates-io-auth-action@v1

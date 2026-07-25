@@ -1,4 +1,4 @@
 /target
 Cargo.lock
 /nupkgs
-/artifacts
+release-assets/
