@@ -7,6 +7,10 @@ on:
   pull_request:
     branches: [ master ]
 
+concurrency:
+  group: ci-${{ github.sha }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   RUSTDOCFLAGS: "--deny warnings"
