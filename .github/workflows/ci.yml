@@ -224,7 +224,7 @@ jobs:
       - name: Build bindings crate (release, generates C header)
         run: cargo build --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --release --features c,csharp
       - name: Setup MSVC dev environment
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: step-security/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.arch }}
       - name: Stage native lib for .NET packaging
