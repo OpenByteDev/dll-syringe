@@ -210,8 +210,10 @@ jobs:
         include:
           - target: x86_64-pc-windows-msvc
             arch: x64
+            machine: X64
           - target: i686-pc-windows-msvc
             arch: x86
+            machine: X86
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -221,6 +223,10 @@ jobs:
           targets: ${{ matrix.target }}
       - name: Build bindings crate (release, generates C header)
         run: cargo build --manifest-path dll-syringe-bindings/Cargo.toml --target ${{ matrix.target }} --release --features c,csharp
+      - name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
       - name: Stage native lib for .NET packaging
         shell: pwsh
         working-directory: dll-syringe-bindings
@@ -239,8 +245,15 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path release-assets -Force | Out-Null
           Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.dll" "release-assets/dll-syringe.${{ matrix.arch }}.dll"
-          Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.dll.lib" "release-assets/dll-syringe.${{ matrix.arch }}.lib"
           Copy-Item "target/${{ matrix.target }}/release/dll_syringe_bindings.lib" "release-assets/dll-syringe.${{ matrix.arch }}.static.lib"
+      - name: Regenerate import lib with renamed DLL name
+        shell: pwsh
+        run: |
+          ./scripts/fix-import-lib.ps1 `
+            -DllPath "dll-syringe-bindings/target/${{ matrix.target }}/release/dll_syringe_bindings.dll" `
+            -DllName "dll-syringe.${{ matrix.arch }}.dll" `
+            -OutLib "dll-syringe-bindings/release-assets/dll-syringe.${{ matrix.arch }}.lib" `
+            -Machine ${{ matrix.machine }}
       - name: Stage C header
         if: matrix.arch == 'x64'
         shell: pwsh
